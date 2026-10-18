@@ -1,6 +1,35 @@
 # Validation
 
-## Room administration and credential protection — 2026-10-18
+## Provider candidates and configuration history — 2026-10-18
+
+Current branch additions include encrypted provider candidates, real connection
+request implementations, configuration history, tested replacement/restore, and
+an administrator editor. They have not been deployed. The full design.md goal
+remains incomplete: Discord audio, media revocation, the complete subtitle path,
+language administration and PiP still require implementation and live evidence.
+
+| Check                                       | Status                    | Evidence                                                                                                                                                                                                                          |
+| ------------------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                    | PASS                      | `npm run ci:local`; 106 first-party source files, largest 397 lines; strict types, eight tests, web/migration/worker builds and unconfigured HTTP boundaries                                                                      |
+| Provider wire contracts                     | PASS                      | `npm test`; real loopback HTTP/WS fixtures verify DeepL method/auth/language scripts, response limits, errors, deadlines and redirect refusal; Soniox frames, silence duration, final acknowledgement and safe failures           |
+| Provider management and PostgreSQL          | PASS                      | `npm run test:providers:db`; signed Access plus persisted session, same-origin guards, encrypted current/history values, failed candidate/restore preservation, referenced deletion refusal and no key/ciphertext in reads/audits |
+| Concurrent tests and stale completion       | PASS                      | Two built Node servers share one lease; concurrent tests/mutations reject; an expired lease permits a newer save, and the older response cannot overwrite it                                                                      |
+| Provider persistence and restoration        | PASS                      | New process reads accepted settings/history; restoring version 1 produces a newer version, failed restoration keeps the current one, and cross-configuration ciphertext is rejected                                               |
+| Existing application regression checks      | PASS                      | `test:db` (seven tests), `test:http:db`, `test:ws:db`, and `test:management:db` on disposable PostgreSQL 16                                                                                                                       |
+| Migration 0004                              | PASS                      | Applied additive provider history/lease columns; readiness and built management tests use the migrated database                                                                                                                   |
+| Browser configuration workflow              | PASS                      | Chrome with local signed identity and local provider fixtures: create, test, invalid-key feedback without replacement, edit, restore as a new version, reload, and empty password field                                           |
+| Narrow browser layout                       | PASS                      | Populated provider editor at 320 px has document width 320 px; fields and buttons remain visible                                                                                                                                  |
+| Real provider access, quality and selection | NOT RUN                   | No provider credentials or authorized speech sample; local responses do not establish live access, translation quality, latency or provider suitability                                                                           |
+| Discord reception and original audio        | WAITING FOR CONFIGURATION | Developer portal confirms the dedicated bot exists; token storage path and guild/channel/commander IDs remain pending                                                                                                             |
+| Production release and full acceptance      | NOT RUN                   | No deployment by this implementation task; production languages/providers remain unavailable                                                                                                                                      |
+
+Browser proof is retained in ignored local artifacts. Tests use generated/fake
+credentials and disposable local services. Test-only routing preloads are absent
+from production code; no alternate endpoint or identity bypass was added. DeepL
+400 errors remain a safe rejected-settings category until specific live error
+contracts are validated. Soniox's documented model error has its own category.
+
+## Room administration and credential protection — 2026-10-18 (historical)
 
 Current branch scope: persistent listeners and player sockets, plus versioned
 room/Discord configuration, encrypted bot credentials and the administrator

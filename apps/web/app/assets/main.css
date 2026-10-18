@@ -206,6 +206,26 @@ small {
 .management-section .entry-form {
   max-width: 720px;
 }
+.provider-editor {
+  padding-top: 24px;
+  border-top: 1px solid var(--babel-border);
+}
+.configuration-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.configuration-list li {
+  display: grid;
+  gap: 16px;
+  padding-block: 24px;
+  border-bottom: 1px solid var(--babel-border);
+}
+.configuration-list h3,
+.provider-editor h3 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
 .management-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));

@@ -10,7 +10,14 @@ export default defineNuxtConfig({
   nitro: {
     experimental: { websocket: true },
     preset: 'node-server',
-    externals: { inline: ['@babel/auth', '@babel/database', '@babel/contracts'] },
+    externals: {
+      inline: [
+        '@babel/auth',
+        '@babel/database',
+        '@babel/contracts',
+        '@babel/providers',
+      ],
+    },
   },
   app: {
     head: {

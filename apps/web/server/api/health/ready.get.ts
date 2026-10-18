@@ -11,6 +11,10 @@ export default defineEventHandler(async (event) => {
     await useDatabase(event).execute(
       sql`select configuration_version, encrypted_discord_credential from room limit 1`,
     )
+    await useDatabase(event).execute(
+      sql`select last_test, test_lease_id from provider_configuration limit 1`,
+    )
+    await useDatabase(event).execute(sql`select id from provider_revision limit 1`)
     return { status: 'ok' }
   } catch {
     throw createError({

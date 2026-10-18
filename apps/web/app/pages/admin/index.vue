@@ -19,6 +19,7 @@ const { status, loading, error, connect } = useAdministratorStatus()
     <template v-else-if="status">
       <AdminRoomSettings />
       <AdminListeners />
+      <AdminProviders />
       <section
         class="room-detail"
         :aria-busy="loading"

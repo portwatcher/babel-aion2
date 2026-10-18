@@ -8,7 +8,8 @@
     "./schema": "./src/schema/index.ts",
     "./listeners": "./src/listeners/index.ts",
     "./credentials": "./src/credentials.ts",
-    "./room-settings": "./src/room-settings.ts"
+    "./room-settings": "./src/room-settings.ts",
+    "./providers": "./src/providers/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"

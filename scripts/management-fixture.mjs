@@ -33,9 +33,9 @@ export async function createManagementFixture(databaseUrl) {
     key,
     actor: `cf_${createHash('sha256').update(`${issuer}\0${subject}`).digest('hex')}`,
     assertion,
-    start(overrides = {}) {
+    start(overrides = {}, nodeImports = []) {
       return startTestServer(databaseUrl, {
-        nodeImports: ['./scripts/fixtures/access-jwks.mjs'],
+        nodeImports: ['./scripts/fixtures/access-jwks.mjs', ...nodeImports],
         environment: { ...environment, ...overrides },
       })
     },

@@ -13,9 +13,11 @@ listener reconciliation sweep and closes it on server shutdown.
 Without database configuration the public lobby stays available; readiness and
 administrator sessions fail closed. No worker starts audio automatically.
 
-Apply migrations through `0003_mature_the_phantom` before this web build. Readiness
+Apply migrations through `0004_bumpy_ma_gnuci` before this web build. Readiness
 checks room configuration columns, listener lifecycle columns and player socket
-registrations as well as administrator tables. Migration 0003 adds room settings
+registrations, provider test/history columns and administrator tables. Migration
+0004 adds provider history and test leases without enabling a provider or language.
+Migration 0003 adds room settings
 without enabling a source or adding credentials. Migration 0001 preserves old rows and marks their entry fingerprints as legacy, so
 they cannot be adopted by an unbound retry. Do not roll back or truncate nickname
 generation/session records while old credentials could still exist.
@@ -52,7 +54,8 @@ To prove restoration in an isolated environment:
 
 No production backup or restore was performed during scaffolding.
 
-`NUXT_PROVIDER_ENCRYPTION_KEY` now protects saved Discord bot credentials. Generate
+`NUXT_PROVIDER_ENCRYPTION_KEY` protects saved Discord bot credentials and current
+and historical provider credentials. Generate
 a 32-byte random key with `openssl rand -base64 32`; store it in the approved secret
 facility, separately from the database. All web replicas need the same key.
 Changing this key does not re-encrypt saved data: retain the original key for
@@ -73,8 +76,10 @@ has no earlier deployed Babel version to restore.
 
 These implementation checks do not establish a production rollback. Local process
 restart preserves the room's stopped state, configuration version, encrypted bot
-credential, administrator session and listener generations. Provider settings and
-live media recovery remain separate unfinished checks.
+credential, administrator session and listener generations. Separate built-server
+checks also preserve provider versions and encrypted history across processes.
+Restoring a provider's historical version is re-tested before saving a new version;
+this is not a deployment rollback or proof of live media recovery.
 
 ## Logging and task cleanup
 

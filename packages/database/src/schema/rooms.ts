@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import type { TerminalReason } from '@babel/contracts'
+import type { ProviderTestResult, TerminalReason } from '@babel/contracts'
 import {
   bigint,
   boolean,
@@ -90,8 +90,33 @@ export const providerConfiguration = pgTable('provider_configuration', {
   publicSettings: jsonb('public_settings').notNull().default({}),
   enabled: boolean('enabled').notNull().default(false),
   version: integer('version').notNull().default(1),
+  lastTest: jsonb('last_test').$type<ProviderTestResult>(),
+  testLeaseId: uuid('test_lease_id'),
+  testLeaseUntil: timestamp('test_lease_until', { withTimezone: true }),
+  lastTestStartedAt: timestamp('last_test_started_at', { withTimezone: true }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+export const providerRevision = pgTable(
+  'provider_revision',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    configurationId: uuid('configuration_id')
+      .notNull()
+      .references(() => providerConfiguration.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    name: text('name').notNull(),
+    settings: jsonb('settings').notNull(),
+    encryptedCredential: text('encrypted_credential').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('provider_revision_version_idx').on(
+      table.configurationId,
+      table.version,
+    ),
+  ],
+)
 
 export const outputLanguage = pgTable('output_language', {
   code: text('code').primaryKey(),

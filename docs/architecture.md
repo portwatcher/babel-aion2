@@ -22,6 +22,10 @@ stale edits receive 409. Source changes persist a stopped room and advance the
 source generation. The administrator list shares the player list component and
 removes the selected session/generation through the revocation coordinator.
 These settings do not start a worker or validate a live Discord source.
+The provider editor saves disabled candidates, performs explicit connection tests,
+and restores encrypted history as a new version. Candidate connection changes
+must pass a probe before replacing saved settings. Database leases prevent
+duplicate tests across replicas and version checks reject late results.
 
 `apps/voice-worker` is a buildable entry point that reports STOPPED and exits.
 It has no Discord connection, lease, media publisher, or provider job. It must
@@ -36,9 +40,10 @@ subtitle output language.
 
 `@babel/database` uses Drizzle and `pg`. The schema contains Better Auth's four
 tables, rooms, global nickname generations, listener sessions, provider
-configurations, output languages, audit events and player socket registrations.
+configurations and their encrypted revisions, output languages, audit events and
+player socket registrations.
 Room settings use a row lock and optimistic version check. Credentials use
-AES-256-GCM with the room ID and credential purpose as authenticated context;
+AES-256-GCM with the room/provider ID and credential purpose as authenticated context;
 read APIs expose only credential presence. See [room settings](room-configuration.md).
 The partial unique index
 allows at most one ACTIVE session per nickname key across rooms. The schema is
@@ -55,6 +60,11 @@ processes. See [listener lifecycle](listener-sessions.md).
 stable administrator ID from the signed issuer and subject, saves the identity,
 and creates an HTTP-only session cookie. Player listener sessions use their own
 tables and are not Better Auth user accounts.
+
+`@babel/providers` implements bounded DeepL text requests and a Soniox WebSocket
+connection probe. Both use fixed official destinations, safe error classifications,
+and request deadlines. They do not run a shared recognition/subtitle pipeline.
+See [provider configuration](providers-and-languages.md) for the exact probe scope.
 
 ## Next implementation gates
 
@@ -73,10 +83,11 @@ tables and are not Better Auth user accounts.
    fencing. List, terminal-state delivery, browser restoration and socket closure
    are implemented; actual subtitle traffic is not. Orphaned socket registrations
    after a hard process failure remain fail-closed and need confirmed recovery.
-5. Implement provider adapters and their dynamic settings, destination
-   restrictions, real connection tests, configuration versions, and audit records.
-   Reuse the server credential cipher already used by Discord settings. Validate
-   the complete processing path before enabling a language.
+5. Complete the recognition stream adapter and validate the candidates against
+   live provider credentials and authorized speech samples. Dynamic settings,
+   destination restrictions, connection probes, encrypted versions and audits
+   are implemented; connection success alone does not validate a subtitle path.
+   Add language-path configuration and validation before enabling any language.
 6. Add one shared processing path per commander and active output language,
    revision fencing, bounded queues, and independent failure recovery.
 7. Add feature-detected Document PiP from a player action, sharing the same
