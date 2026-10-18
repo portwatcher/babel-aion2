@@ -1,47 +1,48 @@
-# Deployment handoff
+# Deployment
 
-Target: `https://babel.juryquinn.com`, administrator page `/admin`.
-This scaffold has not been deployed. No production infra files were changed.
+Target website: `https://babel.juryquinn.com`; administrator page: `/admin`.
+Application source: `https://github.com/portwatcher/babel-aion2` (private today,
+intended for future open source).
 
-## Existing infra references inspected
-
-- `AGENTS.md`: reuse the existing public-edge LoadBalancer and Cloudflare Tunnel.
-- `argocd/clusters/mididaki-prd/npcify/admin/README.md`: Access operator policy,
-  protected internal administrator service, runtime configuration conventions.
-- `argocd/clusters/mididaki-prd/perohub/cloudflared/README.md`: remotely managed tunnel.
-- Existing PostgreSQL services: evaluate reuse before provisioning another database.
-
-Do not copy existing secret values, another application's audience, or private
-database names into this repository. Production resources must be prepared in
-a dedicated managed worktree of the related `infra` repository when deployment
-is requested.
+Production infrastructure and the regular release workflow live in the separate
+private infra repository. Environment details, registry settings, database
+connections, Access configuration, and deployment credentials are kept there.
+See [source and secret boundaries](source-and-secrets.md).
 
 ## Application package
 
-`Dockerfile` builds the Nuxt Node server with Node 24.18.0, copies only `.output`
-into the runtime image, and runs as the `node` user. It does not start the voice
-worker. `/api/health/live` checks the HTTP process. `/api/health/ready` requires
-a migrated database. Neither endpoint proves audio, Access policy, or subtitle health.
+`Dockerfile` builds the Nuxt Node server and a standalone PostgreSQL migration
+runner with Node 24.18.0. The runtime runs as UID 1000. It contains no production
+configuration or credentials and does not start the unfinished voice worker.
 
-Use the established release-driven GitHub Actions image publication flow and
-SER7 self-hosted runners. No remote or registry target has been configured for
-this new repository. Do not publish from a local checkout.
+The migration command is `node database/migrate.mjs` with `DATABASE_URL` supplied
+at runtime. The infra release applies migrations before starting the new web
+release. The application uses private `NUXT_DATABASE_URL` and administrator
+settings from the deployment secret.
 
-## Deployment work still needed
+`/api/health/live` checks the HTTP process. `/api/health/ready` requires a migrated
+database. Neither endpoint proves live audio, subtitle quality, or the Cloudflare
+policy. Public player access remains separate from administrator Access.
 
-1. Configure the application repository, registry path, CI checks, and release flow.
-2. Reuse an appropriate PostgreSQL service; create a restricted application role
-   and database. Apply the committed migration through the approved release path.
-3. Store private `NUXT_*` settings in the infra secret store. Set the canonical
-   site URL and a new Access application audience for all administrator paths.
-4. Route public player traffic through public-edge and protect management routes
-   and origin reachability using existing Access/network conventions.
-5. Add restart policy, resources, probes, logs, retention, backup, and rollback.
-6. After media selection, prove the actual audio transport, required UDP/TCP
-   ports, and TURN fallback if needed. HTTP readiness is insufficient.
-7. Verify real operator access, mainland China player reception, browser
-   background audio, and the actual AION2 PiP display mode.
+## Release contract
 
-No production provider key or language selection is required to prepare the
-initial website deployment. Live Discord/media and operational checks remain
-separate gates before claiming the product goal is complete.
+The private infra workflow checks out an exact Babel commit through a read-only
+deploy key. It runs `npm run ci:local`, real PostgreSQL migrations and session
+tests, and container runtime checks before image publication. Each release uses
+an immutable tag and records the source commit in OCI labels. Existing GitOps
+resources are updated only after publication; ArgoCD owns reconciliation.
+
+The first image can be published before the initial Kubernetes resources exist.
+Those resources are then committed in infra with the verified image reference.
+Subsequent releases update their image references through the same workflow.
+No production image is published from a local checkout.
+
+## Remaining product work
+
+This deployment publishes the scaffold. Discord reception, media transport,
+listener replacement, providers, subtitles, and PiP remain unimplemented. Do not
+advertise their availability. Keep the production output-language list empty
+until validated processing paths and configuration management exist.
+
+Verify Access, database readiness, routing, and actual rollout state separately.
+Use the private infra runbook for operational credentials, backup and recovery.
