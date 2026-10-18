@@ -31,6 +31,7 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     databaseUrl: '',
+    databasePoolMax: 10,
     siteUrl: 'https://babel.juryquinn.com',
     betterAuthSecret: '',
     accessTeamDomain: '',

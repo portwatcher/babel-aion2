@@ -1,8 +1,10 @@
 import { superviseRuntime } from '@babel/processes'
+import { databasePoolSize } from '@babel/database'
 
 const databaseUrl = process.env.NUXT_DATABASE_URL
 if (databaseUrl) {
   try {
+    databasePoolSize(process.env.NUXT_DATABASE_POOL_MAX)
     await superviseRuntime({
       databaseUrl,
       moduleUrl: new URL('./runtime.mjs', import.meta.url),

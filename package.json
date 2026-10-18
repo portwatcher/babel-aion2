@@ -31,6 +31,7 @@
     "test:media:db": "tsx --env-file=.env --test apps/voice-worker/test/media-publication.test.mjs && node --env-file=.env scripts/media-smoke.mjs",
     "test:network:db": "node --env-file=.env scripts/media-network-smoke.mjs",
     "test:recovery:db": "node --env-file=.env scripts/worker-recovery-smoke.mjs && node --env-file=.env scripts/web-recovery-smoke.mjs",
+    "test:pools:db": "node --env-file=.env scripts/database-pool-smoke.mjs",
     "test:subtitles:db": "tsx --env-file=.env --test apps/voice-worker/test/subtitle-delivery.test.mjs",
     "test:management:db": "node --env-file=.env scripts/management-smoke.mjs",
     "test:providers:db": "node --env-file=.env scripts/provider-smoke.mjs",

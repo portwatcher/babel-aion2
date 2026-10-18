@@ -1,5 +1,31 @@
 # Validation
 
+## Database connection budgeting — 2026-10-19
+
+Web and voice runtimes now honor explicit per-pool limits. Each supervisor uses
+one connection; the worker retains independent media, source-control and subtitle
+pools. Invalid settings fail configured production startup. Default runtime pool
+sizes remain 10, so operators must account for replicas, rolling updates and
+maintenance connections before deployment. See [operations](operations.md#database-connection-budget).
+
+| Check                                 | Result         | Evidence                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Baseline regression                   | FAIL, expected | With both configured limits set to 2, the old build opened 11 web and 22 worker PostgreSQL sessions while requests were blocked on real tables. It also stayed running with an invalid web pool size of 0                                                                                                                     |
+| Configured budgets and queue recovery | PASS           | `test:pools:db`: 36 concurrent public/private HTTP requests, actual PostgreSQL lock waits and session counts. The final build peaks at 3 web and 6 worker sessions, within budgets of 3 and 7 including supervisors. Releasing the locks lets every request succeed; service shutdown releases every labeled database session |
+| Invalid configuration                 | PASS           | Actual production entry points exit 1 for zero, fractional and nonnumeric web limits, and for a worker pool of 1, which cannot support both a dedicated source-control session and ongoing queries                                                                                                                            |
+| Local CI                              | PASS           | `npm run ci:local`: 212 first-party source files, maximum 495 lines, formatting, strict types, 18 tests, builds and built HTTP smoke                                                                                                                                                                                          |
+| Restricted-pool regressions           | PASS           | Both runtime settings set to 2: database, HTTP, player WebSocket, media, management, provider, sample, terminology, language, process-recovery and subtitle-transport suites all pass against isolated PostgreSQL                                                                                                             |
+| Production application                | NOT RUN        | Existing production web and TURN readiness was inspected read-only. The new pool settings and voice runtime have not been deployed; no production connection limit or credential was changed                                                                                                                                  |
+
+The new test owns the process-environment and actual connection-usage contract.
+It does not inspect private pool fields or add a production test endpoint. Two
+worker pools are saturated concurrently while source polling continues; it is not
+live Discord reception or a player-capacity benchmark. Existing process and
+application suites retain ownership of authorization and physical-close behavior.
+Production/tooling changes total +45/-9 lines; tests and test support total
++158/-1. Temporary databases and processes are removed after verification; the
+separate authorized Discord preview remains active. No release was performed.
+
 ## Confirmed web-player process recovery — 2026-10-19
 
 Both production services now use the shared `@babel/processes` supervisor. Each

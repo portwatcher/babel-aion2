@@ -19,7 +19,12 @@ export async function until(predicate, label, timeout = 10_000) {
   throw new Error(`Timed out: ${label}`)
 }
 
-export async function startMediaWorker(databaseUrl, secret, previousPort) {
+export async function startMediaWorker(
+  databaseUrl,
+  secret,
+  previousPort,
+  environment = {},
+) {
   let port = previousPort
   if (!port) {
     const probe = createServer()
@@ -32,6 +37,7 @@ export async function startMediaWorker(databaseUrl, secret, previousPort) {
     cwd: fileURLToPath(new URL('../..', import.meta.url)),
     env: {
       ...process.env,
+      ...environment,
       NODE_ENV: 'production',
       DATABASE_URL: databaseUrl,
       MEDIA_CONTROL_SECRET: secret,

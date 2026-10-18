@@ -1,5 +1,5 @@
 import { receiveRuntimeOwner } from '@babel/processes'
-import { createDatabase } from '@babel/database'
+import { createDatabase, databasePoolSize } from '@babel/database'
 import { createCredentialCipher } from '@babel/database/credentials'
 import { runtimeOwnerActive } from '@babel/database/runtime-owners'
 import { MediaPeers } from './media-peers.ts'
@@ -24,9 +24,15 @@ async function start(ownerId: string) {
   const port = Number(process.env.MEDIA_CONTROL_PORT ?? '3100')
   const host = process.env.MEDIA_CONTROL_HOST ?? '127.0.0.1'
   const network = createMediaNetwork(process.env)
-  const database = createDatabase(databaseUrl, { queryTimeoutMs: 2_000 })
-  const sourceDatabase = createDatabase(databaseUrl, { queryTimeoutMs: 2_000 })
-  const subtitleDatabase = createDatabase(databaseUrl, { queryTimeoutMs: 2_000 })
+  // Source ownership holds a dedicated session while queries continue. Preserve
+  // at least one additional slot and keep provider work out of the media pool.
+  const storage = {
+    queryTimeoutMs: 2_000,
+    maxConnections: databasePoolSize(process.env.DATABASE_POOL_MAX, 2),
+  }
+  const database = createDatabase(databaseUrl, storage)
+  const sourceDatabase = createDatabase(databaseUrl, storage)
+  const subtitleDatabase = createDatabase(databaseUrl, storage)
   if (!(await runtimeOwnerActive(database.db, ownerId)) || !process.connected) {
     process.exit(1)
   }

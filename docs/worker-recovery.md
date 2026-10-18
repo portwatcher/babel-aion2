@@ -5,6 +5,8 @@ Each runs its application in a separate child process. The web child owns player
 WebSockets; the voice child owns Discord/DAVE, Opus, WebRTC and subtitle jobs.
 Supervisors own no delivery sockets. Each child receives a fresh UUID through
 private IPC after its `runtime_owner` row has been registered.
+Each supervisor uses at most one database connection; runtime pools are budgeted
+separately. See [database connection budgets](operations.md#database-connection-budget).
 
 Player sockets, media negotiations and voice-source claims record their owning
 incarnation. Their registration transactions hold a shared owner-row lock until

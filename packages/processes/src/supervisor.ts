@@ -13,7 +13,10 @@ export async function superviseRuntime(options: {
   moduleUrl: URL
   component: 'voice-worker' | 'web'
 }) {
-  const database = createDatabase(options.databaseUrl, { queryTimeoutMs: 2_000 })
+  const database = createDatabase(options.databaseUrl, {
+    queryTimeoutMs: 2_000,
+    maxConnections: 1,
+  })
   database.pool.on('error', () => {
     console.error('Babel supervisor storage connection unavailable.')
   })

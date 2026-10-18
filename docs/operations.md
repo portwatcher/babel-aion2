@@ -13,7 +13,7 @@ listener reconciliation sweep and closes it on server shutdown.
 Without database configuration the public lobby stays available; readiness and
 administrator sessions fail closed. No worker starts audio automatically.
 
-Apply migrations through `0009_mysterious_phantom_reporter` before this web build. Web readiness
+Apply migrations through `0011_tough_psylocke` before this web build. Web readiness
 checks room configuration columns, listener lifecycle columns and player socket
 registrations, provider test/history columns, terminology tables, the initialized
 catalog revisions, output-language validation columns and administrator tables. Migration
@@ -36,6 +36,9 @@ Migration 0009 adds exclusive source ownership and durable close receipts.
 The receiving worker holds a dedicated PostgreSQL ownership session; loss of
 that session fences playback and subtitles. Unconfirmed ownership cannot be
 cleared merely because its heartbeat is old. See [original audio](original-audio.md).
+Migrations 0010 and 0011 add runtime ownership and indexed nullable player owners.
+Existing unknown registrations are not assigned an invented process identity.
+See [process recovery](worker-recovery.md) before replacing older runtimes.
 Migration 0003 adds room settings
 without enabling a source or adding credentials. Migration 0001 preserves old rows and marks their entry fingerprints as legacy, so
 they cannot be adopted by an unbound retry. Do not roll back or truncate nickname
@@ -56,6 +59,35 @@ closes actual peers and confirms them before replacement; configured sources
 carry Discord original audio and independent subtitles. Graceful media restart
 is tested. See [media admission](media-admission.md)
 and [listener operations](listener-sessions.md).
+
+## Database connection budget
+
+`NUXT_DATABASE_POOL_MAX` limits each web runtime's pool; it is a positive integer
+with a default of 10. `DATABASE_POOL_MAX` limits each of the worker's three
+independent pools (media, source control and subtitles); it defaults to 10 and
+must be at least 2. Source control holds a dedicated PostgreSQL session while
+other queries continue. Reserve one extra source-pool slot beyond the number of
+simultaneously held source sessions. The current public application configures
+one room. Each supervisor has a separate fixed one-connection pool.
+
+For W web processes and V voice processes, plan for at most
+`W × (web pool + 1) + V × (3 × worker pool + 1)` application connections. Include
+old and new processes overlapping during rollout, then reserve additional
+connections for migrations and operations. Set both limits in private runtime
+configuration to fit the database role and server budgets. Defaults preserve the
+previous runtime pool sizes; they are not a production capacity recommendation.
+
+Zero, fractional and nonnumeric settings fail configured production startup.
+Requests queue when a pool is full, subject to the existing connection-acquisition
+deadline. Provider/subtitle work retains its own pool so it cannot consume all
+media/source slots. These settings do not replace database authorization or the
+existing fail-closed transport checks.
+
+After a build, `npm run test:pools:db` uses an isolated local database and real
+web/worker processes. PostgreSQL table locks hold concurrent HTTP work while the
+test measures actual database sessions, then verifies that queued requests resume
+and shutdown releases those sessions. It also exercises invalid startup settings.
+This is a connection-budget regression, not a user-capacity benchmark.
 
 ## Backup and restore procedure
 

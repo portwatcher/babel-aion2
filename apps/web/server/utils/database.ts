@@ -1,4 +1,4 @@
-import { createDatabase } from '@babel/database'
+import { createDatabase, databasePoolSize } from '@babel/database'
 import type { H3Event } from 'h3'
 
 let connection: ReturnType<typeof createDatabase> | undefined
@@ -12,7 +12,9 @@ export function useDatabase(event?: H3Event) {
         statusMessage: 'Database is not configured',
       })
     }
-    connection = createDatabase(config.databaseUrl)
+    connection = createDatabase(config.databaseUrl, {
+      maxConnections: databasePoolSize(config.databasePoolMax),
+    })
   }
   return connection.db
 }

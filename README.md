@@ -100,6 +100,9 @@ protected key encrypts provider credentials and their history; see
 `DATABASE_URL` is used by database tools. `NUXT_DATABASE_URL` is the private Nuxt
 runtime setting. Point both at the same database. The example database credentials
 are for the local Compose service only.
+Set `NUXT_DATABASE_POOL_MAX` and `DATABASE_POOL_MAX` to fit the database connection
+budget, including supervisors and rolling updates. See
+[connection budgeting](docs/operations.md#database-connection-budget).
 
 ## Workspace
 
@@ -134,6 +137,7 @@ runs in a separate worker.
 | `npm run test:media:db`      | Real Opus publication and source fencing; two built servers + worker/PostgreSQL admission, revocation and recovery                                                                    |
 | `npm run test:network:db`    | Real Coturn UDP/TCP/TLS, UDP fallback, credential expiry and bounded ICE ports; requires Docker and OpenSSL, creates its own disposable database                                      |
 | `npm run test:recovery:db`   | Isolated PostgreSQL and built web/voice processes: SIGKILL, real socket release, blocked receipts, scoped recovery, old credentials and normal shutdown                               |
+| `npm run test:pools:db`      | Actual PostgreSQL connection budgets under concurrent web/worker requests, queue recovery and invalid startup settings                                                                |
 | `npm run test:subtitles:db`  | Built web + real private worker HTTP/player WebSockets, isolated PostgreSQL and loopback provider protocols: shared PCM, language changes, source/provider replacement and revocation |
 | `npm run test:management:db` | Built servers + local PostgreSQL: signed admin login, encrypted room settings, conflicts, stop and removal                                                                            |
 | `npm run test:providers:db`  | Built servers + local PostgreSQL: provider history, encrypted credentials, replacement and test leases; local provider fixtures                                                       |
