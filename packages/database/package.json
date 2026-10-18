@@ -5,12 +5,22 @@
   "type": "module",
   "exports": {
     ".": "./src/client.ts",
-    "./schema": "./src/schema/index.ts"
+    "./schema": "./src/schema/index.ts",
+    "./listeners": "./src/listeners/index.ts",
+    "./credentials": "./src/credentials.ts",
+    "./room-settings": "./src/room-settings.ts",
+    "./voice-sources": "./src/voice-sources.ts",
+    "./runtime-owners": "./src/runtime-owners.ts",
+    "./subtitles": "./src/subtitles.ts",
+    "./providers": "./src/providers/index.ts",
+    "./terms": "./src/terms.ts",
+    "./languages": "./src/languages/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@babel/contracts": "*",
     "drizzle-orm": "0.45.4",
     "pg": "8.23.1"
   }

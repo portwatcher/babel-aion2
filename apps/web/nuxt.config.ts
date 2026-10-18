@@ -8,8 +8,16 @@ export default defineNuxtConfig({
   typescript: { strict: true },
   build: { transpile: ['@babel/contracts'] },
   nitro: {
+    experimental: { websocket: true },
     preset: 'node-server',
-    externals: { inline: ['@babel/auth', '@babel/database', '@babel/contracts'] },
+    externals: {
+      inline: [
+        '@babel/auth',
+        '@babel/database',
+        '@babel/contracts',
+        '@babel/providers',
+      ],
+    },
   },
   app: {
     head: {
@@ -23,15 +31,20 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     databaseUrl: '',
+    databasePoolMax: 10,
     siteUrl: 'https://babel.juryquinn.com',
     betterAuthSecret: '',
     accessTeamDomain: '',
     accessAudience: '',
     providerEncryptionKey: '',
+    mediaControlUrl: '',
+    mediaControlSecret: '',
   },
   primevue: {
     options: { theme: { preset: Aura, options: { darkModeSelector: '.babel-dark' } } },
-    components: { include: ['Button', 'InputText', 'Select', 'Tag'] },
+    components: {
+      include: ['Button', 'Checkbox', 'InputText', 'Select', 'Tag', 'Textarea'],
+    },
     directives: { include: [] },
     composables: { include: [] },
   },

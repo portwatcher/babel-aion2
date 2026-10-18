@@ -1,4 +1,613 @@
-# Scaffold validation
+# Validation
+
+## Actual PostgreSQL backup restoration — 2026-10-19
+
+The restore rehearsal uses real `pg_dump -Fc` and `pg_restore` with matching
+server/tool major versions. Every source and destination is a disposable local
+database. Provider responses, audio and credentials are synthetic fixtures; no
+production data or live provider service is involved.
+
+| Check                                 | Result  | Evidence                                                                                                                                                                                                                                                           |
+| ------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| PostgreSQL 13 and 16                  | PASS    | `test:restore:db` passes on both server majors. Each run dumps a live state and a normally stopped state, then restores each into a separate empty database                                                                                                        |
+| Consistent full storage copy          | PASS    | A shared exported PostgreSQL snapshot supplies the dump and independent per-table digests. All 19 public/migration tables match exactly after restore; rerunning migrations preserves those digests                                                                |
+| Restored application                  | PASS    | Actual web/worker processes reach readiness and reproduce room/provider/history/terminology/language-validation reads. The previous administrator cookie remains usable with verified Access, and cookie-only access is denied                                     |
+| Credential recovery and stopped state | PASS    | A stopped room stays STOPPED. Retaining room/provider credentials succeeds with the original protected key; a wrong key cannot save the retained room credential or alter its version                                                                              |
+| Ended listener                        | PASS    | A listener that left before the stopped-state dump remains denied with HTTP 410 after restoration. A fresh entry reuses the nickname with a higher generation                                                                                                      |
+| Running-state snapshot                | PASS    | An actually open socket is captured in the live dump. After restoration, its receipt remains unconfirmed and duplicate-nickname entry remains JOINING. An unrelated nickname becomes ACTIVE, proving the block is scoped rather than general worker unavailability |
+| Production disaster recovery          | NOT RUN | Production backup storage/encryption, later revocation history, old-service fencing, orchestration receipts and release rollback remain separate gates                                                                                                             |
+
+Local CI is PASS: `npm run ci:local` checked 214 first-party sources, maximum
+495 lines, formatting, strict types, 18 tests, builds and built HTTP smoke.
+The separate PostgreSQL 13 regression is PASS: ten database cases and both actual
+worker/web process crash-recovery cases. This rehearsal uses the disposable
+database owner; production ownership and role grants were not restored or tested.
+
+The first fixture run used a nonexistent provider-detail GET route and stopped
+with 404. The fixture now reads the supported provider-list API; no production
+route was added. Terminal-state inspection uses the application's REMOVED state
+and the actual socket close event before making the stopped-state backup.
+The test owns dump/restore integrity and application behavior after restoration;
+existing suites retain provider protocol, cryptographic corruption and transport
+revocation ownership. No production test endpoint or fake close receipt was added.
+Temporary databases, mode-0600 dumps, the PostgreSQL 13 container and its newly
+pulled image were removed. The separate live Discord fixture remains active.
+Production/tooling adds one command line; tests and test support total +508/-11
+lines. Application runtime behavior is unchanged by this rehearsal.
+
+## Database connection budgeting — 2026-10-19
+
+Web and voice runtimes now honor explicit per-pool limits. Each supervisor uses
+one connection; the worker retains independent media, source-control and subtitle
+pools. Invalid settings fail configured production startup. Default runtime pool
+sizes remain 10, so operators must account for replicas, rolling updates and
+maintenance connections before deployment. See [operations](operations.md#database-connection-budget).
+
+| Check                                 | Result         | Evidence                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Baseline regression                   | FAIL, expected | With both configured limits set to 2, the old build opened 11 web and 22 worker PostgreSQL sessions while requests were blocked on real tables. It also stayed running with an invalid web pool size of 0                                                                                                                     |
+| Configured budgets and queue recovery | PASS           | `test:pools:db`: 36 concurrent public/private HTTP requests, actual PostgreSQL lock waits and session counts. The final build peaks at 3 web and 6 worker sessions, within budgets of 3 and 7 including supervisors. Releasing the locks lets every request succeed; service shutdown releases every labeled database session |
+| Invalid configuration                 | PASS           | Actual production entry points exit 1 for zero, fractional and nonnumeric web limits, and for a worker pool of 1, which cannot support both a dedicated source-control session and ongoing queries                                                                                                                            |
+| Local CI                              | PASS           | `npm run ci:local`: 212 first-party source files, maximum 495 lines, formatting, strict types, 18 tests, builds and built HTTP smoke                                                                                                                                                                                          |
+| Restricted-pool regressions           | PASS           | Both runtime settings set to 2: database, HTTP, player WebSocket, media, management, provider, sample, terminology, language, process-recovery and subtitle-transport suites all pass against isolated PostgreSQL                                                                                                             |
+| Production application                | NOT RUN        | Existing production web and TURN readiness was inspected read-only. The new pool settings and voice runtime have not been deployed; no production connection limit or credential was changed                                                                                                                                  |
+
+The new test owns the process-environment and actual connection-usage contract.
+It does not inspect private pool fields or add a production test endpoint. Two
+worker pools are saturated concurrently while source polling continues; it is not
+live Discord reception or a player-capacity benchmark. Existing process and
+application suites retain ownership of authorization and physical-close behavior.
+Production/tooling changes total +45/-9 lines; tests and test support total
++158/-1. Temporary databases and processes are removed after verification; the
+separate authorized Discord preview remains active. No release was performed.
+
+## Confirmed web-player process recovery — 2026-10-19
+
+Both production services now use the shared `@babel/processes` supervisor. Each
+player socket registers its process owner while holding the owner's row lock.
+Only an observed child exit permits scoped cleanup and a new incarnation. Legacy
+rows without an owner and owners lost with their supervisor remain unconfirmed.
+The production web entry is now `apps/web/.output/server/supervisor.mjs`; migration
+0011 adds nullable player ownership without inventing an identity for old rows.
+
+| Check                     | Result  | Evidence                                                                                                                                                                                                                                                                  |
+| ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                  | PASS    | Final `npm run ci:local`: 211 first-party sources, maximum 495 lines; formatting, strict types including both runtime wrappers, 18 tests, builds and built HTTP smoke                                                                                                     |
+| Database ownership        | PASS    | Ten `test:db` cases in disposable PostgreSQL. Owned player registrations close with the confirmed owner; legacy rows stay open with null ownership; an exited owner cannot register another player connection                                                             |
+| Actual process recovery   | PASS    | Final `test:recovery:db` passes both worker and web regressions. Real web SIGKILL closes the socket, persists its receipt and restarts automatically; reconnect retains the session ID and nickname generation                                                            |
+| Scoped revocation         | PASS    | The same listener's socket on another web process survives the first crash. A locked receipt keeps nickname replacement JOINING until persistence succeeds; obsolete credentials receive only the terminal state, and an unrelated listener remains connected             |
+| Normal shutdown           | PASS    | Actual SIGTERM sends close code 1012 and persists closure. This assertion failed with code 1006 before signal-time socket shutdown was added                                                                                                                              |
+| Linux ARM64 images        | PASS    | Rebuilt web and worker images run as UID 1000, read-only, with capabilities dropped and no-new-privileges. Actual container WebSocket SIGKILL, receipt, same-identity reconnect, Access denial and normal SIGTERM exit 0 pass; normal socket close is 1012                |
+| Development runtime       | PASS    | An isolated Nuxt development process registers a unique owner, reaches readiness and serves an authorized player socket. Missing/forged Access assertions remain denied. Development hard-crash recovery is deliberately not claimed                                      |
+| Application regression    | PASS    | After the final build, isolated `test:db`, `test:http:db`, `test:ws:db`, `test:media:db`, `test:management:db`, `test:providers:db`, `test:samples:db`, `test:terms:db` and `test:languages:db` all pass                                                                  |
+| Subtitle transport        | PASS    | Final `test:subtitles:db` passes real registered player delivery, independent original audio, authorization and stream cancellation using loopback providers                                                                                                              |
+| Integrated Discord speech | NOT RUN | The separate authorized preview remains LISTENING, but its current generation still records zero speakers/frames and the real browser's audio energy is zero. Discord currently shows only the bot in the test channel. Earlier isolated DAVE speech is separate evidence |
+| Supervisor/host recovery  | NOT RUN | Unknown owners after parent/container/host loss stay fail-closed. Multi-worker routing, production deployment and live Discord-to-browser speech acceptance remain outstanding                                                                                            |
+
+The new WebSocket crash regression failed before supervision because its durable
+registration never closed after the OS killed the process. Its final form also
+protects other-process ownership, delayed receipts, replaced credentials and
+normal shutdown. The existing database case owns storage fencing; it is not
+presented as physical transport proof. No test-only production endpoint was added.
+
+An early reconnect check used liveness while asynchronous Nitro initialization
+was still running; the fixture now waits for readiness when a database is
+configured. A development fixture initially omitted Access configuration and
+correctly received 503; after supplying the normal test configuration, access
+denial checks pass. One language regression failed during a concurrent output
+rebuild; a stable-build retry passed. The cause of that initial startup failure
+was not established from the suppressed server logs.
+
+The existing five-case Coturn networking suite passed before the final web
+shutdown adjustment. It covers real UDP/TCP/TLS relay, fallback, expiry, renewal,
+invalid settings and bounded UDP allocation; it does not establish public-network
+reachability. No release, production migration or deployment was performed.
+
+Production/tooling changes total +268/-53 lines; tests and test support total
++254/-6, excluding documentation, generated migrations and the lockfile. The
+disposable databases, containers, image tags and development processes were
+removed; the separate active Discord/browser fixture remains available.
+
+## Confirmed runtime crash recovery — 2026-10-19
+
+A worker supervisor now observes its own child process exiting, persists scoped
+media/source closure and then starts a new incarnation. Owner-row locks fence
+late registration transactions. This covers child-runtime crashes while the
+supervisor survives; whole-supervisor/container/host recovery remains unfinished.
+See [worker recovery](worker-recovery.md).
+
+| Check                   | Result  | Evidence                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                | PASS    | Final `npm run ci:local`: 204 first-party source files, maximum 495 lines; formatting, strict types, 18 tests, web/worker/migration builds and built HTTP smoke                                                                                                                                                                               |
+| Database ownership      | PASS    | `npm run test:db`: ten tests against an isolated disposable database. Exit waits for in-flight registration; terminated IDs reject media/source claims and re-registration; new source generation survives repeated old-owner confirmation                                                                                                    |
+| Real process crash      | PASS    | `test:recovery:db`: actual ICE/DTLS peers, child SIGKILL, independently observed UDP release, automatic same-listener recovery, obsolete negotiation rejection and another runtime's surviving peer                                                                                                                                           |
+| Blocked receipt         | PASS    | A real PostgreSQL row lock prevents exit persistence. The bounded query times out and retries; readiness remains unavailable until the receipt can commit                                                                                                                                                                                     |
+| Linux ARM64 packaging   | PASS    | Built Docker worker runs as UID 1000 on a read-only filesystem with all capabilities dropped and no-new-privileges. Real child SIGKILL releases its UDP sockets, persists closure and restarts; same-listener negotiation resumes. Supervisor SIGTERM exits 0 and closes the fresh registration. This is not container-to-browser audio proof |
+| Media and subtitles     | PASS    | Existing `test:media:db` verifies native Opus publication, scoped retirement, revocation, concurrent recovery and graceful supervisor restart. `test:subtitles:db` passes actual registered player delivery with loopback providers                                                                                                           |
+| Media networking        | PASS    | Final `test:network:db`: all five Coturn/application checks pass, including UDP/TCP/TLS, fallback, real expiry, renewal, untrusted TLS, invalid startup, failed relay authentication and bounded UDP allocation                                                                                                                               |
+| Wider crash recovery    | NOT RUN | Unknown owners after supervisor/container/host loss remain fail-closed. Web-owned player WebSocket orphan recovery and multi-worker routing remain unfinished                                                                                                                                                                                 |
+| Fresh integrated speech | NOT RUN | Existing authorized Discord test is preserved; no new integrated speech frames were observed during this change. No live Discord crash/rejoin acceptance is claimed                                                                                                                                                                           |
+
+The new process regression failed before the repair: the OS released the killed
+worker's UDP sockets, but its persistent registration never closed. It passes
+with supervision and durable reconciliation. An initial network rerun also
+caught a changed generic startup diagnostic; the existing non-secret message was
+restored, the worker rebuilt, and all five checks passed. An initial strict test
+type error was corrected to use PostgreSQL's `PoolClient` type.
+
+Recovery production/tooling changes total +323/-64 lines; tests and test support
+total +473/-12 lines, excluding generated migrations and documentation.
+
+Test databases, relay containers and the temporary image-check container were
+removed. The active Discord preview remains separate. No production migration,
+release or deployment was performed in this change.
+
+## Explicit media networking — 2026-10-19
+
+STUN/TURN configuration, independent temporary worker/browser credentials,
+credential expiry and browser renewal are implemented. See
+[media networking](media-network.md). This is local transport evidence; production
+worker routing and real player-network acceptance remain unfinished.
+
+| Check                                | Status  | Evidence                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                             | PASS    | `npm run ci:local`: 197 source files, maximum 495 lines, formatting, strict types, 18 tests, builds and built HTTP smoke                                                                                                                                                                                  |
+| Real relay transport                 | PASS    | Pinned Coturn 4.18.0-r0, real player HTTP authorization/private control and native Opus decoding. UDP, TCP, TLS and UDP-to-TCP fallback select relay candidates at both ends and decode nonzero audio                                                                                                     |
+| Credential lifetime                  | PASS    | With a 60-second lifetime, publication stops, the actual peer closes and its close receipt persists. A subsequent attempt retains the listener generation and obtains different credentials. Coturn rejects expired credentials with actual 401; fresh credentials allocate through the same request path |
+| TLS and invalid settings             | PASS    | TLS succeeds with the fixture CA trusted only in the test child; a separate process with no trust rejects it. Incomplete credentials, invalid URLs, unsafe lifetime and incomplete port configuration fail actual worker startup with a generic message                                                   |
+| Relay authentication failure         | PASS    | A reachable Coturn with a mismatched secret returns no usable offer: Babel responds 503, reveals no relay credential and persists actual negotiation closure                                                                                                                                              |
+| Direct/STUN port configuration       | PASS    | Two simultaneous authorized peers gather actual STUN candidates, use distinct ports in the configured local UDP range, decode audio and release their OS sockets after closure                                                                                                                            |
+| Chrome UDP/TCP and renewal           | PASS    | Real Chrome stats show relay at both ends, UDP/TCP relay protocols and nonzero audio energy. TCP completes multiple renewals with one open peer and one audio element; database evidence retains one session and one nickname generation                                                                  |
+| Existing media and subtitle delivery | PASS    | Real publication/admission/replacement/recovery suite passes. Subtitle suite passes independently and in a nested disposable database. Teardown initially triggered PostgreSQL `57P01`; the fixture now waits for server-side disconnection and drops its database without FORCE                          |
+| Public network and deployment        | NOT RUN | Public NAT/TURN routes, China mainland players, production TLS/browser trust, native AMD64 relay performance and end-to-end Discord speech latency                                                                                                                                                        |
+
+The first isolated relay probe advertised host loopback from Docker. Allocation
+succeeded, but Coturn rejected relay permissions. The corrected fixture relays
+both endpoints within its Docker network, without exposing relay ports or enabling
+loopback-peer exceptions. An initial expiry assertion observed only a Werift
+timeout: its integrity guard drops unsigned post-authentication errors. The final
+check reads the real TURN error response and requires a fresh-credential positive
+control, so network failure cannot count as authentication denial.
+
+Two runs exposed a test teardown race: `pg-pool.end()` removes clients from its
+inventory before their socket-close callbacks finish. Immediate `DROP DATABASE
+... WITH (FORCE)` could therefore terminate a still-closing client with `57P01`.
+The shared fixture now observes zero connections in `pg_stat_activity` before a
+normal database drop. No production database lifecycle behavior was changed.
+
+Default host-only networking now uses ICE-lite. Inspection of the exact Werift
+dependency showed that an empty `iceServers` list alone still selected its built-in
+Google STUN fallback; the earlier “no implicit external STUN” statement was not
+true for that previous configuration. The current configuration suppresses that
+fallback. Existing direct admission and subtitle transport checks pass with it.
+
+The test-authoring gate assigns the new suite ownership of actual relay, lifetime,
+TLS and port-binding contracts; existing tests retain application replacement and
+subtitle ordering ownership. No production test endpoint or TLS bypass was added.
+Temporary relay containers, generated secrets/certificates, browser previews and
+their databases are removed after use. The separate live Discord/browser test
+remains available for a new authorized speech sample. No deployment is claimed.
+
+## Authorized shared subtitle delivery — 2026-10-19
+
+Per-member decoded PCM now feeds shared recognition and output-language
+translation independently of original playback. Private HTTP streams relay
+current authorized results through the existing player WebSocket to the main
+page and PiP. Language activation requires current sample proof and worker
+readiness. Fresh installations still have no enabled languages or credentials.
+
+| Check                                       | Result  | Evidence                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                    | PASS    | `npm run ci:local`: 191 first-party source files, maximum 495 lines; formatting, strict types, 18 tests, web/worker/migration builds and HTTP smoke                                                                                                                                                               |
+| Actual subtitle transport                   | PASS    | `test:subtitles:db`: built web, private NDJSON HTTP, registered player WebSockets, independent disposable PostgreSQL and loopback provider protocols. Three listeners share one recognition connection and two translation requests for two languages                                                             |
+| Independent sources and stale work          | PASS    | Nonzero synthetic stereo PCM reaches separate mono recognition connections at 48 kHz. Same display names retain different member IDs. New listeners receive no prior work; language/source/provider replacement discards late results                                                                             |
+| Runtime configuration and release           | PASS    | A saved credential replacement takes effect without deployment and preserves recognition; disabling all languages updates public configuration, closes actual recognition sockets and prevents held translations from delivery                                                                                    |
+| Original audio and nickname replacement     | PASS    | Actual WebRTC receiver keeps receiving packets during held translation and quota failure. Same-nickname replacement waits for the old player socket and real media UDP ports to close; old credentials receive no subtitles                                                                                       |
+| Display ordering regression                 | PASS    | A late subtitle revived a stopped source before the fix; the owner-boundary test fails with `1 !== 0` before the source-retirement fence and passes afterward. Other checks cover revisions, stream/configuration ordering and translation completion order                                                       |
+| Database and built API regressions          | PASS    | `test:db` (nine tests), HTTP, WebSocket, media, management, providers, samples, terminology and language suites pass in a separate disposable database; no live-test room data changed                                                                                                                            |
+| Browser main page and PiP controls          | PASS    | Chrome/macOS displays two synthetic sources, clears old language on switch, retains selected language on quota failure, clears disabled subtitles and retains connected media. PiP opens/closes through normal controls; receipts show one player socket and one media peer in total; no captured warnings/errors |
+| Native PiP pixels and live provider quality | NOT RUN | Mac locked during native window inspection. Synthetic provider responses do not prove recognition/translation quality, live latency, native PiP contents or game behavior                                                                                                                                         |
+| Integrated Discord speech                   | NOT RUN | Earlier isolated DAVE speech/rejoin passed. The application listener is connected but the pending new sample still has zero speakers/frames and browser signal energy zero; silence is not spoken-audio proof                                                                                                     |
+
+All new protocol inputs and translations are explicitly synthetic test fixtures;
+there is no production synthetic-input endpoint or fabricated activation receipt.
+The integration test owns authentication, transport, cancellation and physical
+closure. The display reducer owns UI ordering; provider tests retain the queue
+and revision contracts. Temporary subtitle databases/servers were removed after
+verification. The separate Discord test remains open for the requested speech.
+No release or deployment was performed in this change.
+
+## Original-audio worker integration — 2026-10-19
+
+The worker now connects configured Discord voice sources, independently decodes
+members and publishes bounded mixed playback over the existing revocable media
+transport. Start requests, source status and actual member frame counts are
+available in administration. Live provider subtitles and full product acceptance
+remain incomplete.
+
+| Check                                  | Result  | Evidence                                                                                                                                                                                                                                                                           |
+| -------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                               | PASS    | `npm run ci:local`; 179 first-party source files, largest 495 lines; formatting, strict types, 16 tests, production builds and HTTP smoke                                                                                                                                          |
+| Migration and ownership                | PASS    | Migration 0009 applied to disposable PostgreSQL 16; `test:db` passes nine tests including actual ownership-session termination, duplicate controller exclusion, unconfirmed-owner refusal and persisted start/stop                                                                 |
+| Mixer                                  | PASS    | Native Opus output independently decoded: 48 kHz stereo/960 samples per channel, separate speaker channels, 10 ms input assembly, pause preservation, 100 ms backlog bound and cessation after permission loss/close                                                               |
+| Publication and source retirement      | PASS    | Actual WebRTC peers receive nonzero synthetic PCM only in the correct room. Source retirement releases real UDP sockets, persists close receipts, fences a pending offer held on the real nickname lock, and permits the same listener to reconnect                                |
+| Built application regressions          | PASS    | `test:management:db`, `test:media:db`, `test:http:db` and `test:ws:db`; authenticated start/status boundaries, same-origin denial, old-credential refusal, replacement, concurrent recovery and graceful media-worker restart                                                      |
+| Linux ARM64 native boundary tests      | PASS    | Five bundled source-boundary tests run inside the Node 24.18.0/Alpine worker image as UID 1000 on a read-only filesystem: native mixing, PostgreSQL ownership and actual local WebRTC source retirement. Initial Opus compilation failed; the ARM64 declaration macro corrected it |
+| Linux AMD64 source-boundary tests      | PASS    | The final AMD64/Alpine image passes the same five native decoding, ownership and actual local WebRTC tests under Docker emulation on the ARM64 host. This is architecture compatibility evidence, not native AMD64 performance or live Discord receipt.                            |
+| Worker runtime packaging               | PASS    | The final ARM64 and emulated AMD64 images run as UID 1000 with a read-only filesystem, no capabilities and no-new-privileges. Built web entry, authenticated offer/close, persisted transport closure and SIGTERM exit 0 pass; this does not establish container-to-browser ICE.   |
+| Worker dependency audit                | PASS    | The Opus installer brought tar 6.2.1; root override and refreshed lock resolve 7.5.22. Actual installer resolution is checked and worker-only production npm audit reports zero findings. Broader workspace toolchain advisories are outside this worker-only result               |
+| Live application connection            | PASS    | Real encrypted bot configuration saved through authenticated local management API; start request reaches LISTENING and a real Chrome listener receives Opus silence with one audio element playing and no capture request                                                          |
+| Live source stop/restart               | PASS    | Browser management stop reaches STOPPED with no open source receipt; start advances source generation from 4 to 6 and rejoins Discord. The existing Chrome listener replaces its closed peer, resumes real Opus receipt and retains one audio element and the original entry time  |
+| Live application speech                | NOT RUN | Browser connection and silence are not proof of spoken audio. A further authorized sample is requested after the integrated receiver becomes ready                                                                                                                                 |
+| Multi-member and production acceptance | NOT RUN | Simultaneous speakers, matching nicknames, member re-entry, Go Live, native AMD64 performance, Linux live reception, production networking, background/game/PiP behavior and end-to-end latency/capacity remain open                                                               |
+
+The new mixer and publication tests own signal conversion and source retirement;
+the existing media suite continues to own HTTP admission and nickname revocation.
+Ownership tests exercise real PostgreSQL locks but do not simulate or claim
+physical Discord-close receipts. See [original audio](original-audio.md).
+
+## Configurable Discord capture scope — 2026-10-19 (historical)
+
+The administrator can select specific Discord members or every speaking channel
+member. All-channel configuration needs no commander IDs. The existing selected
+scope is the migration default, and changing scope stops the desired source and
+advances its generation. Actual speaker discovery and audio publication remain
+unfinished; this change does not claim a live receiving worker.
+
+| Check                                       | Status  | Evidence                                                                                                                                                                                                                                                |
+| ------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                    | PASS    | `npm run ci:local`; 166 source files, maximum 494 lines, strict types, 14 tests, web/worker/migration builds and HTTP smoke                                                                                                                             |
+| Migration and database regression           | PASS    | Migration 0008 applied to disposable PostgreSQL 16; `npm run test:db` passes seven tests                                                                                                                                                                |
+| Capture scope through built management HTTP | PASS    | `npm run test:management:db`: selected default, all-channel completeness with no member IDs, invalid mode rejection, scope-change stop/generation, unchanged generation on rename, incomplete empty selected list and persistence across server restart |
+| Browser configuration                       | PASS    | Chrome/macOS: all-channel save and refresh retain the mode and hide the ID field; keyboard switching restores the selected-member field; reloading saved state restores all-channel; no captured warning/error entries                                  |
+| Bot identity and guild installation         | PASS    | Credential stays in ignored mode-0600 `.env`; official bot API confirms the expected identity, installed test guild and selected private voice channel                                                                                                  |
+| Isolated native candidate loading           | PASS    | Node 24/macOS arm64 loads `@discordjs/voice` 0.19.2 with DAVE, `discord.js` 14.27.0 and `@discordjs/opus` 0.10.0; a known Opus silence packet decodes to 3,840 PCM bytes; natural exit 0                                                                |
+| Private-channel access                      | PASS    | Approved browser grant is saved; official bot API confirms a member override with only ViewChannel and Connect (allow 1049600, deny 0)                                                                                                                  |
+| Voice transport connection                  | PASS    | Isolated bot with Guilds and GuildVoiceStates intents reaches Ready with self-mute enabled and self-deafen disabled; DAVE protocol 1 completes a ready group session after an authorized member joins                                                   |
+| Live DAVE and independent decoding          | PASS    | Real member audio: 1,129 packets decoded to 48 kHz stereo signed-16 PCM, 884 nonzero frames, peak 16,904; every decoded frame observed DAVE protocol 1 ready; zero decoder or voice errors                                                              |
+| Rejoin and native cleanup                   | PASS    | First receiver closes and exits 0; a fresh receiver rejoins with a member present and decodes 62 DAVE frames, 53 nonzero frames, peak 1,156, zero errors; second receiver also closes and exits 0                                                       |
+| Multiple sources and application delivery   | NOT RUN | One real member was observed. Simultaneous users, identical nicknames, member re-entry, Go Live audio, Linux live reception and application/browser original-audio delivery remain integration gates                                                    |
+
+`design.md` and `GOAL.md` are synchronized with the requested all-channel mode and
+identity limits: one member's locally mixed microphone/game/music is one source.
+The existing built HTTP suite owns the new persisted contract; no parallel unit
+suite or test-only production seam was introduced. Private fixture IDs, token,
+probe dependencies and screenshots remain in ignored local task files. No release
+or deployment was made.
+
+## Revocable media admission — 2026-10-19 (historical)
+
+The application now uses Werift 0.25.1 for authenticated, receive-only WebRTC.
+The worker registers each negotiation under the global nickname lock, closes
+actual peers before acknowledging replacement and rejects obsolete credentials.
+The production audio track is empty: Discord reception and PCM publication remain
+unfinished. No synthetic source or fake transport acknowledgement was added to
+the application. See [media admission](media-admission.md) for configuration.
+
+| Check                                      | Status                    | Evidence                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                   | PASS                      | `npm run ci:local`; 166 first-party source files, maximum 494 lines, strict types, 14 tests, web/worker/migration builds and HTTP smoke                                                                                                                                                                    |
+| Migration 0007 and database regressions    | PASS                      | Applied media registration migration to disposable PostgreSQL 16; `test:db` passes seven tests; `test:http:db`, `test:ws:db` and `test:management:db` pass against built servers                                                                                                                           |
+| Real media admission                       | PASS                      | `test:media:db` uses two built web processes, the real worker and actual ICE/DTLS peers; receive-only negotiation connects, unauthorized private control returns 401, invalid listener credentials return 401 and foreign origins return 403                                                               |
+| Actual closure and replacement             | PASS                      | OS UDP binds independently prove candidate sockets occupied before close and released afterward. A held database close receipt keeps replacement JOINING even after socket release; both media and player socket closure are required                                                                      |
+| In-flight admission and old credentials    | PASS                      | Replacement queued before an old offer on the nickname lock makes that offer return 410 without inserting a media registration. The replacement obtains an actual connected peer; old credentials cannot reopen media                                                                                      |
+| Reconnect ordering                         | PASS                      | Same-ID open offer is idempotent; obsolete attempts/IDs return 409 without closing the newer peer. Three overlapping recoveries with delayed close persistence initially failed, then passed after closing only earlier attempts; one actual peer survives                                                 |
+| Scope, subscription and restart            | PASS                      | Delayed old-generation revocation leaves the current peer intact. Null-language update preserves identity and occupied sockets. Graceful worker restart closes old sockets/receipts and reconnects the same listener under a new worker owner                                                              |
+| Linux arm64                                | PASS                      | Same actual media suite, including overlapping recovery, passes on Node 24.18.0/Alpine as user `node` in the disposable PostgreSQL container network namespace                                                                                                                                             |
+| Worker runtime image                       | PASS                      | `voice-worker` target runs as UID 1000 with a read-only filesystem, all capabilities dropped and no-new-privileges. Actual web entry becomes ACTIVE, offer/close persist a real receipt, private readiness is authenticated and SIGTERM exits 0. This packaging check does not claim host-to-container ICE |
+| Browser media lifecycle                    | PASS                      | Chrome/macOS: connected peer, mute toggle, refresh retains the same listener/generation with one open media row; PiP open/close adds no media row; second entry replaces the first, old-page refresh stays at entry, and explicit leave leaves no open media rows                                          |
+| Browser layout and errors                  | PASS                      | New controls fit a 320 px document/viewport without horizontal overflow; default viewport restored; no captured warnings/errors in either test tab                                                                                                                                                         |
+| Discord credential and guild discovery     | WAITING FOR CONFIGURATION | Ignored mode-0600 `.env` credential returns the expected bot identity and HTTP 200. Guild lookup still returns an empty list; installation, voice channel and commander selection are pending                                                                                                              |
+| Hard crashes and production routing        | NOT RUN                   | Unknown transport owners remain fail-closed. Confirmed orphan recovery, multiple-worker routing, exclusive guild control, public ICE/TURN, Linux amd64 and actual player networks are unfinished                                                                                                           |
+| Original audio and full product acceptance | NOT RUN                   | No Discord/DAVE receipt, per-commander PCM publication, live provider quality, authorized player subtitles, native PiP pixel/closure proof, background audio, AION2 display modes or latency/capacity evidence                                                                                             |
+
+The new media suite owns real admission and transport lifecycle at the built HTTP
+boundary. Existing database tests continue to own transactional behavior with
+controlled transport ports; the candidate harness owns synthetic decoding and
+native runtime compatibility. `design.md` and `GOAL.md` remain byte-identical.
+No release or production deployment was made. Local evidence and credentials
+stay in ignored task files; source/history contain no real secrets.
+Owned browser previews, test processes, containers, volumes, networks and local
+image tags were removed. The unmerged worktree and its local credential remain
+preserved.
+
+## Isolated media compatibility checks — 2026-10-18 (historical)
+
+Candidate SDKs now have a separately installed validation harness. Application
+dependencies and behavior are unchanged: the worker remains stopped, listeners
+remain JOINING, and live Discord original audio is not available.
+
+| Check                                                                               | Status                    | Evidence                                                                                                                                                                                                                                          |
+| ----------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                                                            | PASS                      | `npm run ci:local`; 155 first-party source files, maximum 494 lines, strict types, 14 tests, production builds and HTTP smoke                                                                                                                     |
+| Werift synthetic RTP and sender shutdown                                            | PASS                      | Node 24.18.0 / macOS arm64; at least 50 Opus packets and 9,533 payload bytes received over actual peers. Closing only the sender stops further reception; source and receiver remain active during observation; child exits naturally with code 0 |
+| Browser decoding and shutdown                                                       | PASS                      | Chrome receives 3,855 packets / 846,815 bytes; decoded RMS peak 0.06296. Server close stops packets, RMS returns to zero, and replaying the closed answer receives 404. One muted audio element; no captured browser warnings/errors              |
+| Failed-source negative control                                                      | PASS                      | An unavailable FFmpeg executable makes the real transport check fail at `receive-rtp`, exit 1, without a timeout; no synthetic success is supplied                                                                                                |
+| Native wrtc cleanup                                                                 | FAIL                      | `@roamhq/wrtc` 0.10.0 creates/stops a native audio track, then terminates with SIGSEGV on macOS arm64. The parent correctly reports FAIL despite the stop call completing                                                                         |
+| LiveKit synthetic media and removal                                                 | PASS                      | Server 1.13.10 / native SDK 1.1.0 / server SDK 2.19.1 on Linux arm64: 137 decoded frames, peak sample 705; RemoveParticipant emits client disconnection and the server list confirms absence; native cleanup completes                            |
+| LiveKit old-token revocation                                                        | FAIL                      | The exact unexpired listener token reconnects after removal; the isolated command exits 1 with `oldTokenRejoined: true`. No admission gateway is implemented or claimed                                                                           |
+| Discord REST access and guild discovery                                             | WAITING FOR CONFIGURATION | Bot token remains in ignored mode-0600 `.env`; authenticated guild lookup returns 200 and an empty list. Installation, voice channel and commander selection are pending                                                                          |
+| Babel credential revocation, live Discord, deployment transport and player networks | NOT RUN                   | The probes do not enter application sessions, authorize real command delivery, test DAVE or prove TURN/network/game behavior                                                                                                                      |
+
+See [media compatibility](media-compatibility.md) for exact versions, reproduction
+commands, platform limits and selection implications. No production media SDK was
+added. The harness uses identified synthetic audio and isolated fixture credentials.
+Temporary browser/encoder processes and both experimental Docker networks were
+removed; the unmerged implementation worktree and local credential remain preserved.
+
+## Player subtitle window and Discord credential check — 2026-10-18 (historical)
+
+The player panel now owns a feature-detected Document PiP presentation with shared
+reactive status and text size. It is a status window until authorized live
+subtitles are connected; this does not establish the full PiP/audio acceptance gate.
+
+| Check                                      | Status                    | Evidence                                                                                                                                                                      |
+| ------------------------------------------ | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                   | PASS                      | `npm run ci:local`; 149 source files, maximum 494 lines, strict types, 14 existing tests, production builds and HTTP smoke                                                    |
+| Browser open/close and keyboard activation | PASS                      | Built app in Chrome on macOS: click and Enter complete `requestWindow`, owner control changes to close, and closing returns to the open control without ending the listener   |
+| Shared listener identity                   | PASS                      | Real PostgreSQL retains one current listener generation and one open socket after opening/closing PiP; no separate listener entry is created                                  |
+| Text size and narrow layout                | PASS                      | Main-page extra-large status computes to 32 px; complete controls fit 320 px; no captured browser warnings/errors                                                             |
+| Replacement and explicit exit UI           | PASS                      | Another actual browser entry replaces the old generation, displays the required terminal message and removes its listener panel; explicit leave also removes the panel        |
+| Native PiP rendering and physical close    | NOT RUN                   | Native-app capture failed; browser read-only DOM inspection cannot access the separate PiP document. Main-page lifecycle state alone is not proof of native pixels or closure |
+| Live subtitles, background audio and AION2 | NOT RUN                   | No live source/media adapter or authorized player subtitle delivery; no actual game/display-mode or player-network test                                                       |
+| Discord credential                         | PASS                      | User-generated bot token saved only in ignored local `.env` with mode 0600; Discord `GET /users/@me` returns 200 and confirms the dedicated bot identity                      |
+| Discord guild/voice receive                | WAITING FOR CONFIGURATION | `GET /users/@me/guilds` returns 200 with an empty list; bot installation, target voice channel and commander selection are pending                                            |
+
+No credentials are included in source, this report or browser screenshots. No
+production deployment was made. See [PiP implementation and limits](picture-in-picture.md).
+
+## Output-language configuration and validation — 2026-10-18 (historical)
+
+Administrators can prepare language paths, select service configurations and term
+policy, order languages, choose a default, and persist sample validation against
+the exact revisions used. The player language list remains empty and activation
+fails closed; live worker and player subtitle delivery are still unfinished.
+
+| Check                                 | Status                    | Evidence                                                                                                                                                                                                                      |
+| ------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                              | PASS                      | `npm run ci:local`; 147 first-party source files, maximum 494 lines, strict types, 14 tests, production builds and unconfigured HTTP boundaries                                                                               |
+| Migration 0006                        | PASS                      | Applied to fresh disposable PostgreSQL 16, adds language/catalog versions and validation metadata without seeded languages                                                                                                    |
+| Language administration HTTP          | PASS                      | `npm run test:languages:db`; verified Access plus matching session and same origin; canonical codes, input bounds, immutable provider roles and references                                                                    |
+| Validation persistence                | PASS                      | Built HTTP requests through actual loopback WebSocket/HTTP fixtures; stable source and translated text produce a revision-bound proof that survives restart; quota failure records the attempt and preserves the last success |
+| Stale evidence and concurrent editing | PASS                      | Two built processes race edits; provider and term revisions make old proof stale; replacing a path while its translation is held rejects the late sample with 409 and leaves the new path unvalidated                         |
+| Ordering, default and pagination      | PASS                      | Atomic adjacent move, stale default rejection, persisted default and deletion cleanup; 53 languages exercise 50-entry pages and reject an obsolete page version; delete/recreate cannot reuse an old entry version            |
+| Activation remains closed             | PASS                      | An unvalidated language returns PATH_UNVALIDATED; a successfully validated language returns DELIVERY_UNAVAILABLE; public languages remain empty                                                                               |
+| Privacy and provider deletion         | PASS                      | Language responses and audit omit credentials, audio and transcript text; a referenced provider cannot be deleted, and deletion succeeds after references are removed                                                         |
+| Database and related regressions      | PASS                      | `test:db` (seven tests), `test:http:db`, `test:ws:db`, `test:management:db`, `test:providers:db`, `test:samples:db`, `test:terms:db` on disposable PostgreSQL                                                                 |
+| Readiness dependency check            | PASS                      | Removing the initialized language catalog row, then hiding the output-language validation column, each returns 503; restoring each dependency returns 200                                                                     |
+| Browser language workflow             | PASS                      | Chrome with local signed identity: create canonicalized code and two paths, reorder, choose default, reload in another tab; stale save is refused and explicit reload shows the accepted name                                 |
+| Responsive layout and shared form     | PASS                      | Language editor and saved-path sample form fit a 320 px viewport/document width; both sample forms have distinct IDs; literal angle brackets remain text; no captured browser errors/warnings                                 |
+| Complete browser WAV upload/results   | NOT RUN                   | The existing Chrome file-URL permission limitation remains unresolved; sample form and HTTP upload/persistence were checked separately, without claiming a complete browser result                                            |
+| Real provider access and quality      | NOT RUN                   | All provider responses/audio in these checks are synthetic fixtures; no real provider credentials or authorized battle speech supplied                                                                                        |
+| Discord/audio/full acceptance         | WAITING FOR CONFIGURATION | Dedicated bot page verified; existing token cannot be viewed again. Saved token location and guild/channel/commander IDs remain pending. Media revocation, worker integration, player subtitles and PiP remain incomplete     |
+
+The new suite owns persisted language behavior at the built HTTP boundary; existing
+provider/sample suites own wire format and upload semantics. It introduces no
+production test switch or fake activation path. No deployment was made.
+`design.md` and `GOAL.md` remain byte-identical. Browser evidence is stored in
+ignored local task artifacts. See [output languages](output-languages.md).
+
+## Shared streaming subtitle processing — 2026-10-18 (historical)
+
+The administrator sample now runs recognition and translation concurrently through
+the shared source/language engine. This is executable processing used by the
+application, but the Discord worker and authorized player-delivery boundary are
+not yet connected to it. Production languages and providers remain disabled.
+
+| Check                                                 | Status                    | Evidence                                                                                                                                                                                                         |
+| ----------------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                              | PASS                      | `npm run ci:local`; 131 first-party source files, largest 494 lines, strict types, 14 tests, builds and unconfigured HTTP boundaries                                                                             |
+| Shared requests and independent languages             | PASS                      | Local protocol test: two Japanese subscribers plus one Korean subscriber use one recognition connection and two translations per language for two utterances                                                     |
+| Audio input during slow translation                   | PASS                      | All 50 PCM frames and stream termination reach recognition while Japanese translation is held; Korean completes independently. This verifies provider input, not browser original-audio playback                 |
+| Revisions, retraction and finality                    | PASS                      | Corrected text cancels the actual older HTTP request; withdrawn text clears immediately; an unchanged final transcript reuses its existing translation without an extra request                                  |
+| Path replacement and source failure                   | PASS                      | Higher path version clears queued work and rejects late results without restarting recognition; a dropped recognition connection cancels its HTTP work and a fresh source receives only its own results          |
+| New subscribers and release                           | PASS                      | A subscriber joining while a prior request is held receives no earlier result; the remaining subscriber continues; the last unsubscribe leads to physical recognition socket closure after the grace period      |
+| Bounded translation queue                             | PASS                      | A held request followed by 40 synthetic utterances discards obsolete queued work, marks discontinuity and retains the newest 32; delayed work never overwrites a newer revision                                  |
+| Configuration normalization regression                | PASS                      | Reordered keys in equivalent path settings first caused INVALID_CONFIGURATION; canonical validation now shares the same lane                                                                                     |
+| Total cancellation regression                         | PASS                      | Cancelling after recognition had finished first left translation running; the owner deadline now aborts the actual held HTTP request and rejects with TIMEOUT                                                    |
+| Built sample HTTP and persistence guards              | PASS                      | `npm run test:samples:db` on disposable PostgreSQL 16; upload bounds, PCM/pauses, source revisions, terminology and opt-out, failures, pair leases, stale provider/catalog rejection and safe audit remain valid |
+| Related provider and catalog regressions              | PASS                      | `test:providers:db` and `test:terms:db` pass against built servers and fresh migrated PostgreSQL                                                                                                                 |
+| Browser sample upload and result rendering            | NOT RUN                   | Previously blocked by the Chrome extension's lack of file-URL access. Stable/provisional translation labels were updated; no complete browser sample-result success is claimed                                   |
+| Real provider access, speech quality and live latency | NOT RUN                   | Requests in these checks use loopback protocol fixtures with synthetic speech text and translations                                                                                                              |
+| Discord original audio and core production acceptance | WAITING FOR CONFIGURATION | Bot token location and guild/channel/commander IDs remain pending; media, worker integration, player subtitles, PiP and network/game acceptance remain incomplete                                                |
+
+No new deployment was made. Provider processing bounds are implementation guards,
+not measured battle latency or supported-player capacity. The shared engine's
+subscriber callbacks are server-internal; these tests do not replace player
+WebSocket authorization or media-revocation tests. See [streaming subtitles](streaming-subtitles.md).
+
+## Editable terminology and sample context — 2026-10-18 (historical)
+
+Administrators can now create, edit, disable, delete and search versioned game
+terms. Authorized sample comparisons can send enabled terms through Soniox and
+DeepL's documented context fields, preserving the source and translated text as
+returned. Context hints are not evidence that a provider used the intended term.
+The catalog starts empty and no production provider or language is enabled.
+
+| Check                                                  | Status                    | Evidence                                                                                                                                                                                                   |
+| ------------------------------------------------------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                               | PASS                      | `npm run ci:local`; 128 first-party source files, largest 494 lines, strict types, eight tests, web/migration/worker builds and unconfigured HTTP boundaries                                               |
+| Migration 0005                                         | PASS                      | Applied to disposable PostgreSQL 16; adds term tables and the empty catalog revision without seeded vocabulary                                                                                             |
+| Authenticated terminology HTTP                         | PASS                      | `npm run test:terms:db`; verified Access plus persisted session and same origin; invalid fields, control characters and oversized/chunked bodies rejected                                                  |
+| Persistent terms and concurrent edits                  | PASS                      | Two built processes share one catalog; source/alias collisions, concurrent creation and stale updates reject; restart preserves entries; delete/recreate cannot reuse an obsolete version                  |
+| Search and pagination                                  | PASS                      | 52 synthetic entries exercise 50-entry pages, literal percent-sign search and stale catalog-page rejection                                                                                                 |
+| Provider context and output-language separation        | PASS                      | `npm run test:samples:db`; loopback Soniox receives source terms without target expressions; DeepL receives only the selected target expression; disabled terms and comparisons without terms are excluded |
+| Sample revision and context limits                     | PASS                      | A catalog edit while translation is in flight rejects the old result with 409; excessive context rejects before provider requests; audits contain revisions without term, audio or transcript text         |
+| Unknown-language validation regressions                | PASS                      | Tests first reproduced acceptance of `und` as a term/output language; shared validation now rejects it, including sample requests before provider work                                                     |
+| Existing application regressions                       | PASS                      | `test:db` (seven tests), `test:http:db`, `test:ws:db`, `test:management:db` and `test:providers:db` on disposable PostgreSQL 16                                                                            |
+| Browser terminology workflow                           | PASS                      | Chrome with local signed identity: create three output expressions, reload in another tab, edit and disable; an older tab's save is refused and explicit reload shows the accepted revision                |
+| Literal text and narrow layout                         | PASS                      | Angle brackets render as text; populated term editor and all language fields fit a 320 px viewport with document width 320 px; captured console has no warning/error entries                               |
+| Live recognition, translation and terminology accuracy | NOT RUN                   | No real provider credentials or authorized battle samples; synthetic responses do not establish quality, latency or provider suitability                                                                   |
+| Discord reception and original audio                   | WAITING FOR CONFIGURATION | Dedicated bot exists; saved token location and guild/channel/commander IDs remain pending                                                                                                                  |
+| Shared live subtitles, PiP and full acceptance         | NOT RUN                   | No deployment by this task; media and live subtitle integration remain incomplete                                                                                                                          |
+
+Browser screenshots are retained under ignored local task artifacts. Vocabulary
+and provider responses are explicitly synthetic test fixtures. These checks do
+not constitute a complete accessibility audit or game compatibility assessment.
+The source specification files remain byte-identical. See [game terminology](game-terms.md)
+for the exact context-matching rules and processing bounds.
+
+Readiness regression: **PASS** on a built server and disposable PostgreSQL.
+Temporarily removing access to the terminology table, then to the initialized
+catalog row, each returned 503; restoring each returned 200. Local CI and the
+existing database-backed HTTP suite passed again after extending the probe.
+
+## Recognition adapter and audio-sample comparison — 2026-10-18 (historical)
+
+This stage adds Soniox recognition with token revisions and utterance endpoints,
+plus an administrator-only authorized WAV comparison using saved Soniox and
+DeepL candidates. It does not enable production providers/languages or player
+subtitles. No live credential or authorized speech sample was supplied, and this
+implementation task has not deployed these changes.
+
+| Check                                                | Status                    | Evidence                                                                                                                                                                                                                            |
+| ---------------------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                             | PASS                      | `npm run ci:local`; 115 first-party source files, largest 430 lines, strict types, eight tests, web/migration/worker builds and unconfigured HTTP boundaries                                                                        |
+| Soniox wire format regression                        | PASS                      | The protocol test first failed with actual `s16le` versus documented `pcm_s16le`; the shared recognizer now sends the correct format and passes the same test                                                                       |
+| Authorized sample HTTP and input limits              | PASS                      | `npm run test:samples:db`; signed Access plus persisted session and same origin; truncated/stereo/overlong WAV rejected before network use; JSON above 1,400,000 bytes returns 413                                                  |
+| PCM timing and transcript revisions                  | PASS                      | A generated tone/paused sample reaches a real loopback WebSocket byte-for-byte, including silence; a protocol fixture revises “Attack” to “Do not attack,” finalizes two utterances, and known versus missing times remain distinct |
+| Separate translation and safe outcomes               | PASS                      | Stable utterances produce one DeepL request each with the selected output script; no-speech makes no translation request; quota failures retain original text with a safe classification                                            |
+| Pair leases, stale evidence and audit privacy        | PASS                      | Two built servers verify both configurations are locked during sample processing; replacing one after lease expiry makes the old result return 409; audits omit audio, text and credentials                                         |
+| Existing regression checks                           | PASS                      | `test:db` (seven tests), `test:http:db`, `test:ws:db`, `test:management:db`, and `test:providers:db` against disposable PostgreSQL 16                                                                                               |
+| Browser sample form and responsive layout            | PASS                      | Chrome: saved candidates selectable, output-language input editable, submission disabled without a file; viewport and document width both 320 px, no captured browser errors/warnings                                               |
+| Browser file selection and complete sample UI result | NOT RUN                   | The Chrome extension lacks file-URL access; automated file selection was rejected before upload. The real HTTP upload/processing path passed separately; no browser-result success is claimed                                       |
+| Live provider access, quality and latency            | NOT RUN                   | Local fixture text is deterministic test data. No actual Soniox/DeepL access or recognition/translation quality has been established                                                                                                |
+| Discord source and original audio                    | WAITING FOR CONFIGURATION | Dedicated bot exists; token storage location and guild/channel/commander IDs remain pending                                                                                                                                         |
+| Full design acceptance and release                   | NOT RUN                   | Shared live jobs, language administration, media revocation, player subtitles and PiP remain unfinished; no deployment                                                                                                              |
+
+The sample HTTP test also first reproduced rejection of Soniox's documented
+`translation_status: none` source tokens as `INVALID_RESPONSE`. The parser now
+accepts both documented source-token statuses (`none` and `original`) while
+rejecting translated tokens on this recognition-only stream.
+
+No production test flags, alternate provider destinations or identity bypasses
+were introduced. Browser screenshots are ignored local artifacts. The sample
+does not store recordings or transcript text and does not overwrite a saved
+configuration's connection-test result. `design.md` and `GOAL.md` remain identical.
+
+## Provider candidates and configuration history — 2026-10-18 (historical)
+
+Current branch additions include encrypted provider candidates, real connection
+request implementations, configuration history, tested replacement/restore, and
+an administrator editor. They have not been deployed. The full design.md goal
+remains incomplete: Discord audio, media revocation, the complete subtitle path,
+language administration and PiP still require implementation and live evidence.
+
+| Check                                       | Status                    | Evidence                                                                                                                                                                                                                          |
+| ------------------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                    | PASS                      | `npm run ci:local`; 106 first-party source files, largest 397 lines; strict types, eight tests, web/migration/worker builds and unconfigured HTTP boundaries                                                                      |
+| Provider wire contracts                     | PASS                      | `npm test`; real loopback HTTP/WS fixtures verify DeepL method/auth/language scripts, response limits, errors, deadlines and redirect refusal; Soniox frames, silence duration, final acknowledgement and safe failures           |
+| Provider management and PostgreSQL          | PASS                      | `npm run test:providers:db`; signed Access plus persisted session, same-origin guards, encrypted current/history values, failed candidate/restore preservation, referenced deletion refusal and no key/ciphertext in reads/audits |
+| Concurrent tests and stale completion       | PASS                      | Two built Node servers share one lease; concurrent tests/mutations reject; an expired lease permits a newer save, and the older response cannot overwrite it                                                                      |
+| Provider persistence and restoration        | PASS                      | New process reads accepted settings/history; restoring version 1 produces a newer version, failed restoration keeps the current one, and cross-configuration ciphertext is rejected                                               |
+| Existing application regression checks      | PASS                      | `test:db` (seven tests), `test:http:db`, `test:ws:db`, and `test:management:db` on disposable PostgreSQL 16                                                                                                                       |
+| Migration 0004                              | PASS                      | Applied additive provider history/lease columns; readiness and built management tests use the migrated database                                                                                                                   |
+| Browser configuration workflow              | PASS                      | Chrome with local signed identity and local provider fixtures: create, test, invalid-key feedback without replacement, edit, restore as a new version, reload, and empty password field                                           |
+| Narrow browser layout                       | PASS                      | Populated provider editor at 320 px has document width 320 px; fields and buttons remain visible                                                                                                                                  |
+| Real provider access, quality and selection | NOT RUN                   | No provider credentials or authorized speech sample; local responses do not establish live access, translation quality, latency or provider suitability                                                                           |
+| Discord reception and original audio        | WAITING FOR CONFIGURATION | Developer portal confirms the dedicated bot exists; token storage path and guild/channel/commander IDs remain pending                                                                                                             |
+| Production release and full acceptance      | NOT RUN                   | No deployment by this implementation task; production languages/providers remain unavailable                                                                                                                                      |
+
+Browser proof is retained in ignored local artifacts. Tests use generated/fake
+credentials and disposable local services. Test-only routing preloads are absent
+from production code; no alternate endpoint or identity bypass was added. DeepL
+400 errors remain a safe rejected-settings category until specific live error
+contracts are validated. Soniox's documented model error has its own category.
+
+## Room administration and credential protection — 2026-10-18 (historical)
+
+Current branch scope: persistent listeners and player sockets, plus versioned
+room/Discord configuration, encrypted bot credentials and the administrator
+listener list. These additions have not been deployed by this implementation
+task. Discord audio, real subtitles, provider settings and PiP remain incomplete.
+
+| Check                                                         | Status  | Evidence                                                                                                                                                                                          |
+| ------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source checks and unconfigured boundaries                     | PASS    | `npm run ci:local`; 86 first-party source files, largest 386 lines; strict types, seven unit tests, web/migration/worker builds and built HTTP smoke                                              |
+| Existing database, HTTP and socket contracts                  | PASS    | `npm run test:db` (seven tests), `npm run test:http:db` and `npm run test:ws:db` on disposable PostgreSQL 16                                                                                      |
+| Authenticated management HTTP                                 | PASS    | `npm run test:management:db`; generated RS256 assertion plus persisted Better Auth cookie; no assertion, no cookie, forged assertion and foreign Origin rejected                                  |
+| Empty-POST administrator sign-in regression                   | PASS    | The new built-Nitro test first reproduced HTTP 415; preserving the absent request body makes the unchanged bodyless POST return 200                                                               |
+| Credential storage and failure handling                       | PASS    | Independent Node crypto decryption verifies AES-256-GCM storage; tag tampering, cross-room ciphertext, wrong key and missing key reject saves without advancing the version                       |
+| Versioning, redaction and restart                             | PASS    | Concurrent same-version writes yield one 200 and one 409; reads/audits omit credentials; replacement gets a fresh nonce; stopped state, settings and administrator cookie survive process restart |
+| Exact-generation administrator removal                        | PASS    | Signed administrator removes an actual WebSocket session; wrong generation returns 404, correct generation sends ADMINISTRATOR_REMOVED and closes the socket                                      |
+| Migration 0003                                                | PASS    | Applied the additive room configuration migration and repeated `npm run db:migrate` successfully; readiness and all database-backed checks use the migrated schema                                |
+| Administrator browser flow                                    | PASS    | Chrome on macOS with a local signed-identity fixture; save/reload persists settings, no credential is repopulated, stale second-tab edit is rejected, explicit reload recovers current version    |
+| Browser removal and narrow layout                             | PASS    | Player receives the administrator-removal message and does not re-enter after refresh; populated admin form/list at 320px has document width 320px                                                |
+| Real Access operator sign-in and Discord reception            | NOT RUN | Local keys and a test-only JWKS response do not validate live Access policy or Discord token permissions; token storage and guild/channel/commander inputs remain pending                         |
+| Audio, subtitle/provider paths, PiP and production acceptance | NOT RUN | No new transport or provider is enabled; the full design.md objective remains incomplete                                                                                                          |
+
+Browser screenshots are retained in ignored local task artifacts. Only a fake
+local bot credential and local test IDs were used; the fake credential was removed
+after verification. The browser fixture still goes through RSA verification and
+the database-backed session; no production authentication bypass was added.
+The source specification files remain byte-identical. Unconfirmed media shutdown
+continues to show DISCONNECTING and never grants a replacement command access.
+
+## Player WebSocket and browser sessions — 2026-10-18 (historical)
+
+Scope of the preceding stage: persistent listeners plus real player sockets and the waiting-room
+interface. With a migrated database, entry is available as JOINING. Original audio,
+actual subtitle delivery and media revocation remain unavailable; no listener is
+authorized for command delivery. The full design.md objective remains incomplete.
+
+| Check                                                                                        | Status  | Evidence                                                                                                                                                                          |
+| -------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source limits, formatting, strict types, unit tests, builds and unconfigured HTTP boundaries | PASS    | `npm run ci:local`; 73 first-party source files, largest 318 lines; seven unit tests                                                                                              |
+| Database coordinator and HTTP regressions                                                    | PASS    | `npm run test:db` (seven tests) and `npm run test:http:db` against disposable PostgreSQL 16                                                                                       |
+| Real player WebSocket authorization                                                          | PASS    | `npm run test:ws:db`; foreign Origin rejected at upgrade, invalid credential receives no session/list, client subtitle publication closes the connection                          |
+| Cross-process replacement and close confirmation                                             | PASS    | Same suite uses two built Node processes sharing PostgreSQL; replacement on B sends terminal state and closes A's socket; old credentials cannot register a live socket           |
+| Heartbeat, recovery and graceful server shutdown                                             | PASS    | Real nonce/pong renews the database heartbeat; socket closure and graceful process shutdown leave no open registration; reconnection retains session/generation                   |
+| Browser entry, refresh and public list                                                       | PASS    | Chrome on macOS; entry renders JOINING, nickname `<前排>验证-1018` is literal text, a fresh tab reads the existing list; refresh preserves the original session ID and generation |
+| Browser replacement and obsolete-page refresh                                                | PASS    | Second tab takes generation 2; first tab displays the required replacement notice; refreshing it creates no third session or generation                                           |
+| Browser recovery and pending leave                                                           | PASS    | Local server restart restores one socket on generation 2; a leave during outage survives refresh, ends generation 2 and opens no replacement socket                               |
+| Narrow layout                                                                                | PASS    | Chrome viewport and document width both 320px; entry/listener controls and list remain readable; screenshots retained in local task artifacts                                     |
+| Migration 0002                                                                               | PASS    | `npm run db:migrate` applied `player_connection` on PostgreSQL 16; schema used by the real socket and browser checks                                                              |
+| Hard-crash registration recovery                                                             | NOT RUN | Unconfirmed sockets remain fail-closed; an operational method to prove owning transport shutdown and reconcile orphaned rows is still required                                    |
+| Live Discord, original audio, actual subtitles, providers and PiP                            | NOT RUN | No live audio/provider credentials have been used and no media adapter is enabled; these results cannot establish sound shutdown or translation quality                           |
+| Production/network/game-mode acceptance                                                      | NOT RUN | These implementation checks used loopback HTTP/WebSocket on macOS, not a player network or AION2                                                                                  |
+
+The browser checks are functional checks, not a complete accessibility audit.
+The list intentionally retains DISCONNECTING rows while media shutdown is
+unconfirmed. No test fixture or enabled language is seeded into production.
+The waiting-room WebSocket sends no battle commands or subtitle history.
+
+The branch incorporates remote main's migration packaging at `09bbb8b`. A clean
+`npm ci` followed by all four validation commands above passed after integration.
+Gitleaks 8.30.1 scanned the full available Git history with redaction and reported
+no leaks. The source specification files remain byte-identical.
+
+## Persistent HTTP stage — 2026-10-18 (historical)
+
+Scope of the preceding implementation stage: persistent listener lifecycle,
+guarded HTTP operations and local PostgreSQL. At that stage browser entry was
+disabled. The current waiting-room status and later checks are recorded above.
+
+| Check                                                                                                  | Status  | Evidence                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source limits, formatting, strict types, unit tests, web/worker build and unconfigured HTTP boundaries | PASS    | `npm run ci:local`; 58 first-party source files, largest 260 lines; seven unit tests                                                                                                                    |
+| Database-backed administrator and listener operations                                                  | PASS    | `npm run test:db`; seven tests total, including six listener scenarios using actual PostgreSQL 16                                                                                                       |
+| Atomic cross-room replacement and concurrent entry                                                     | PASS    | Eight concurrent entries produce generations 1–8 with only generation 8 ACTIVE; NFC variants share the global nickname key                                                                              |
+| Idempotency, obsolete retries, stale cleanup, and uncertain removal                                    | PASS    | Concurrent copies of one request return one session; old retries never replace the current one; A→B→C waits for A as well as B; partial acknowledgements keep JOINING/DISCONNECTING                     |
+| Language subscription persistence and refusal                                                          | PASS    | Enabled local fixture selection preserves session/generation, increments subscription version; disabled code is refused; no transport revocation called                                                 |
+| Built HTTP API with a real database                                                                    | PASS    | `npm run test:http:db`; origin and credential rejection, 202 JOINING, terminal replacement, replay conflict, public field allowlist, unauthorized management denial, process restart and explicit leave |
+| Migration and populated-schema upgrade                                                                 | PASS    | `npm run db:migrate` repeated successfully; migration 0001 applied to an isolated 0000 schema containing one legacy session, preserving the row and initialized subscription version                    |
+| Specifications kept identical                                                                          | PASS    | `cmp design.md GOAL.md`                                                                                                                                                                                 |
+| Discord application lookup                                                                             | PASS    | User-supplied Developer Portal application `1561310594714304685` is named `babel-aion2`; bot page inspected in the authenticated browser                                                                |
+| Live Discord reception and actual media/subtitle shutdown                                              | NOT RUN | The bot token cannot be viewed again in the portal; token storage location and guild/channel/commander IDs are pending. No transport adapter selected or enabled                                        |
+| Browser refresh, replacement message, sound shutdown, and WebSocket delivery                           | NOT RUN | Server restore/terminal data is implemented; listening UI and WebSocket are not connected                                                                                                               |
+| Provider configuration, subtitles, PiP, production deployment and actual network/game-mode acceptance  | NOT RUN | Remain required by the full design; no production changes in this implementation batch                                                                                                                  |
+
+Transport acknowledgement fixtures are simulated. They prove coordinator ordering
+and database state, not actual audio stop, old-token rejection or subtitle delivery.
+The public lobby still advertises zero languages/providers and unavailable entry.
+There is no claim that live Cloudflare policy or production media has passed.
+
+At the end of that stage, the implementation was retained in the dedicated
+Codex-managed `babel-implementation` worktree. The newly configured GitHub remote
+had no integration branch yet. Remote main was created during the later WebSocket
+stage; worktree cleanup still requires verified remote integration of task commits.
+
+## Scaffold baseline
 
 Date: 2026-10-18. Scope: scaffold validation and initial private release,
 not full product delivery. Release source: `09bbb8bf88600df29edea0f0e63792aaa746129e`.
@@ -71,6 +680,11 @@ repository. After task commits are verified on the latest `origin/main`, the
 task worktree can be archived through Codex. Other active task worktrees must
 be preserved. Infrastructure changes use the existing infra checkout explicitly
 selected by the owner; no separate infra repository was created.
+
+The active `babel-implementation` worktree contains the subsequent listener and
+room-administration work. Its branch incorporates the release documentation from
+`origin/main` at `528ac38`; these task commits remain unmerged and the worktree is
+preserved. This implementation task has not changed production infrastructure.
 
 Temporary preview and container processes are stopped at completion. Local task
 records and the accessible chat list were checked for missing working directories;

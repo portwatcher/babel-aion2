@@ -1,3 +1,22 @@
+import { z } from 'zod'
+
+export const languageCodeSchema = z
+  .string()
+  .min(2)
+  .max(35)
+  .refine((value) => {
+    try {
+      const locale = new Intl.Locale(value)
+      return (
+        locale.baseName === value &&
+        Boolean(locale.language) &&
+        locale.language !== 'und'
+      )
+    } catch {
+      return false
+    }
+  }, 'Use a canonical language code with an identified language')
+
 export interface OutputLanguage {
   code: string
   name: string

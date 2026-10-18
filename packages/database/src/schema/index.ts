@@ -1,2 +1,7 @@
 export * from './auth.ts'
 export * from './rooms.ts'
+export * from './player-connections.ts'
+export * from './media-connections.ts'
+export * from './terms.ts'
+export * from './voice-sources.ts'
+export * from './runtime-owners.ts'

@@ -1,0 +1,17 @@
+services:
+  livekit:
+    image: livekit/livekit-server:v1.13.10@sha256:89ca9ce0791e18d6e03bf6e2c49ceb27e1c754eae8bd50c989386c1a5963791a
+    command: ['--config', '/livekit.yaml']
+    volumes:
+      - ./livekit.yaml:/livekit.yaml:ro
+  probe:
+    image: node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d
+    depends_on:
+      - livekit
+    working_dir: /probe
+    volumes:
+      - .:/probe:ro
+      - node-modules:/probe/node_modules
+    command: ['sh', '-c', 'npm ci --no-audit --no-fund && npm run check:livekit']
+volumes:
+  node-modules:

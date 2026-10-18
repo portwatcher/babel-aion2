@@ -18,7 +18,7 @@
     "dev:worker": "npm run dev --workspace=@babel/voice-worker",
     "prepare": "npm run prepare --workspace=@babel/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "tsx --test packages/contracts/test/*.test.ts packages/auth/test/*.test.ts",
+    "test": "tsx --test packages/contracts/test/*.test.ts packages/auth/test/*.test.ts packages/providers/test/*.test.mjs apps/voice-worker/test/room-audio.test.ts apps/web/test/*.test.ts",
     "test:db": "tsx --env-file=.env --test packages/database/test/*.test.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -26,12 +26,28 @@
     "check": "npm run check:lines && npm run format:check && npm run typecheck && npm test",
     "ci:local": "npm run check && npm run build && npm run test:http",
     "test:http": "node scripts/smoke.mjs",
+    "test:http:db": "node --env-file=.env scripts/listener-smoke.mjs",
+    "test:ws:db": "node --env-file=.env scripts/player-websocket-smoke.mjs",
+    "test:media:db": "tsx --env-file=.env --test apps/voice-worker/test/media-publication.test.mjs && node --env-file=.env scripts/media-smoke.mjs",
+    "test:network:db": "node --env-file=.env scripts/media-network-smoke.mjs",
+    "test:recovery:db": "node --env-file=.env scripts/worker-recovery-smoke.mjs && node --env-file=.env scripts/web-recovery-smoke.mjs",
+    "test:pools:db": "node --env-file=.env scripts/database-pool-smoke.mjs",
+    "test:restore:db": "node --env-file=.env scripts/backup-restore-smoke.mjs",
+    "test:subtitles:db": "tsx --env-file=.env --test apps/voice-worker/test/subtitle-delivery.test.mjs",
+    "test:management:db": "node --env-file=.env scripts/management-smoke.mjs",
+    "test:providers:db": "node --env-file=.env scripts/provider-smoke.mjs",
+    "test:samples:db": "node --env-file=.env scripts/provider-sample-smoke.mjs",
+    "test:terms:db": "node --env-file=.env scripts/term-catalog-smoke.mjs",
+    "test:languages:db": "node --env-file=.env scripts/output-language-smoke.mjs",
     "db:up": "docker compose up -d --wait postgres",
     "db:down": "docker compose down",
     "db:generate": "drizzle-kit generate --config packages/database/drizzle.config.ts",
     "db:migrate": "tsx --env-file=.env packages/database/src/migrate.ts",
     "db:studio": "drizzle-kit studio --config packages/database/drizzle.config.ts",
     "worktree:audit": "node scripts/worktree-audit.mjs"
+  },
+  "overrides": {
+    "tar": "7.5.22"
   },
   "devDependencies": {
     "@types/node": "24.19.2",
@@ -41,7 +57,8 @@
     "prettier": "3.9.10",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
+    "vue-router": "5.4.0",
     "vue-tsc": "3.3.13",
-    "vue-router": "5.4.0"
+    "ws": "8.22.0"
   }
 }

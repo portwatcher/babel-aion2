@@ -13,7 +13,12 @@ See [source and secret boundaries](source-and-secrets.md).
 
 `Dockerfile` builds the Nuxt Node server and a standalone PostgreSQL migration
 runner with Node 24.18.0. The runtime runs as UID 1000. It contains no production
-configuration or credentials and does not start the unfinished voice worker.
+configuration or credentials and does not start the optional voice worker.
+The `voice-worker` build target packages Discord/DAVE reception, shared subtitle
+processing and private WebRTC admission with pruned dependencies and UID 1000.
+Keep its authenticated control service private. Source ownership and explicit
+[STUN/TURN settings](media-network.md) are implemented; production worker images,
+public relay routing and firewall rules remain separate private infra work.
 
 The migration command is `node database/migrate.mjs` with `DATABASE_URL` supplied
 at runtime. The infra release applies migrations before starting the new web
@@ -39,10 +44,14 @@ No production image is published from a local checkout.
 
 ## Remaining product work
 
-This deployment publishes the scaffold. Discord reception, media transport,
-listener replacement, providers, subtitles, and PiP remain unimplemented. Do not
-advertise their availability. Keep the production output-language list empty
-until validated processing paths and configuration management exist.
+Player WebSockets, persistent sessions, provider/language administration, a PiP
+window, revocable media admission, per-member Discord reception, PCM publication
+and authorized shared subtitles are implemented. Live audio/provider acceptance,
+native PiP/game behavior and production networking remain unfinished. A JOINING
+connection cannot receive commands. Production may start with an empty language
+list; the administrator later validates and enables configured paths.
+See [validation](test-report.md) for local evidence;
+these changes do not establish a successful production rollout.
 
 Verify Access, database readiness, routing, and actual rollout state separately.
 Use the private infra runbook for operational credentials, backup and recovery.

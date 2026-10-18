@@ -8,9 +8,86 @@ are local-only. `npm run db:migrate` applies committed Drizzle migrations;
 running it again is safe. `npm run db:generate` creates migrations from schema
 changes and requires review before committing.
 
-The app opens its PostgreSQL pool lazily and closes it on server shutdown.
+The app opens its PostgreSQL pool on the first database operation or configured
+listener reconciliation sweep and closes it on server shutdown.
 Without database configuration the public lobby stays available; readiness and
 administrator sessions fail closed. No worker starts audio automatically.
+
+Apply migrations through `0011_tough_psylocke` before this web build. Web readiness
+checks room configuration columns, listener lifecycle columns and player socket
+registrations, provider test/history columns, terminology tables, the initialized
+catalog revisions, output-language validation columns and administrator tables. Migration
+0004 adds provider history and test leases without enabling a provider or language.
+Migration 0005 adds the empty terminology catalog and game-term table. Include both
+tables in the same database backup; catalog and entry versions must be restored
+together. No production term vocabulary is initialized.
+Migration 0006 adds language versions, sample proof/attempt metadata and the global
+language catalog; it normalizes existing ordering without enabling or adding
+languages. Back up language/catalog rows, room defaults, provider revisions and
+terminology versions consistently. A restored proof is current only when all
+referenced versions still match. See [output languages](output-languages.md).
+Migration 0007 adds media connection owners, listener generations, negotiation
+attempts and physical-close receipts. Worker readiness checks this schema.
+Preserve these records consistently with listener and nickname records; do not
+clear a registration until its owning transport is confirmed stopped.
+Migration 0008 adds the capture-mode enum and preserves selected-member scope on
+existing rooms. Readiness checks this column; a previous schema returns 503.
+Migration 0009 adds exclusive source ownership and durable close receipts.
+The receiving worker holds a dedicated PostgreSQL ownership session; loss of
+that session fences playback and subtitles. Unconfirmed ownership cannot be
+cleared merely because its heartbeat is old. See [original audio](original-audio.md).
+Migrations 0010 and 0011 add runtime ownership and indexed nullable player owners.
+Existing unknown registrations are not assigned an invented process identity.
+See [process recovery](worker-recovery.md) before replacing older runtimes.
+Migration 0003 adds room settings
+without enabling a source or adding credentials. Migration 0001 preserves old rows and marks their entry fingerprints as legacy, so
+they cannot be adopted by an unbound retry. Do not roll back or truncate nickname
+generation/session records while old credentials could still exist.
+
+The listener reconciler checks every 30 seconds and expires sessions with no
+heartbeat for 120 seconds. Expiry revokes access first; uncertain transport
+shutdown stays visible. Player WebSocket pings run every 15 seconds, allow 90
+seconds without a valid pong, and renew only the authenticated current session.
+Graceful shutdown closes sockets before the database pool; a physical close is
+required before the socket registration is acknowledged. Hard crashes or storage
+faults may leave open registrations: never clear these by age alone. Web and voice
+supervisors reconcile their own child’s confirmed OS exit before restarting it;
+unknown supervisor/host owners still need independent orchestration evidence.
+See [process recovery](worker-recovery.md) for supported entry points, migrations
+and readiness. The optional media worker now
+closes actual peers and confirms them before replacement; configured sources
+carry Discord original audio and independent subtitles. Graceful media restart
+is tested. See [media admission](media-admission.md)
+and [listener operations](listener-sessions.md).
+
+## Database connection budget
+
+`NUXT_DATABASE_POOL_MAX` limits each web runtime's pool; it is a positive integer
+with a default of 10. `DATABASE_POOL_MAX` limits each of the worker's three
+independent pools (media, source control and subtitles); it defaults to 10 and
+must be at least 2. Source control holds a dedicated PostgreSQL session while
+other queries continue. Reserve one extra source-pool slot beyond the number of
+simultaneously held source sessions. The current public application configures
+one room. Each supervisor has a separate fixed one-connection pool.
+
+For W web processes and V voice processes, plan for at most
+`W × (web pool + 1) + V × (3 × worker pool + 1)` application connections. Include
+old and new processes overlapping during rollout, then reserve additional
+connections for migrations and operations. Set both limits in private runtime
+configuration to fit the database role and server budgets. Defaults preserve the
+previous runtime pool sizes; they are not a production capacity recommendation.
+
+Zero, fractional and nonnumeric settings fail configured production startup.
+Requests queue when a pool is full, subject to the existing connection-acquisition
+deadline. Provider/subtitle work retains its own pool so it cannot consume all
+media/source slots. These settings do not replace database authorization or the
+existing fail-closed transport checks.
+
+After a build, `npm run test:pools:db` uses an isolated local database and real
+web/worker processes. PostgreSQL table locks hold concurrent HTTP work while the
+test measures actual database sessions, then verifies that queued requests resume
+and shutdown releases those sessions. It also exercises invalid startup settings.
+This is a connection-budget regression, not a user-capacity benchmark.
 
 ## Backup and restore procedure
 
@@ -24,13 +101,62 @@ To prove restoration in an isolated environment:
 1. Create a consistent PostgreSQL custom-format dump with `pg_dump` using the
    approved credential source. Do not put a production connection string in shell history.
 2. Restore with `pg_restore` into a separate database; do not overwrite a running room.
+   Keep it outside public routing and leave voice workers stopped during inspection.
 3. Run readiness and the relevant database-backed tests against that database.
-4. Verify configuration versions and administrator session behavior. Once provider
-   encryption exists, verify that protected keys can recover a saved test credential.
+4. Verify configuration versions, stopped state and administrator session behavior.
+   With the original protected key, confirm that saving a retained test credential
+   succeeds. Missing/wrong keys and damaged or cross-room ciphertext must fail closed.
 5. Record the release, migration version, duration, and evidence before using
    the procedure for disaster recovery.
 
-No production backup or restore was performed during scaffolding.
+Restoration does not provide transport-close evidence. A backup taken before a
+socket closes still contains its unconfirmed owner/receipt after restoration,
+even if the original database later recorded the close. Those rows must remain
+fail-closed until independent physical shutdown evidence is available. Do not
+clear them by age or mark them closed merely because a dump was restored.
+Also account for revocations written after the snapshot: a point-in-time backup
+does not contain that later history. Production recovery must fence the old
+services and outstanding credentials before exposing the restored application.
+Supervisor/host recovery and production disaster-recovery coordination remain
+unfinished; the local checks below do not establish those paths.
+
+`npm run test:restore:db` rehearses real custom-format dumps and restores using
+only generated local fixture data. It creates its own source and destination
+databases. Host `pg_dump`/`pg_restore` must match the server major version. For the
+local Compose service, use its matching tools instead:
+
+```sh
+BABEL_TEST_POSTGRES_CONTAINER=babel-local-postgres-1 npm run test:restore:db
+```
+
+The named container must be the disposable PostgreSQL service referenced by
+`DATABASE_URL`. Credentials pass through process environment, not command-line
+arguments. Custom-format dumps are mode 0600 in an ignored private temporary
+directory and are removed afterward. This test is not a production backup tool
+or encrypted backup-storage implementation.
+The fixture restores with ownership/ACL changes omitted into a database owned by
+its local test user. Production roles, grants and backup retention remain the
+private infra procedure's responsibility and need separate verification.
+
+The fixture exports one PostgreSQL snapshot for both the dump and independent
+table digests. It verifies all application/migration tables after restore, repeats
+migration safely, then starts the actual application. Checks include saved
+administrator sessions with mandatory Access, stopped rooms, encrypted room and
+provider settings/history, terminology and language validation revisions, and
+denial of a previously ended listener. A separate running-state snapshot retains
+an unconfirmed player receipt: nickname replacement stays JOINING while an
+unrelated nickname becomes ACTIVE. See [validation](test-report.md) for tested
+PostgreSQL versions. No production backup or restore has been rehearsed.
+
+`NUXT_PROVIDER_ENCRYPTION_KEY` protects saved Discord bot credentials and current
+and historical provider credentials. Generate
+a 32-byte random key with `openssl rand -base64 32`; store it in the approved secret
+facility, separately from the database. All web replicas need the same key;
+the worker uses that value as `PROVIDER_ENCRYPTION_KEY`.
+Changing this key does not re-encrypt saved data: retain the original key for
+recovery. A general re-key procedure is not implemented. A valid administrator
+can replace or remove an unreadable bot credential explicitly, but a normal save
+that retains it fails. No read or export operation returns its plaintext.
 
 ## Release rollback
 
@@ -41,14 +167,34 @@ destructive migration without an explicit data recovery plan. Verify probes,
 Access boundaries, sessions, and live media after the rollback.
 
 Use only previously published, verified image references. An initial deployment
-has no earlier deployed Babel version to restore. An application restart must
-eventually preserve a stopped room, provider settings, and current generations.
+has no earlier deployed Babel version to restore.
+
+These implementation checks do not establish a production rollback. Local process
+restart preserves the room's stopped state, configuration version, encrypted bot
+credential, administrator session and listener generations. Separate built-server
+checks also preserve provider versions and encrypted history across processes.
+Restoring a provider's historical version is re-tested before saving a new version;
+this is not a deployment rollback or proof of live media recovery.
 
 ## Logging and task cleanup
 
 Log service state and safe error codes, never credentials, JWTs, cookies,
 connection strings, full provider responses, or complete battle recordings.
-The worker currently logs only its stopped state.
+The worker logs only controlled startup state, its listening port and safe
+configuration/startup errors. Management reads actual Discord state and member
+frame counters through the authenticated private worker API. Subtitle readiness
+checks the private service, database and key configuration; it does not establish
+provider quality. Subtitle traffic uses bounded private HTTP streams attached to
+registered player sockets. Source and provider failures discard obsolete work;
+audio, transcripts and translated text are not persisted. See
+[shared processing and delivery limits](streaming-subtitles.md).
+Administrator audio-sample comparisons hold both provider test slots for at most
+the 35-second lease, with a 30-second processing deadline and the existing test
+cooldown. A crashed process releases its slots through lease expiry. Sample
+requests and results are not durable jobs: a page reload loses the comparison.
+Audits retain only candidate IDs/versions and safe result codes; do not add audio
+or transcript logging when investigating a sample failure. See the
+[sample format and provider scope](providers-and-languages.md#audio-sample-comparison).
 
 At task completion, stop owned preview servers and test processes and inspect
 worktrees with `npm run worktree:audit`. Follow `AGENTS.md` before any removal.

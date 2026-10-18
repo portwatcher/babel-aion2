@@ -1,6 +1,15 @@
 import { entryRequestSchema } from '@babel/contracts'
+import {
+  listenerOperation,
+  requireListenerCredential,
+  requirePlayerOrigin,
+  useListeners,
+} from '../../utils/listeners'
+import { useListenerRoom } from '../../utils/room-configuration'
 
 export default defineEventHandler(async (event) => {
+  requirePlayerOrigin(event)
+  const credential = requireListenerCredential(event)
   const request = entryRequestSchema.safeParse(await readBody(event))
   if (!request.success) {
     throw createError({
@@ -9,9 +18,10 @@ export default defineEventHandler(async (event) => {
       data: request.error.flatten(),
     })
   }
-  // Do not issue credentials before real media revocation can be confirmed.
-  throw createError({
-    statusCode: 503,
-    statusMessage: '收听通道尚未接入，请稍后重试。',
+  return listenerOperation(async () => {
+    const { roomId } = await useListenerRoom(event)
+    const session = await useListeners(event).enter(roomId, request.data, credential)
+    setResponseStatus(event, session.state === 'JOINING' ? 202 : 200)
+    return session
   })
 })

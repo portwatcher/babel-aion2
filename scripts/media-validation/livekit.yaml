@@ -1,0 +1,10 @@
+port: 17880
+bind_addresses: [0.0.0.0]
+rtc:
+  tcp_port: 17881
+  udp_port: 17882
+  use_external_ip: false
+keys:
+  local-media-validation: local-media-validation-only-not-a-secret
+logging:
+  level: warn
