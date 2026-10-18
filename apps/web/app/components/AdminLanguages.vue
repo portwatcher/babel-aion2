@@ -114,7 +114,7 @@ function save(code: string, input: LanguageSave) {
         method: 'PUT',
         body: input,
       }),
-    '输出语言已保存，尚未开放给玩家。',
+    '输出语言已保存。新语言需要验证路径后再启用。',
   )
 }
 function move(language: ManagedLanguage, direction: 'up' | 'down') {
@@ -208,7 +208,11 @@ onBeforeUnmount(() => {
       配置玩家的字幕语言、服务路径和显示顺序。样本验证记录对应的服务及词表版本，不代表实战翻译质量已通过验收。
     </p>
     <p id="language-activation-help" class="muted">
-      玩家字幕投递尚未接通。可以先保存并验证配置，目前所有语言均不向玩家开放。
+      {{
+        page?.activationAvailable
+          ? '通过当前版本的样本路径验证后，可以启用语言。只有已启用的语言会显示给玩家。'
+          : '字幕工作进程暂不可用。可以先保存并验证配置，恢复后再启用语言。'
+      }}
     </p>
     <p v-if="page" class="muted">
       默认语言：{{ page.defaultOutputLanguage ?? '尚未设置' }}
@@ -296,7 +300,11 @@ onBeforeUnmount(() => {
             :aria-label="`${language.enabled ? '停用' : '启用'} ${language.name}`"
             aria-describedby="language-activation-help"
             severity="secondary"
-            :disabled="locked || (!language.enabled && !page?.activationAvailable)"
+            :disabled="
+              locked ||
+              (!language.enabled &&
+                (!page?.activationAvailable || language.validationState !== 'CURRENT'))
+            "
             @click="setState(language)"
           />
           <Button

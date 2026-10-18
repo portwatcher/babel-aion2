@@ -5,10 +5,12 @@ Picture-in-Picture in a secure, top-level page. Opening requires the player's
 click or keyboard activation. An unsupported browser keeps the ordinary page
 usable and does not show this button. A rejected request shows a retry message.
 
-The window currently displays the same honest subtitle/connection status as the
-main page. Actual commander subtitles are still unavailable because authorized
-player delivery is unfinished. No sample text, synthetic video, capture request,
-or extra audio element is created.
+The window displays the latest member's selected-language subtitle and connection
+status from the same authorized stream as the main page. The compact text is
+limited to two lines and labels speaker/finality; the main page also offers the
+source text and up to two current speakers. No synthetic video, capture request
+or extra audio element is created. Text is cleared on subscription changes,
+source stop, connection loss or session retirement.
 
 ## Use and lifecycle
 
@@ -36,6 +38,23 @@ games. Actual AION2 display-mode and background-audio checks remain required.
 
 ## Current verification boundary
 
+The shared subtitle change was exercised in Chrome/macOS against a built web
+server, isolated PostgreSQL, the actual private subtitle service and explicitly
+synthetic PCM/provider responses. Two named sources rendered independently;
+changing Japanese to Korean cleared the previous text before new results arrived.
+Quota failure kept Korean selected, and disabling all languages cleared the text
+while media remained connected. PiP controls opened and closed successfully.
+Database receipts showed exactly one player socket and one media negotiation
+across language changes, provider failure and PiP use. No browser warning/error
+entries were captured. This establishes transport/UI behavior, not translation
+quality or an independently observed audible browser signal.
+
+Native PiP pixels were not available because the Mac was locked. The successful
+API response and main-page control state do not prove native window contents.
+Live speech, background/game modes and native window disappearance remain NOT RUN.
+
+### Earlier status-window check
+
 The built application was exercised in Chrome on macOS using a real local
 PostgreSQL listener: opening and closing the API request, keyboard activation,
 the main page's 32 px extra-large text, unchanged listener identity/socket count,
@@ -47,6 +66,6 @@ No browser warnings/errors were captured.
 Native PiP pixels and physical window disappearance could not be independently
 observed: the native-app screenshot helper failed, and the browser's read-only
 DOM scope does not expose the PiP window. These remain NOT RUN, as do live
-speaker/translation display, audio continuity, actual AION2 and player-network
+speaker/translation quality, audible continuity, actual AION2 and player-network
 checks. A successful `requestWindow` response and main-page state are not a
 substitute for those checks.

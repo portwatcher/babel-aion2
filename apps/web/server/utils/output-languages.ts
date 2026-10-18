@@ -10,6 +10,7 @@ import { requireAdministratorSession } from './auth'
 import { useDatabase } from './database'
 import { BodyInputError, readBoundedJson } from './bounded-json'
 import { providerConfigurationFailure } from './provider-configuration'
+import { subtitlesReady } from './media-control'
 
 export async function languageOperation<T>(
   event: H3Event,
@@ -21,7 +22,7 @@ export async function languageOperation<T>(
   const { identity } = await requireAdministratorSession(event)
   try {
     return await operation(
-      createLanguageService(useDatabase(event)),
+      createLanguageService(useDatabase(event), subtitlesReady),
       administratorUserId(identity),
     )
   } catch (error) {

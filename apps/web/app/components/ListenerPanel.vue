@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ListenerSnapshot, PublicRoomConfiguration } from '@babel/contracts'
 import { audioStatus } from '~/utils/audio-status'
+import type { SubtitlePresentation } from '~/utils/subtitle-view'
 const props = defineProps<{
   session: ListenerSnapshot
   configuration: PublicRoomConfiguration
@@ -10,6 +11,7 @@ const props = defineProps<{
   muted: boolean
   busy: boolean
   changingLanguage: boolean
+  subtitles: SubtitlePresentation
 }>()
 const emit = defineEmits<{
   leave: []
@@ -81,6 +83,7 @@ const languageName = computed(
       :language-name="languageName"
       :changing-language="changingLanguage"
       :text-size="textSize"
+      :subtitles="subtitles"
     />
     <div class="field">
       <label for="subtitle-text-size">字幕字号</label>
@@ -112,6 +115,7 @@ const languageName = computed(
         :language-name="languageName"
         :changing-language="changingLanguage"
         :text-size="textSize"
+        :subtitles="subtitles"
         compact
       />
     </Teleport>

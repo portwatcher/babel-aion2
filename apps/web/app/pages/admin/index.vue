@@ -50,11 +50,17 @@ const providers = shallowRef<ProviderSummary[]>([])
           </div>
           <div>
             <dt>识别与翻译服务</dt>
-            <dd>尚未接入</dd>
+            <dd>
+              {{
+                status.services.subtitles === 'READY'
+                  ? '字幕处理可用'
+                  : '字幕工作进程暂不可用'
+              }}
+            </dd>
           </div>
           <div>
             <dt>字幕语言</dt>
-            <dd>尚未开放</dd>
+            <dd>由输出语言设置控制</dd>
           </div>
         </dl>
       </section>

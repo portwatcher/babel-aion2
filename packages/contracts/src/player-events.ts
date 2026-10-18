@@ -5,6 +5,8 @@ import {
   publicListenerSchema,
 } from './listeners.ts'
 import { publicRoomConfigurationSchema } from './room.ts'
+import { subtitleMessageSchema } from './subtitles.ts'
+import { languageCodeSchema } from './languages.ts'
 
 // Credentials travel in the first WebSocket frame (WSS in production), not a URL.
 export const playerMessageSchema = z.discriminatedUnion('type', [
@@ -19,6 +21,12 @@ export const playerMessageSchema = z.discriminatedUnion('type', [
 ])
 
 export const playerEventSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('subtitles'),
+    subscriptionVersion: z.number().int().nonnegative(),
+    outputLanguage: languageCodeSchema,
+    event: subtitleMessageSchema,
+  }),
   z.object({ type: z.literal('session'), session: listenerSnapshotSchema }),
   z.object({ type: z.literal('players'), players: z.array(publicListenerSchema) }),
   z.object({

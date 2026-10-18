@@ -19,6 +19,7 @@ import type { Hooks, Peer } from 'crossws'
 import { useDatabase } from './database'
 import { publicRoomConfiguration } from './room-configuration'
 import { mediaReady, revokeMedia } from './media-control'
+import { createSubtitleRelay } from './subtitle-relay'
 
 interface Connection {
   peer: Peer
@@ -35,6 +36,7 @@ interface Connection {
   timeout: ReturnType<typeof setTimeout>
   acknowledgeClose: () => void
   closedPromise: Promise<void>
+  subtitles: ReturnType<typeof createSubtitleRelay> | null
 }
 
 const connections = new Map<string, Connection>()
@@ -58,6 +60,7 @@ function end(connection: Connection, code: number, reason: string) {
     return
   }
   connection.closing = true
+  connection.subtitles?.stop()
   clearTimeout(connection.timeout)
   connection.peer.close(code, reason)
   connection.timeout = setTimeout(() => connection.peer.terminate(), 1_500)
@@ -106,6 +109,7 @@ async function refresh(connection: Connection) {
   if (connection.closing) {
     return
   }
+  connection.subtitles?.update(session)
   const now = Date.now()
   if (now - connection.pongAt > 90_000) {
     end(connection, 4408, 'Heartbeat timeout')
@@ -223,12 +227,16 @@ export const playerWebSocketHooks: Partial<Hooks> = {
       pongAt: Date.now(),
       acknowledgeClose,
       closedPromise,
+      subtitles: null,
       timeout: setTimeout(
         () => end(connection, 4401, 'Authentication required'),
         5_000,
       ),
     }
     connection.timeout.unref()
+    connection.subtitles = createSubtitleRelay(peer.id, (event) =>
+      send(connection, event),
+    )
     connections.set(peer.id, connection)
   },
   async message(peer, message) {
@@ -303,6 +311,7 @@ export const playerWebSocketHooks: Partial<Hooks> = {
       return
     }
     connection.closed = true
+    connection.subtitles?.stop()
     clearTimeout(connection.timeout)
     try {
       await persistClose(connection)

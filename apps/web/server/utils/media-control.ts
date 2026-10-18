@@ -48,6 +48,11 @@ export async function mediaReady() {
   return result?.status === 200 && flag(result.data, 'ready')
 }
 
+export async function subtitlesReady() {
+  const result = await control('/subtitles/ready', undefined, 2_000)
+  return result?.status === 200 && flag(result.data, 'ready')
+}
+
 export async function voiceSourceStatus(roomId: string) {
   const result = await control('/source', { roomId }, 2_000)
   if (result?.status !== 200) {

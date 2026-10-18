@@ -13,12 +13,14 @@ import {
 import { DiscordSource } from './discord-source.ts'
 import { RoomAudio } from './room-audio.ts'
 import type { MediaPeers } from './media-peers.ts'
+import type { SubtitleService } from './subtitle-service.ts'
 
 interface Source {
   configuration: VoiceSourceConfiguration
   lease: Awaited<ReturnType<typeof claimVoiceSource>> | null
   discord: DiscordSource | null
   audio: RoomAudio | null
+  subtitles: ReturnType<SubtitleService['source']> | null
   starting: Promise<void> | null
   closing: boolean
   closingTask: Promise<void> | null
@@ -45,6 +47,7 @@ export class VoiceSources {
     private readonly database: ReturnType<typeof createDatabase>,
     private readonly peers: MediaPeers,
     private readonly cipher: CredentialCipher | null,
+    private readonly subtitles: SubtitleService,
   ) {
     this.timer = setInterval(() => this.check(), 500)
     this.timer.unref()
@@ -132,6 +135,7 @@ export class VoiceSources {
         lease: null,
         discord: null,
         audio: null,
+        subtitles: null,
         starting: null,
         closing: false,
         closingTask: null,
@@ -227,10 +231,21 @@ export class VoiceSources {
       (packet) => this.peers.publish(configuration.id, packet),
       () => this.fail(source, 'DISCORD'),
     )
+    source.subtitles = this.subtitles.source(
+      configuration.id,
+      source.configuration.sourceGeneration,
+      allowed,
+    )
     source.discord = new DiscordSource(
       source.configuration,
-      (id, pcm) => source.audio?.receive(id, pcm),
-      (id) => source.audio?.remove(id),
+      (id, pcm, name) => {
+        source.audio?.receive(id, pcm)
+        source.subtitles?.receive(id, name, pcm)
+      },
+      (id) => {
+        source.audio?.remove(id)
+        source.subtitles?.remove(id)
+      },
       () => this.fail(source, 'DISCORD'),
     )
     await source.discord.open(token)
@@ -239,6 +254,7 @@ export class VoiceSources {
   private close(source: Source): Promise<void> {
     source.closing = true
     source.audio?.close()
+    source.subtitles?.close()
     if (source.closingTask) {
       return source.closingTask
     }
@@ -250,6 +266,7 @@ export class VoiceSources {
       ])
       await source.starting
       source.audio?.close()
+      source.subtitles?.close()
       await source.discord?.close()
       // Closing old peers discards browser decoder/jitter state as well as the
       // worker's PCM queues. New negotiation is fenced by the room epoch.

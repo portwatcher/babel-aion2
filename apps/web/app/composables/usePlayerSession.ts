@@ -38,6 +38,7 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
   let disposed = false
   const connection = usePlayerConnection(receive, invalidSession)
   const playerList = usePlayerList(connection.state)
+  const subtitles = usePlayerSubtitles(session, connection.state, changingLanguage)
   const audio = useListenerAudio((reference) => {
     if (
       !access ||
@@ -52,6 +53,7 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
   })
 
   function clearAccess() {
+    subtitles.clear()
     audio.stop()
     access = null
     restoreFailed.value = false
@@ -103,7 +105,9 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
   }
 
   function receive(event: PlayerEvent) {
-    if (event.type === 'session') {
+    if (event.type === 'subtitles') {
+      subtitles.receive(event)
+    } else if (event.type === 'session') {
       error.value = ''
       accept(event.session)
     } else if (event.type === 'players') {
@@ -112,13 +116,21 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
       configuration.value = event.configuration
       const current = session.value?.outputLanguage
       if (
-        current &&
-        !event.configuration.outputLanguages.some(
-          (language) => language.code === current,
-        )
+        active.value &&
+        !changingLanguage.value &&
+        ((!current && event.configuration.outputLanguages.length > 0) ||
+          (current &&
+            !event.configuration.outputLanguages.some(
+              (language) => language.code === current,
+            )))
       ) {
-        notice.value = '原字幕语言已停用，已按你的语言偏好重新选择。'
-        void changeLanguage(chooseLanguage(), false)
+        const selected = chooseLanguage()
+        notice.value = !selected
+          ? '所有字幕语言已停用，原声继续播放。'
+          : current
+            ? '原字幕语言已停用，已按你的语言偏好重新选择。'
+            : '字幕已启用，已按你的语言偏好选择语言。'
+        void changeLanguage(selected, false)
       }
     } else if (event.type === 'error' && event.code === 'UNAVAILABLE') {
       error.value = '连接暂时不可用，正在恢复本页会话。'
@@ -304,6 +316,7 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
     active,
     leavePending,
     connectionState: connection.state,
+    subtitles: subtitles.presentation,
     audioState: audio.state,
     audioBlocked: audio.blocked,
     muted: audio.muted,

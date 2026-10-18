@@ -4,12 +4,13 @@
 
 The administrator can create, edit, test, restore and remove encrypted candidate
 configurations. Soniox is a recognition candidate; DeepL is a separate text
-translation candidate. Every saved configuration stays `enabled: false` and the
-public language list stays empty. The UI distinguishes a connection test from
-speech/subtitle quality. There is no enable operation or player-defined endpoint.
+translation candidate. Saved configurations remain candidates; the separate
+language state controls live use. The UI distinguishes a connection test from
+speech/subtitle quality. There is no player-defined provider endpoint.
 The separate [output-language editor](output-languages.md) references these
 candidates and persists version-bound sample validation, ordering and defaults.
-It cannot activate a language while player delivery remains unavailable.
+It can activate a currently validated path when the private worker is ready.
+Production starts with no configured languages.
 
 `@babel/providers` makes real protocol requests when used with real credentials.
 Local validation substitutes loopback HTTP/WebSocket servers only in test processes.
@@ -19,8 +20,8 @@ The Soniox recognition adapter handles real-time transcript revisions and uttera
 endpoints. Its audio-sample operation feeds current utterance revisions to the
 separate DeepL adapter while recognition continues. The [shared processing engine](streaming-subtitles.md)
 coalesces revisions and shares work among language subscribers. The Discord
-worker, language-demand coordinator and authorized player subtitle path are not
-yet connected to it.
+worker and language-demand coordinator now deliver its output through authorized
+player connections. This does not turn fixture results into live quality evidence.
 
 ## Candidate APIs and test scope
 
@@ -163,8 +164,8 @@ Soniox sends frames of at most 20 ms and stops if its pending send buffer exceed
 500 ms. Input sample offsets must be contiguous; a discontinuity fails the stream
 instead of silently joining separate fragments. A paused open stream sends a
 documented keepalive every 10 seconds. It ends after 295 minutes, before the
-documented 300-minute session limit; the future continuous worker must replace
-that generation. There is no automatic replay of old audio.
+documented 300-minute session limit; the continuous worker rotates at 290 minutes
+and advances stream generation. There is no automatic replay of old audio.
 The probe requires a finished response after all frames, with at least 1000 ms
 processed; early completion, malformed responses and timeout fail. Soniox
 responses over 64 KiB are rejected. HTTP translation redirects are rejected to
@@ -186,11 +187,11 @@ when its writing system is compatible. Tests include `ja-JP` â†’ `ja`, `ko-KR` â
 
 The player supplies browser preferences and saves explicit choices locally.
 Changing a subscription preserves the listener session/generation. Production
-languages still remain empty. Language-path administration, full validation,
-worker/player integration of shared processing and PiP are unfinished.
+languages remain empty until configured. Language-path administration, sample
+validation, worker/player delivery and shared PiP content are implemented.
 
 Before enabling `zh-Hans`, `ja`, `ko` or another language, implement and validate
-its whole path with authorized samples, compare measured candidates, then expose
-the administrator's provider/path selection. Release unused shared work after a
-short delay. Provider failures must leave original audio independent and must
-not silently switch the requested language.
+its whole path with authorized samples and compare quality. The administrator
+selects and enables validated paths. Unused work is released after a short delay.
+Provider failures preserve original audio and the selected language; the page
+shows its fault. Live quality, latency and production capacity remain unverified.

@@ -1,9 +1,9 @@
 # Output-language preparation and validation
 
 Administrators can save output-language paths, order them, choose a default, and
-validate a saved path with an authorized audio sample. This is preparation for
-player subtitles. The worker and authorized player delivery are not connected;
-activation fails closed and the public language list remains empty.
+validate a saved path with an authorized audio sample, then enable it when the
+private subtitle worker is ready. New installations have an empty public language
+list. No credentials or languages are seeded.
 
 ## Administrator workflow
 
@@ -13,8 +13,9 @@ activation fails closed and the public language list remains empty.
    references, and a choice of whether to include enabled game terms.
 3. Use **验证样本路径** to select an authorized PCM WAV and inspect its source and
    translated text. The existing sample form and provider adapters handle it.
-4. Reorder languages and optionally select a default. These choices are saved
-   but do not expose a language to players before activation is implemented.
+4. Enable a language with a current sample proof and a ready worker. Reorder the
+   enabled choices and optionally select a default. Players receive catalog updates
+   through their existing authenticated WebSocket.
 
 Codes are immutable after creation. Simplified and Traditional Chinese use
 separate `zh-Hans` and `zh-Hant` paths; provider adapters map these site codes to
@@ -61,18 +62,18 @@ All routes require a verified Cloudflare Access identity and its matching
 persisted Better Auth session. Mutations also require the configured same origin.
 Administration uses HTTP and private, noncacheable responses.
 
-| Operation          | Route and body                                                                                                                                  |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| List               | `GET /api/management/languages`; 50 entries per page                                                                                            |
-| Next page          | Same GET with `offset` and `expectedVersion` from the first page                                                                                |
-| Create             | `PUT /api/management/languages/:code`, `expectedVersion: 0`, `name`, `recognitionConfigurationId`, `translationConfigurationId`, `includeTerms` |
-| Edit               | Same PUT with the current entry `expectedVersion`                                                                                               |
-| Validate           | `POST /api/management/languages/:code/validate`, current `expectedVersion` and canonical `audioBase64`                                          |
-| Move               | `POST /api/management/languages/:code/move`, current `expectedCatalogVersion`, `direction: "up"` or `"down"`                                    |
-| Default            | `POST /api/management/languages/default`, current `expectedCatalogVersion`, `code` or `null`                                                    |
-| Disable            | `POST /api/management/languages/:code/state`, current `expectedVersion`, `enabled: false`                                                       |
-| Request activation | Same state route with `enabled: true`; currently always rejected                                                                                |
-| Delete             | `DELETE /api/management/languages/:code`, current `expectedVersion`; language must be disabled                                                  |
+| Operation | Route and body                                                                                                                                  |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| List      | `GET /api/management/languages`; 50 entries per page                                                                                            |
+| Next page | Same GET with `offset` and `expectedVersion` from the first page                                                                                |
+| Create    | `PUT /api/management/languages/:code`, `expectedVersion: 0`, `name`, `recognitionConfigurationId`, `translationConfigurationId`, `includeTerms` |
+| Edit      | Same PUT with the current entry `expectedVersion`                                                                                               |
+| Validate  | `POST /api/management/languages/:code/validate`, current `expectedVersion` and canonical `audioBase64`                                          |
+| Move      | `POST /api/management/languages/:code/move`, current `expectedCatalogVersion`, `direction: "up"` or `"down"`                                    |
+| Default   | `POST /api/management/languages/default`, current `expectedCatalogVersion`, `code` or `null`                                                    |
+| Disable   | `POST /api/management/languages/:code/state`, current `expectedVersion`, `enabled: false`                                                       |
+| Enable    | Same state route with `enabled: true`; requires current sample proof and worker readiness                                                       |
+| Delete    | `DELETE /api/management/languages/:code`, current `expectedVersion`; language must be disabled                                                  |
 
 Ordinary mutation bodies are limited to 32 KiB; sample JSON to 1,400,000 bytes.
 Unknown fields are rejected. Referenced configurations must exist and have the
@@ -89,15 +90,23 @@ The initial migration normalizes existing sort positions and initializes the
 catalog without adding languages. Preserve the catalog, language rows, room
 defaults, provider revisions and terminology catalog together in backups.
 
-## Remaining activation gate
+## Activation and current listeners
 
 An enable request without a current proof returns `PATH_UNVALIDATED` (409).
-With a current sample proof it returns `DELIVERY_UNAVAILABLE` (503). There is no
-test flag or positive activation path. The UI explains this and disables enable
-controls. Public configuration continues to omit all prepared languages.
+An unavailable worker returns `DELIVERY_UNAVAILABLE` (503). Readiness uses the
+authenticated private worker and its database/key access; it is not a provider
+quality or live-source claim. A successful enable operation persists the state
+and audit. Only enabled, sample-validated paths enter public configuration.
 
-Before activation can ship, connect the shared engine to real source/language
-demand, prove generation-fenced player subtitle delivery, implement language-list
-notifications and subscription fallback, and validate actual provider access and
-speech quality. Disabling an active language must update current subscribers
-without interrupting original audio; those live transitions remain unfinished.
+Players retain their session while changing language. Disabled choices trigger
+the saved/browser/default/first fallback, or `null` when none remain; the page
+clears old text immediately and explains the change. With all languages disabled,
+original audio continues and the UI shows that subtitles are not enabled.
+Temporary provider errors keep the selected language and display its fault.
+
+Disable a language before changing its provider references or terminology policy.
+Changes to an existing provider take effect without deployment after the normal
+candidate probe succeeds. The worker cancels old version work; translation-only
+changes retain recognition. Such revisions make sample proof stale, so re-enabling
+later requires validation again. See [streaming delivery](streaming-subtitles.md).
+Live provider access, speech quality and latency still require authorized evidence.

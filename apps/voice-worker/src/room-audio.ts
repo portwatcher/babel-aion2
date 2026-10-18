@@ -1,5 +1,6 @@
 import { performance } from 'node:perf_hooks'
 import opus from '@discordjs/opus'
+import { PcmTimeline } from './pcm-timeline.ts'
 
 const SAMPLE_RATE = 48_000
 const CHANNELS = 2
@@ -7,20 +8,11 @@ const FRAME_SAMPLES = 960
 const FRAME_BYTES = FRAME_SAMPLES * CHANNELS * 2
 const FRAME_MS = 20
 const MAX_QUEUE_MS = 100
-interface Frame {
-  pcm: Buffer
-  receivedAt: number
-}
-interface Timeline {
-  frames: Frame[]
-  remainder: Buffer
-  receivedAt: number
-}
 
 /** Receives independent speaker PCM. Only the playback branch is mixed. */
 export class RoomAudio {
   private readonly encoder = new opus.OpusEncoder(SAMPLE_RATE, CHANNELS)
-  private readonly queues = new Map<string, Timeline>()
+  private readonly queues = new Map<string, PcmTimeline>()
   private readonly timer: ReturnType<typeof setInterval>
   private closed = false
   private lastTick = performance.now()
@@ -47,30 +39,9 @@ export class RoomAudio {
       return
     }
     const receivedAt = performance.now()
-    const prior = this.queues.get(speakerId)
-    // Never concatenate speech separated by a real pause, or replay a backlog
-    // accumulated while the process was stalled.
-    const queue =
-      prior?.frames.filter((frame) => receivedAt - frame.receivedAt < MAX_QUEUE_MS) ??
-      []
-    const remainder =
-      prior && receivedAt - prior.receivedAt < 40 ? prior.remainder : Buffer.alloc(0)
-    const combined = Buffer.concat([remainder, pcm])
-    let offset = 0
-    for (; offset + FRAME_BYTES <= combined.length; offset += FRAME_BYTES) {
-      queue.push({
-        pcm: Buffer.from(combined.subarray(offset, offset + FRAME_BYTES)),
-        receivedAt,
-      })
-    }
-    while (queue.length * FRAME_MS > MAX_QUEUE_MS) {
-      queue.shift()
-    }
-    this.queues.set(speakerId, {
-      frames: queue,
-      remainder: Buffer.from(combined.subarray(offset)),
-      receivedAt,
-    })
+    const timeline = this.queues.get(speakerId) ?? new PcmTimeline()
+    timeline.receive(pcm, receivedAt)
+    this.queues.set(speakerId, timeline)
   }
 
   remove(speakerId: string) {
@@ -90,23 +61,11 @@ export class RoomAudio {
     this.lastTick = now
     const frames: Buffer[] = []
     for (const [id, timeline] of this.queues) {
-      const queue = timeline.frames
-      if (timeline.remainder.length && now - timeline.receivedAt >= 40) {
-        if (now - timeline.receivedAt < MAX_QUEUE_MS) {
-          const padded = Buffer.alloc(FRAME_BYTES)
-          timeline.remainder.copy(padded)
-          queue.push({ pcm: padded, receivedAt: timeline.receivedAt })
-        }
-        timeline.remainder = Buffer.alloc(0)
-      }
-      while (queue[0] && now - queue[0].receivedAt >= MAX_QUEUE_MS) {
-        queue.shift()
-      }
-      const frame = queue.shift()
+      const frame = timeline.take(now)
       if (frame) {
-        frames.push(frame.pcm)
+        frames.push(frame)
       }
-      if (!queue.length && !timeline.remainder.length) {
+      if (timeline.empty) {
         this.queues.delete(id)
       }
     }

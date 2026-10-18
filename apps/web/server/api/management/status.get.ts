@@ -1,15 +1,26 @@
 import { requireAdministratorSession } from '../../utils/auth'
+import {
+  mediaReady,
+  subtitlesReady,
+  voiceSourceStatus,
+} from '../../utils/media-control'
+import { DEFAULT_ROOM_ID } from '../../utils/room-configuration'
 
 export default defineEventHandler(async (event) => {
   const { identity } = await requireAdministratorSession(event)
+  const [source, media, subtitles] = await Promise.all([
+    voiceSourceStatus(DEFAULT_ROOM_ID),
+    mediaReady(),
+    subtitlesReady(),
+  ])
   return {
     administrator: { email: identity.email },
     services: {
-      discord: 'NOT_IMPLEMENTED',
-      media: 'NOT_IMPLEMENTED',
-      subtitles: 'NOT_IMPLEMENTED',
+      discord: source?.state ?? 'UNAVAILABLE',
+      media: media ? 'READY' : 'UNAVAILABLE',
+      subtitles: subtitles ? 'READY' : 'UNAVAILABLE',
     },
-    availableProviders: [],
+    availableProviders: subtitles ? ['soniox', 'deepl'] : [],
     configurationEditable: true,
   }
 })

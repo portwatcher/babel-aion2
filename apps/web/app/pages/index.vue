@@ -23,6 +23,7 @@ const {
   active,
   leavePending,
   connectionState,
+  subtitles,
   audioState,
   audioBlocked,
   muted,
@@ -81,6 +82,7 @@ onBeforeUnmount(() => clearInterval(configurationTimer))
           :session="session"
           :configuration="configuration"
           :connection-state="connectionState"
+          :subtitles="subtitles"
           :audio-state="audioState"
           :audio-blocked="audioBlocked"
           :muted="muted"

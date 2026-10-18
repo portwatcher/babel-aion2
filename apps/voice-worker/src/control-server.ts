@@ -4,10 +4,12 @@ import {
   mediaControlRequestSchema,
   listenerReferenceSchema,
   voiceSourceRequestSchema,
+  subtitleSubscriptionSchema,
 } from '@babel/contracts'
 import { ListenerError } from '@babel/database/listeners'
 import { MediaPeerError, type MediaPeers } from './media-peers.ts'
 import type { VoiceSources } from './voice-sources.ts'
+import { SubtitleDeliveryError, type SubtitleService } from './subtitle-service.ts'
 
 function digest(value: string) {
   return createHash('sha256').update(value).digest()
@@ -36,6 +38,7 @@ export function createControlServer(
   peers: MediaPeers,
   secret: string,
   sources: VoiceSources,
+  subtitles: SubtitleService,
 ) {
   const expected = digest(`Bearer ${secret}`)
   const server = createServer(async (request, response) => {
@@ -44,6 +47,57 @@ export function createControlServer(
       return
     }
     try {
+      if (request.url === '/subtitles/ready' && request.method === 'GET') {
+        const ready = await subtitles.ready()
+        json(response, ready ? 200 : 503, { ready })
+        return
+      }
+      if (request.url === '/subtitles' && request.method === 'POST') {
+        const parsed = subtitleSubscriptionSchema.safeParse(await input(request))
+        if (!parsed.success) {
+          json(response, 400, { code: 'INVALID_REQUEST' })
+          return
+        }
+        const stop = await subtitles.subscribe(parsed.data, {
+          send(event) {
+            const line = JSON.stringify(event) + '\n'
+            if (
+              response.destroyed ||
+              response.writableEnded ||
+              response.writableLength + Buffer.byteLength(line) > 256 * 1024
+            ) {
+              return false
+            }
+            response.write(line)
+            return true
+          },
+          close() {
+            response.end()
+          },
+        })
+        if (response.destroyed) {
+          stop()
+          return
+        }
+        response.writeHead(200, {
+          'content-type': 'application/x-ndjson',
+          'cache-control': 'no-store',
+        })
+        response.flushHeaders()
+        const keepalive = setInterval(() => {
+          if (response.writableLength >= 256 * 1024) {
+            response.destroy()
+          } else if (!response.destroyed && !response.writableEnded) {
+            response.write('\n')
+          }
+        }, 10_000)
+        keepalive.unref()
+        response.once('close', () => {
+          clearInterval(keepalive)
+          stop()
+        })
+        return
+      }
       if (request.url === '/ready' && request.method === 'GET') {
         const ready = await peers.ready()
         json(response, ready ? 200 : 503, { ready })
@@ -102,11 +156,13 @@ export function createControlServer(
       }
     } catch (error) {
       const code =
-        error instanceof ListenerError || error instanceof MediaPeerError
-          ? error.code
-          : error instanceof SyntaxError
-            ? 'INVALID_REQUEST'
-            : 'UNAVAILABLE'
+        error instanceof SubtitleDeliveryError
+          ? 'NOT_FOUND'
+          : error instanceof ListenerError || error instanceof MediaPeerError
+            ? error.code
+            : error instanceof SyntaxError
+              ? 'INVALID_REQUEST'
+              : 'UNAVAILABLE'
       const status =
         code === 'INVALID_CREDENTIAL'
           ? 401

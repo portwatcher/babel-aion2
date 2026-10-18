@@ -21,7 +21,10 @@ import {
 
 export { LanguageConfigurationError } from './model.ts'
 
-export function createLanguageService(db: Database) {
+export function createLanguageService(
+  db: Database,
+  deliveryReady: () => Promise<boolean> = async () => false,
+) {
   async function read(code: string) {
     return db.transaction(async (tx) => {
       await catalog(tx, 'share')
@@ -54,6 +57,7 @@ export function createLanguageService(db: Database) {
     read,
     prepare,
     async list(roomId: string, query: unknown) {
+      const activationAvailable = await deliveryReady().catch(() => false)
       const parsed = languagePageQuerySchema.safeParse(query)
       if (!parsed.success) {
         throw new LanguageConfigurationError('INVALID_LANGUAGE')
@@ -83,7 +87,7 @@ export function createLanguageService(db: Database) {
           offset: input.offset,
           nextOffset: rows.length > 50 ? input.offset + 50 : null,
           defaultOutputLanguage: destination?.defaultOutputLanguage ?? null,
-          activationAvailable: false,
+          activationAvailable,
         }
       })
     },
@@ -237,6 +241,7 @@ export function createLanguageService(db: Database) {
       return { language: await read(code), sample: { ...sample, code: resultCode } }
     },
     async state(code: string, version: number, enabled: boolean, actor: string) {
+      const available = !enabled || (await deliveryReady().catch(() => false))
       await db.transaction(async (tx) => {
         const revision = await catalog(tx, 'update')
         const [row] = await tx
@@ -249,18 +254,18 @@ export function createLanguageService(db: Database) {
           if (view?.validationState !== 'CURRENT') {
             throw new LanguageConfigurationError('PATH_UNVALIDATED')
           }
-          // The shared processor exists, but no worker-to-player delivery path
-          // has been proved. Do not turn a sample success into production access.
-          throw new LanguageConfigurationError('DELIVERY_UNAVAILABLE')
+          if (!available) {
+            throw new LanguageConfigurationError('DELIVERY_UNAVAILABLE')
+          }
         }
         const next = await advance(tx, revision.version)
         await tx
           .update(outputLanguage)
-          .set({ enabled: false, version: next })
+          .set({ enabled, version: next })
           .where(eq(outputLanguage.code, code))
         await tx.insert(auditEvent).values({
           actorSubject: actor,
-          action: 'language.disable',
+          action: enabled ? 'language.enable' : 'language.disable',
           resourceId: code,
           metadata: { version: next },
         })

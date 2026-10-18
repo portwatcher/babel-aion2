@@ -9,6 +9,7 @@ export async function createProviderFixture() {
   const observations = []
   const holds = new Map()
   const speechSockets = new Map()
+  const speechConnections = new Map()
   const listener = createServer(async (request, response) => {
     if (request.url !== '/v2/translate') {
       observations.push({ protocol: 'redirect' })
@@ -95,8 +96,10 @@ export async function createProviderFixture() {
     }
     observations.push(observation)
     speechSockets.set(key, socket)
+    speechConnections.set(observation, socket)
     socket.on('close', () => {
       observation.closed = true
+      speechConnections.delete(observation)
       if (speechSockets.get(key) === socket) {
         speechSockets.delete(key)
       }
@@ -190,8 +193,10 @@ export async function createProviderFixture() {
     setMode(key, mode) {
       credentials.set(key, mode)
     },
-    transcript(key, tokens) {
-      const socket = speechSockets.get(key)
+    transcript(key, tokens, observation) {
+      const socket = observation
+        ? speechConnections.get(observation)
+        : speechSockets.get(key)
       if (!socket) {
         throw new Error('No fixture recognition connection')
       }

@@ -14,8 +14,10 @@ Document PiP window shares the page's current subtitle/connection status and tex
 size; it does not open another listener session or media connection. The optional
 media worker now authorizes receive-only WebRTC and confirms actual peer closure
 before replacement. A configured Discord source now decodes each speaker
-independently and publishes mixed original audio to that room. The complete
-subtitle pipeline and production-network acceptance remain unfinished.
+independently and publishes mixed original audio to that room. Each member's PCM
+also feeds shared recognition and language-specific translation, delivered through
+the existing authenticated player socket to the page and PiP. Live provider quality
+and production-network acceptance remain unfinished.
 Administrators can save versioned room/Discord settings, protect the bot credential
 with server-side encryption, persist a stopped room, and remove a specific listener
 generation. Saving a changed source stops it; the separate start action requests
@@ -33,9 +35,10 @@ Samples use the shared streaming processor: recognition and translation overlap,
 and obsolete revisions are cancelled before they can replace current text.
 Administrators can prepare output-language paths, order them, choose a default,
 and save sample validation tied to the exact provider and terminology revisions.
-Player-language activation stays unavailable until authorized delivery is implemented.
-These candidates remain disabled for production subtitles; live provider quality
-is unvalidated. Isolated real DAVE receipt and rejoin passed with one member;
+Activation requires current sample validation and a ready private subtitle worker.
+New installations still have no languages or credentials; the administrator chooses
+which validated paths to enable. Live provider quality is unvalidated.
+Isolated real DAVE receipt and rejoin passed with one member;
 see the test report for the separate application and browser evidence.
 Isolated [media compatibility checks](docs/media-compatibility.md) record native
 cleanup, actual synthetic audio reception and the self-hosted LiveKit token-reuse
@@ -111,26 +114,27 @@ runs in a separate worker.
 
 ## Commands
 
-| Command                      | Purpose                                                                                                                                                     |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev`                | Start the local Nuxt app                                                                                                                                    |
-| `npm run build`              | Build the web app, standalone migrations, and worker entry point                                                                                            |
-| `npm start`                  | Run the built Nuxt server                                                                                                                                   |
-| `npm run ci:local`           | Source limits, formatting, types, unit tests, build, HTTP smoke                                                                                             |
-| `npm run test:db`            | Real PostgreSQL administrator sessions, listener lifecycle, source start/stop and exclusive ownership tests                                                 |
-| `npm run test:http:db`       | Built server + local PostgreSQL: entry, replacement, isolation and restart; run after build/migrations                                                      |
-| `npm run test:ws:db`         | Two built servers + local PostgreSQL: real player WebSockets, replacement, shutdown and recovery                                                            |
-| `npm run test:media:db`      | Real Opus publication and source fencing; two built servers + worker/PostgreSQL admission, revocation and recovery                                          |
-| `npm run test:management:db` | Built servers + local PostgreSQL: signed admin login, encrypted room settings, conflicts, stop and removal                                                  |
-| `npm run test:providers:db`  | Built servers + local PostgreSQL: provider history, encrypted credentials, replacement and test leases; local provider fixtures                             |
-| `npm run test:samples:db`    | Built servers + local PostgreSQL: authorized WAV sample processing, transcript revisions, upload limits and stale-result rejection; local provider fixtures |
-| `npm run test:terms:db`      | Built servers + local PostgreSQL: terminology CRUD, aliases, concurrent edits, restart, pagination and redacted audit                                       |
-| `npm run test:languages:db`  | Built servers + local PostgreSQL: language paths, persisted validation, ordering/default, conflicts and fail-closed activation                              |
-| `npm run db:generate`        | Generate a migration after schema changes                                                                                                                   |
-| `npm run db:migrate`         | Apply committed migrations using `.env`                                                                                                                     |
-| `npm run db:studio`          | Open the local schema browser using `.env`                                                                                                                  |
-| `npm run db:down`            | Stop the local database without deleting its volume                                                                                                         |
-| `npm run worktree:audit`     | Show worktrees and remote availability without deleting anything                                                                                            |
+| Command                      | Purpose                                                                                                                                                                               |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`                | Start the local Nuxt app                                                                                                                                                              |
+| `npm run build`              | Build the web app, standalone migrations, and worker entry point                                                                                                                      |
+| `npm start`                  | Run the built Nuxt server                                                                                                                                                             |
+| `npm run ci:local`           | Source limits, formatting, types, unit tests, build, HTTP smoke                                                                                                                       |
+| `npm run test:db`            | Real PostgreSQL administrator sessions, listener lifecycle, source start/stop and exclusive ownership tests                                                                           |
+| `npm run test:http:db`       | Built server + local PostgreSQL: entry, replacement, isolation and restart; run after build/migrations                                                                                |
+| `npm run test:ws:db`         | Two built servers + local PostgreSQL: real player WebSockets, replacement, shutdown and recovery                                                                                      |
+| `npm run test:media:db`      | Real Opus publication and source fencing; two built servers + worker/PostgreSQL admission, revocation and recovery                                                                    |
+| `npm run test:subtitles:db`  | Built web + real private worker HTTP/player WebSockets, isolated PostgreSQL and loopback provider protocols: shared PCM, language changes, source/provider replacement and revocation |
+| `npm run test:management:db` | Built servers + local PostgreSQL: signed admin login, encrypted room settings, conflicts, stop and removal                                                                            |
+| `npm run test:providers:db`  | Built servers + local PostgreSQL: provider history, encrypted credentials, replacement and test leases; local provider fixtures                                                       |
+| `npm run test:samples:db`    | Built servers + local PostgreSQL: authorized WAV sample processing, transcript revisions, upload limits and stale-result rejection; local provider fixtures                           |
+| `npm run test:terms:db`      | Built servers + local PostgreSQL: terminology CRUD, aliases, concurrent edits, restart, pagination and redacted audit                                                                 |
+| `npm run test:languages:db`  | Built servers + local PostgreSQL: language paths, persisted validation, ordering/default, conflicts and fail-closed activation                                                        |
+| `npm run db:generate`        | Generate a migration after schema changes                                                                                                                                             |
+| `npm run db:migrate`         | Apply committed migrations using `.env`                                                                                                                                               |
+| `npm run db:studio`          | Open the local schema browser using `.env`                                                                                                                                            |
+| `npm run db:down`            | Stop the local database without deleting its volume                                                                                                                                   |
+| `npm run worktree:audit`     | Show worktrees and remote availability without deleting anything                                                                                                                      |
 
 Source files should remain below 600 lines; 800 is the enforced maximum.
 Configuration, generated migrations, lockfiles, and vendored skills are exempt.

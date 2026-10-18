@@ -1,5 +1,34 @@
 # Validation
 
+## Authorized shared subtitle delivery — 2026-10-19
+
+Per-member decoded PCM now feeds shared recognition and output-language
+translation independently of original playback. Private HTTP streams relay
+current authorized results through the existing player WebSocket to the main
+page and PiP. Language activation requires current sample proof and worker
+readiness. Fresh installations still have no enabled languages or credentials.
+
+| Check                                       | Result  | Evidence                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                    | PASS    | `npm run ci:local`: 191 first-party source files, maximum 495 lines; formatting, strict types, 18 tests, web/worker/migration builds and HTTP smoke                                                                                                                                                               |
+| Actual subtitle transport                   | PASS    | `test:subtitles:db`: built web, private NDJSON HTTP, registered player WebSockets, independent disposable PostgreSQL and loopback provider protocols. Three listeners share one recognition connection and two translation requests for two languages                                                             |
+| Independent sources and stale work          | PASS    | Nonzero synthetic stereo PCM reaches separate mono recognition connections at 48 kHz. Same display names retain different member IDs. New listeners receive no prior work; language/source/provider replacement discards late results                                                                             |
+| Runtime configuration and release           | PASS    | A saved credential replacement takes effect without deployment and preserves recognition; disabling all languages updates public configuration, closes actual recognition sockets and prevents held translations from delivery                                                                                    |
+| Original audio and nickname replacement     | PASS    | Actual WebRTC receiver keeps receiving packets during held translation and quota failure. Same-nickname replacement waits for the old player socket and real media UDP ports to close; old credentials receive no subtitles                                                                                       |
+| Display ordering regression                 | PASS    | A late subtitle revived a stopped source before the fix; the owner-boundary test fails with `1 !== 0` before the source-retirement fence and passes afterward. Other checks cover revisions, stream/configuration ordering and translation completion order                                                       |
+| Database and built API regressions          | PASS    | `test:db` (nine tests), HTTP, WebSocket, media, management, providers, samples, terminology and language suites pass in a separate disposable database; no live-test room data changed                                                                                                                            |
+| Browser main page and PiP controls          | PASS    | Chrome/macOS displays two synthetic sources, clears old language on switch, retains selected language on quota failure, clears disabled subtitles and retains connected media. PiP opens/closes through normal controls; receipts show one player socket and one media peer in total; no captured warnings/errors |
+| Native PiP pixels and live provider quality | NOT RUN | Mac locked during native window inspection. Synthetic provider responses do not prove recognition/translation quality, live latency, native PiP contents or game behavior                                                                                                                                         |
+| Integrated Discord speech                   | NOT RUN | Earlier isolated DAVE speech/rejoin passed. The application listener is connected but the pending new sample still has zero speakers/frames and browser signal energy zero; silence is not spoken-audio proof                                                                                                     |
+
+All new protocol inputs and translations are explicitly synthetic test fixtures;
+there is no production synthetic-input endpoint or fabricated activation receipt.
+The integration test owns authentication, transport, cancellation and physical
+closure. The display reducer owns UI ordering; provider tests retain the queue
+and revision contracts. Temporary subtitle databases/servers were removed after
+verification. The separate Discord test remains open for the requested speech.
+No release or deployment was performed in this change.
+
 ## Original-audio worker integration — 2026-10-19
 
 The worker now connects configured Discord voice sources, independently decodes

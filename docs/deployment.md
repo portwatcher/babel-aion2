@@ -44,11 +44,11 @@ No production image is published from a local checkout.
 ## Remaining product work
 
 Player WebSockets, persistent sessions, provider/language administration, a PiP
-status window and optional revocable media admission are implemented. Discord
-reception, decoded PCM publication, actual subtitle delivery and full PiP/audio
-acceptance remain unfinished. A JOINING connection cannot receive commands;
-ACTIVE media peers currently have an empty track. Keep the production language
-list empty until validated processing and authorized delivery exist.
+window, revocable media admission, per-member Discord reception, PCM publication
+and authorized shared subtitles are implemented. Live audio/provider acceptance,
+native PiP/game behavior and production networking remain unfinished. A JOINING
+connection cannot receive commands. Production may start with an empty language
+list; the administrator later validates and enables configured paths.
 See [validation](test-report.md) for local evidence;
 these changes do not establish a successful production rollout.
 

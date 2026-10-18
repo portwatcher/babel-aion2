@@ -1,11 +1,11 @@
 # Shared subtitle processing
 
-`@babel/providers` now supplies `openSharedSubtitleStream`, used by the actual
-administrator audio-sample operation. Recognition and translation overlap in
-time. This module has no audio publisher: slow translation does not block its
-PCM input, but browser original-audio delivery still requires a verified media
-adapter. The Discord worker and authorized player subtitle delivery are not yet
-connected to this engine. Production languages and providers remain disabled.
+`openSharedSubtitleStream` serves administrator samples and the Discord worker.
+Each independently decoded member feeds original playback and a separate subtitle
+timeline. The worker sends authorized subtitles over private streaming HTTP to
+the web process, which relays them through the player's existing WebSocket. The
+main page and Document PiP share the same presentation state. Initial language
+configuration is empty; an administrator must validate and enable each path.
 
 ## Source and output ownership
 
@@ -24,9 +24,12 @@ it does not authorize a player or replace nickname-generation validation.
 `replaceOutput` requires a higher processing-path version. It cancels the old
 lane, clears its pending work, sends a reset event and waits for new source
 updates. It retains that language's subscribers and does not restart recognition
-or another output language. The future configuration coordinator must advance
-this path version when provider choice, credentials or other path inputs change.
-These are runtime replacements, not a database-backed language enable operation.
+or another output language. The worker reconciles saved configuration every
+500 ms and advances a runtime path version when provider versions or included
+terminology change. Recognition is shared by member, recognition configuration
+and terminology policy/revision. Different recognition configurations or term
+policies need additional provider sessions per member; adding listeners to a
+matching path does not add recognition or translation work.
 
 The last unsubscribe starts a two-second release grace period. A one-second
 sweep closes unused lanes, so physical release occurs after roughly two to three
@@ -57,17 +60,57 @@ player capacity or a required number of languages.
 
 `sequence` identifies utterance order within a recognition stream, rather than
 translation completion order. Revisions of one utterance retain the same
-sequence. A delivery owner must include room/source/speaker identity and use this
-order to prevent a delayed earlier utterance from becoming the current command.
-Known audio times remain provider-relative data; missing times stay null.
+sequence. Delivery includes room/source/member identity and `streamGeneration`,
+which advances on recognition restart, member re-entry and timed rotation.
+The browser compares source, stream, configuration, sequence and revisions,
+displaying at most the latest command per member, two members on the main page
+and one in PiP. Translation completion does not reorder speakers. Stopping a
+source clears its text and prevents late packets from reviving it.
+
+Known audio times are milliseconds relative to that recognition stream's PCM
+sample zero, identified by room/source/member/stream generation. Each 960-sample
+frame represents 20 ms at 48 kHz; pauses use zero-filled frames. Provider times
+are not Discord capture times or synchronized browser playback times. Missing
+times remain null. `serverSentAt` records delivery creation, not measured latency.
 
 PCM writes reuse the existing 20 ms frame and 500 ms socket-buffer bounds.
 Sample offsets must be contiguous; pauses remain actual PCM samples. A source
 failure discards its translation work and reports a safe failure code. A new
-source instance does not adopt its pending requests or cached text. The eventual
-worker must advance source generation, reconnect independently and replace long
-recognition sessions before their duration limit. This module does not yet
-implement that worker lifecycle or media revocation.
+source instance does not adopt pending requests or cached text. The worker copies
+stereo PCM into a separate 100 ms queue and downmixes each member to mono. It
+discards pre-ready audio, retries failed recognition after five seconds and starts
+a fresh stream after a queue overflow or event-loop gap over 100 ms, keeping
+separate speech fragments from being silently joined. Translation failures do
+not restart original playback or switch the selected language.
+
+The worker rotates recognition at 290 minutes, before the adapter's 295-minute
+safety cutoff and Soniox's documented [300-minute limit](https://soniox.com/docs/stt/rt/limits-and-quotas).
+The adapter sends the documented keepalive when PCM pauses; live room timelines
+normally continue to send actual silence. Rotation may lose speech during the
+new connection; it clears the previous text and never replays buffered history.
+
+## Authorized delivery and failure isolation
+
+The private `/subtitles` NDJSON endpoint requires the configured worker control
+secret and an actual registered player connection. Every event rechecks the
+current listener/nickname generation, subscription version and enabled language.
+Subtitle values additionally check persisted source and provider/path/term
+versions immediately before sending. No public route accepts a destination URL,
+provider credential or synthetic PCM. Subtitles are ephemeral, without stored
+history or transcript logs.
+
+Each subscriber has at most 16 queued events and 256 KiB of HTTP output. Slow
+consumers are closed; the web relay reconnects after 1–15 seconds and discards
+old subscription work. The relay bounds individual frames to 128 KiB, checks
+schema/room/language, requires headers within five seconds and stream activity
+within 25 seconds; the worker emits a blank heartbeat every ten seconds.
+These limits do not claim a production player capacity. Database failures close
+subtitle streams while the independently owned media path follows its own checks.
+
+The existing player socket remains the revocation owner. Its physical close is
+required before a replacement nickname can become active, and its closure aborts
+the private stream. Switching language aborts the previous subscription, clears
+page/PiP text and preserves the listener and original-audio peer.
 
 ## Administrator samples and evidence
 
@@ -83,5 +126,11 @@ The protocol tests use real loopback WebSocket/HTTP connections with explicitly
 synthetic source text and translation responses. They exercise shared requests,
 independent languages, uninterrupted PCM input while translation is held,
 corrections, retraction, version replacement, queue overflow, subscriber release
-and source failure. They do not establish speech accuracy, browser audio,
-Discord/DAVE compatibility, live latency or production capacity.
+and source failure. `test:subtitles:db` additionally uses an isolated disposable
+database, the built web app, actual private HTTP/player WebSockets and a real
+WebRTC receiver. It covers language sharing, nonzero per-member PCM, late results,
+same-name speakers, source and credential replacement, disabled languages,
+physical recognition closure, nickname revocation and audio during provider
+delay/failure. Provider responses and PCM are explicitly synthetic. These tests
+do not establish speech accuracy, live Discord-to-provider quality, live latency
+or production capacity. See [the validation report](test-report.md).

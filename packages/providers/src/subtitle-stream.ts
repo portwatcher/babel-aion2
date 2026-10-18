@@ -173,6 +173,28 @@ export function openSharedSubtitleStream(input: {
   if (input.signal?.aborted) {
     abort()
   }
+  function replaceOutput(path: TranslationPath) {
+    if (closed || ending) {
+      throw new ProviderFailure('UNAVAILABLE')
+    }
+    const value = checked(path)
+    const previous = outputs.get(value.outputLanguage)
+    if (!previous || value.version <= previous.lane.path.version) {
+      throw new ProviderFailure('INVALID_CONFIGURATION')
+    }
+    previous.lane.close()
+    for (const subscriber of previous.subscribers) {
+      subscriber.after = eventSequence
+    }
+    const output = makeOutput(value, previous.subscribers)
+    output.releaseAt = previous.releaseAt
+    outputs.set(value.outputLanguage, output)
+    deliver(output, {
+      type: 'reset',
+      outputLanguage: value.outputLanguage,
+      configurationVersion: value.version,
+    })
+  }
   void recognition.finished
     .then(async (result) => {
       await Promise.all([...outputs.values()].map((output) => output.lane.drain()))
@@ -197,7 +219,8 @@ export function openSharedSubtitleStream(input: {
       const value = checked(path)
       let output = outputs.get(value.outputLanguage)
       if (output && JSON.stringify(output.lane.path) !== JSON.stringify(value)) {
-        throw new ProviderFailure('INVALID_CONFIGURATION')
+        replaceOutput(value)
+        output = outputs.get(value.outputLanguage)
       }
       if (!output) {
         if (outputs.size >= 32) {
@@ -218,28 +241,7 @@ export function openSharedSubtitleStream(input: {
         }
       }
     },
-    replaceOutput(path: TranslationPath) {
-      if (closed || ending) {
-        throw new ProviderFailure('UNAVAILABLE')
-      }
-      const value = checked(path)
-      const previous = outputs.get(value.outputLanguage)
-      if (!previous || value.version <= previous.lane.path.version) {
-        throw new ProviderFailure('INVALID_CONFIGURATION')
-      }
-      previous.lane.close()
-      for (const subscriber of previous.subscribers) {
-        subscriber.after = eventSequence
-      }
-      const output = makeOutput(value, previous.subscribers)
-      output.releaseAt = previous.releaseAt
-      outputs.set(value.outputLanguage, output)
-      deliver(output, {
-        type: 'reset',
-        outputLanguage: value.outputLanguage,
-        configurationVersion: value.version,
-      })
-    },
+    replaceOutput,
     write(pcm: Uint8Array, sampleOffset: number) {
       if (closed) {
         throw failure ?? new ProviderFailure('UNAVAILABLE')

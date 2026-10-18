@@ -1,6 +1,6 @@
 import type { PublicRoomConfiguration } from '@babel/contracts'
-import { room } from '@babel/database/schema'
-import { eq, sql } from 'drizzle-orm'
+import { outputLanguage, room } from '@babel/database/schema'
+import { and, asc, eq, isNotNull, sql } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import { useDatabase } from './database'
 import { voiceSourceConfigured } from '@babel/database/voice-sources'
@@ -35,6 +35,21 @@ export async function publicRoomConfiguration(
     const [saved] = await database.select().from(room).where(eq(room.id, roomId))
     if (saved) {
       configuration.room.name = saved.name
+      configuration.outputLanguages = await database
+        .select({ code: outputLanguage.code, name: outputLanguage.name })
+        .from(outputLanguage)
+        .where(
+          and(
+            eq(outputLanguage.enabled, true),
+            isNotNull(outputLanguage.pathValidatedAt),
+          ),
+        )
+        .orderBy(asc(outputLanguage.order), asc(outputLanguage.code))
+      configuration.defaultOutputLanguage = configuration.outputLanguages.some(
+        (language) => language.code === saved.defaultOutputLanguage,
+      )
+        ? saved.defaultOutputLanguage
+        : null
       if (voiceSourceConfigured(saved)) {
         const source = await voiceSourceStatus(roomId)
         configuration.room.audioState = source?.state ?? 'UNAVAILABLE'

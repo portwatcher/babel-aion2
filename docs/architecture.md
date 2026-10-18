@@ -12,14 +12,14 @@ automatically. No sample players, language choices or subtitles are generated.
 A player action can open a feature-detected Document PiP window. Vue Teleport
 shares the existing listener's reactive status and text size with that document;
 there is no extra network client, session or media element. Session replacement,
-leave, page navigation and listener-component disposal close the window. Actual
-subtitle content still needs the authorized delivery path described below.
+leave, page navigation and listener-component disposal close the window. Current
+member subtitles arrive through the same authorized socket and shared view state.
 Without the optional private media worker, new sessions remain JOINING and entry
 returns 202. A configured worker can authorize the current listener after older
 socket and media closures are confirmed. The browser opens one receive-only peer
 and owns its playback/mute control; PiP adds no audio element. Entry returns 503
 without database configuration. A separately configured and started Discord
-source supplies original audio; subtitle delivery remains unfinished.
+source supplies original audio and independently feeds per-member recognition.
 
 Administration uses separate `/api/management/*` HTTP routes. Server middleware
 protects those routes, `/admin` and its descendants, and `/api/auth/*`.
@@ -49,8 +49,8 @@ result. The original and translated text remain provider output.
 The output-language editor stores provider references, terminology policy, order
 and a room default. Sample validation binds to the path and provider/catalog
 revisions; stale results cannot validate a replacement path. Last successful
-proofs and latest attempts are separate. Activation remains unavailable until
-the worker-to-player path exists. See [output languages](output-languages.md).
+proofs and latest attempts are separate. Activation requires current proof and
+private worker readiness. See [output languages](output-languages.md).
 
 `apps/voice-worker` implements authenticated private media control and Werift
 0.25.1 receive-only admission. It rechecks persisted listener authorization,
@@ -59,8 +59,10 @@ the actual close acknowledgement. A PostgreSQL ownership session and durable
 source receipt exclude duplicate bot/guild controllers. The source controller
 connects Discord with DAVE, maintains separate member decoders and bounded PCM
 queues, and publishes mixed original audio independently of subtitle work. Source
-retirement closes old browser peers before acknowledging shutdown. Provider jobs
-are not connected yet. See [original audio](original-audio.md) and
+retirement closes old browser peers before acknowledging shutdown. Separate
+member timelines feed shared provider jobs only while language demand exists.
+Version-checked private HTTP streams feed actual registered player sockets.
+See [original audio](original-audio.md) and
 [media admission](media-admission.md).
 
 ## Shared code
@@ -107,9 +109,10 @@ comparison preserves PCM pauses and uses the shared streaming engine to translat
 while recognition continues. The engine shares recognition per source and
 translation work per output language, bounds pending revisions, cancels obsolete
 requests and releases unused lanes. Both adapters use fixed official destinations,
-safe error classifications and deadlines. The Discord worker and authorized
-player delivery are not yet connected to the engine; player subtitles remain
-unavailable. See [streaming processing](streaming-subtitles.md).
+safe error classifications and deadlines. The worker groups recognition by
+member/configuration/terminology and translates once per requested language.
+Current listener/source/configuration checks fence delivery and cancel obsolete
+work. See [streaming processing](streaming-subtitles.md).
 See [provider configuration](providers-and-languages.md) for probe and sample limits.
 
 ## Next implementation gates
@@ -126,24 +129,22 @@ See [provider configuration](providers-and-languages.md) for probe and sample li
    and worker routing before scaling beyond one configured control endpoint.
    Current revocation observes actual peers and old credentials are denied, but
    unknown owners remain fail-closed. Graceful restart preserves listener identity.
-4. Extend the player WebSocket with authorized subtitles and generation/revision
-   fencing. List, terminal-state delivery, browser restoration and socket closure
-   are implemented; actual subtitle traffic is not. Orphaned socket registrations
-   after a hard process failure remain fail-closed and need confirmed recovery.
+4. Recover orphaned player socket registrations after a confirmed hard process
+   failure. Authorized subtitle delivery, generation/revision fencing and actual
+   socket closure are implemented; unknown owners remain fail-closed.
 5. Validate the recognition and translation candidates against
    live provider credentials and authorized speech samples. Dynamic settings,
    destination restrictions, connection probes, encrypted versions and audits
    and the administrator sample comparison are implemented; connection success
    alone does not validate a subtitle path or speech quality.
    Language-path configuration and persisted sample validation are implemented;
-   live provider evidence and authorized delivery are still required for activation.
-6. Connect the shared processing engine to the Discord worker and actual
-   language demand, with source-generation fencing and independent reconnects.
-   Runtime revision fencing, bounded translation queues and unused-stream release
-   are implemented and exercised by the sample path and local protocol tests.
-7. Connect real subtitle content to the implemented Document PiP status window.
-   Verify its native rendering, background updates, single audio output and actual
-   game display modes. See [PiP scope and evidence](picture-in-picture.md).
+   authorized delivery is implemented, but live provider quality remains unproven.
+6. Measure the integrated per-member recognition/translation path under real
+   provider limits, concurrency and recovery. Loopback transport proves sharing,
+   source/provider replacement and unused release; it does not prove live latency.
+7. Verify native PiP rendering, background updates and actual game display modes
+   with live speech. Main-page and PiP subtitle content share state and one media
+   output. See [PiP scope and evidence](picture-in-picture.md).
 8. Complete deployment, transport, restore, rollback, and real-network evidence
    from `design.md`. Optional character lookup remains outside core delivery.
 

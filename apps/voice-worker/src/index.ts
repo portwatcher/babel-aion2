@@ -3,6 +3,7 @@ import { createCredentialCipher } from '@babel/database/credentials'
 import { MediaPeers } from './media-peers.ts'
 import { createControlServer } from './control-server.ts'
 import { VoiceSources } from './voice-sources.ts'
+import { SubtitleService } from './subtitle-service.ts'
 
 const databaseUrl = process.env.DATABASE_URL
 const secret = process.env.MEDIA_CONTROL_SECRET
@@ -19,6 +20,7 @@ if (!databaseUrl || !secret) {
 } else {
   const database = createDatabase(databaseUrl)
   const sourceDatabase = createDatabase(databaseUrl, { queryTimeoutMs: 2_000 })
+  const subtitleDatabase = createDatabase(databaseUrl, { queryTimeoutMs: 2_000 })
   // Public ICE/TURN configuration remains a deployment gate. No external STUN
   // service is contacted implicitly, and no production connectivity is claimed.
   const peers = new MediaPeers(database.db, { iceServers: [], iceUseIpv6: false })
@@ -28,8 +30,9 @@ if (!databaseUrl || !secret) {
   } catch {
     /* Media admission remains available without a source credential key. */
   }
-  const sources = new VoiceSources(sourceDatabase, peers, cipher)
-  const server = createControlServer(peers, secret, sources)
+  const subtitles = new SubtitleService(subtitleDatabase.db, cipher)
+  const sources = new VoiceSources(sourceDatabase, peers, cipher, subtitles)
+  const server = createControlServer(peers, secret, sources, subtitles)
   server.listen(port, host, () => {
     const address = server.address()
     console.log(
@@ -48,6 +51,8 @@ if (!databaseUrl || !secret) {
     stopping = true
     server.close()
     await sources.stop()
+    await subtitles.stop()
+    await subtitleDatabase.close()
     await sourceDatabase.close()
     await peers.stop()
     await database.close()

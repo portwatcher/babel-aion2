@@ -161,6 +161,17 @@ small {
   font-size: 0.875rem;
   overflow-wrap: anywhere;
 }
+.subtitle-command {
+  min-width: 0;
+}
+.subtitle-command details {
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.subtitle-command summary {
+  cursor: pointer;
+  padding-block: 8px;
+}
 .subtitle-pip-page {
   min-width: 0;
   padding: 16px;
@@ -168,6 +179,12 @@ small {
 .listener-subtitles-compact {
   padding: 0;
   border: 0;
+}
+.listener-subtitles-compact .subtitle-message {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .session-notice,
 .session-feedback {

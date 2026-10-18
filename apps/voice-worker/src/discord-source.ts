@@ -30,7 +30,7 @@ export class DiscordSource {
 
   constructor(
     private readonly configuration: VoiceSourceConfiguration,
-    private readonly frame: (id: string, pcm: Buffer) => void,
+    private readonly frame: (id: string, pcm: Buffer, displayName: string) => void,
     private readonly removed: (id: string) => void,
     private readonly failed: () => void,
   ) {
@@ -163,7 +163,7 @@ export class DiscordSource {
       try {
         const pcm = decoder.decode(packet)
         speaker.receivedFrames += 1
-        this.frame(id, pcm)
+        this.frame(id, pcm, speaker.displayName)
       } catch {
         this.fail()
       }

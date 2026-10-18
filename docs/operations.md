@@ -13,7 +13,7 @@ listener reconciliation sweep and closes it on server shutdown.
 Without database configuration the public lobby stays available; readiness and
 administrator sessions fail closed. No worker starts audio automatically.
 
-Apply migrations through `0008_quiet_doomsday` before this web build. Web readiness
+Apply migrations through `0009_mysterious_phantom_reporter` before this web build. Web readiness
 checks room configuration columns, listener lifecycle columns and player socket
 registrations, provider test/history columns, terminology tables, the initialized
 catalog revisions, output-language validation columns and administrator tables. Migration
@@ -32,6 +32,10 @@ Preserve these records consistently with listener and nickname records; do not
 clear a registration until its owning transport is confirmed stopped.
 Migration 0008 adds the capture-mode enum and preserves selected-member scope on
 existing rooms. Readiness checks this column; a previous schema returns 503.
+Migration 0009 adds exclusive source ownership and durable close receipts.
+The receiving worker holds a dedicated PostgreSQL ownership session; loss of
+that session fences playback and subtitles. Unconfirmed ownership cannot be
+cleared merely because its heartbeat is old. See [original audio](original-audio.md).
 Migration 0003 adds room settings
 without enabling a source or adding credentials. Migration 0001 preserves old rows and marks their entry fingerprints as legacy, so
 they cannot be adopted by an unbound retry. Do not roll back or truncate nickname
@@ -46,8 +50,9 @@ required before the socket registration is acknowledged. Hard crashes or storage
 faults may leave open registrations: never clear these by age alone. Operational
 recovery must first establish that the owning transport cannot deliver anymore.
 This orphan-recovery tool is not yet implemented. The optional media worker now
-closes actual peers and confirms them before replacement; it still carries no
-Discord audio. Graceful restart is tested. See [media admission](media-admission.md)
+closes actual peers and confirms them before replacement; configured sources
+carry Discord original audio and independent subtitles. Graceful media restart
+is tested. See [media admission](media-admission.md)
 and [listener operations](listener-sessions.md).
 
 ## Backup and restore procedure
@@ -74,7 +79,8 @@ No production backup or restore was performed during scaffolding.
 `NUXT_PROVIDER_ENCRYPTION_KEY` protects saved Discord bot credentials and current
 and historical provider credentials. Generate
 a 32-byte random key with `openssl rand -base64 32`; store it in the approved secret
-facility, separately from the database. All web replicas need the same key.
+facility, separately from the database. All web replicas need the same key;
+the worker uses that value as `PROVIDER_ENCRYPTION_KEY`.
 Changing this key does not re-encrypt saved data: retain the original key for
 recovery. A general re-key procedure is not implemented. A valid administrator
 can replace or remove an unreadable bot credential explicitly, but a normal save
@@ -103,7 +109,13 @@ this is not a deployment rollback or proof of live media recovery.
 Log service state and safe error codes, never credentials, JWTs, cookies,
 connection strings, full provider responses, or complete battle recordings.
 The worker logs only controlled startup state, its listening port and safe
-configuration/startup errors. Discord audio is always reported STOPPED.
+configuration/startup errors. Management reads actual Discord state and member
+frame counters through the authenticated private worker API. Subtitle readiness
+checks the private service, database and key configuration; it does not establish
+provider quality. Subtitle traffic uses bounded private HTTP streams attached to
+registered player sockets. Source and provider failures discard obsolete work;
+audio, transcripts and translated text are not persisted. See
+[shared processing and delivery limits](streaming-subtitles.md).
 Administrator audio-sample comparisons hold both provider test slots for at most
 the 35-second lease, with a 30-second processing deadline and the existing test
 cooldown. A crashed process releases its slots through lease expiry. Sample
