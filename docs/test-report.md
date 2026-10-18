@@ -1,4 +1,38 @@
-# Scaffold validation
+# Validation
+
+## Listener implementation — 2026-10-18
+
+Scope: persistent listener lifecycle, guarded HTTP operations, and local PostgreSQL.
+The full design.md objective is still incomplete. Production entry remains disabled
+because no real subtitle/media revocation adapter is connected.
+
+| Check                                                                                                  | Status  | Evidence                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source limits, formatting, strict types, unit tests, web/worker build and unconfigured HTTP boundaries | PASS    | `npm run ci:local`; 58 first-party source files, largest 260 lines; seven unit tests                                                                                                                    |
+| Database-backed administrator and listener operations                                                  | PASS    | `npm run test:db`; seven tests total, including six listener scenarios using actual PostgreSQL 16                                                                                                       |
+| Atomic cross-room replacement and concurrent entry                                                     | PASS    | Eight concurrent entries produce generations 1–8 with only generation 8 ACTIVE; NFC variants share the global nickname key                                                                              |
+| Idempotency, obsolete retries, stale cleanup, and uncertain removal                                    | PASS    | Concurrent copies of one request return one session; old retries never replace the current one; A→B→C waits for A as well as B; partial acknowledgements keep JOINING/DISCONNECTING                     |
+| Language subscription persistence and refusal                                                          | PASS    | Enabled local fixture selection preserves session/generation, increments subscription version; disabled code is refused; no transport revocation called                                                 |
+| Built HTTP API with a real database                                                                    | PASS    | `npm run test:http:db`; origin and credential rejection, 202 JOINING, terminal replacement, replay conflict, public field allowlist, unauthorized management denial, process restart and explicit leave |
+| Migration and populated-schema upgrade                                                                 | PASS    | `npm run db:migrate` repeated successfully; migration 0001 applied to an isolated 0000 schema containing one legacy session, preserving the row and initialized subscription version                    |
+| Specifications kept identical                                                                          | PASS    | `cmp design.md GOAL.md`                                                                                                                                                                                 |
+| Discord application lookup                                                                             | PASS    | User-supplied Developer Portal application `1561310594714304685` is named `babel-aion2`; bot page inspected in the authenticated browser                                                                |
+| Live Discord reception and actual media/subtitle shutdown                                              | NOT RUN | The bot token cannot be viewed again in the portal; token storage location and guild/channel/commander IDs are pending. No transport adapter selected or enabled                                        |
+| Browser refresh, replacement message, sound shutdown, and WebSocket delivery                           | NOT RUN | Server restore/terminal data is implemented; listening UI and WebSocket are not connected                                                                                                               |
+| Provider configuration, subtitles, PiP, production deployment and actual network/game-mode acceptance  | NOT RUN | Remain required by the full design; no production changes in this implementation batch                                                                                                                  |
+
+Transport acknowledgement fixtures are simulated. They prove coordinator ordering
+and database state, not actual audio stop, old-token rejection or subtitle delivery.
+The public lobby still advertises zero languages/providers and unavailable entry.
+There is no claim that live Cloudflare policy or production media has passed.
+
+The implementation is retained in the dedicated Codex-managed `babel-implementation`
+worktree. During this work, another active deployment task configured `origin` as
+`https://github.com/portwatcher/babel-aion2.git`. A final `git fetch origin` succeeded
+but returned no integration branch; remote HEAD was still unknown. These task
+commits are not yet remotely integrated, so the worktree is retained.
+
+## Scaffold baseline
 
 Date: 2026-10-18. Scope: local scaffold only, not full product delivery.
 

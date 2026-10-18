@@ -11,7 +11,9 @@ export function useAdministratorStatus() {
 
   async function refresh() {
     try {
-      status.value = await $fetch('/api/management/status')
+      status.value = await $fetch<NonNullable<typeof status.value>>(
+        '/api/management/status',
+      )
       error.value = ''
     } catch {
       status.value = null

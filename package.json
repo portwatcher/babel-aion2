@@ -25,6 +25,7 @@
     "check": "npm run check:lines && npm run format:check && npm run typecheck && npm test",
     "ci:local": "npm run check && npm run build && npm run test:http",
     "test:http": "node scripts/smoke.mjs",
+    "test:http:db": "node --env-file=.env scripts/listener-smoke.mjs",
     "db:up": "docker compose up -d --wait postgres",
     "db:down": "docker compose down",
     "db:generate": "drizzle-kit generate --config packages/database/drizzle.config.ts",

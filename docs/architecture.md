@@ -3,9 +3,11 @@
 ## Current foundation
 
 `apps/web` uses Nuxt 4 and Nitro's Node server preset. The player page requests
-only `/api/player/config`. It renders real initial-state information with no
-sample players, language choices, or subtitles. `/api/player/sessions` validates
-the input and returns 503 because transport revocation is not implemented.
+only `/api/player/config` while entry is unavailable. It renders real initial
+state with no sample players, language choices, or subtitles. The listener HTTP
+API now persists entry, replacement, restoration, language subscription, heartbeat
+and removal. Unavailable transports hold all new sessions in JOINING; a valid
+entry returns 202 with a database, or 503 without database configuration.
 
 Administration uses separate `/api/management/*` HTTP routes. Server middleware
 protects those routes, `/admin` and its descendants, and `/api/auth/*`.
@@ -28,7 +30,11 @@ subtitle output language.
 tables, rooms, global nickname generations, listener sessions, provider
 configurations, output languages, and audit events. The partial unique index
 allows at most one ACTIVE session per nickname key across rooms. The schema is
-a foundation; it does not implement the full replacement transaction.
+backed by transactional listener operations. Request IDs bind to the original
+payload and credential. Nickname rows serialize generations globally, and a new
+session cannot become ACTIVE until all older deliveries have acknowledged shutdown.
+The production revocation adapter remains unavailable; the database tests use
+explicitly simulated transport acknowledgements. See [listener lifecycle](listener-sessions.md).
 
 `@babel/auth` implements a Cloudflare Access Better Auth plugin. It derives a
 stable administrator ID from the signed issuer and subject, saves the identity,
@@ -43,10 +49,11 @@ tables and are not Better Auth user accounts.
 2. Select and prove a browser media transport, including old-token revocation,
    active-connection removal, and reconnect authorization. Keep entry disabled
    until revocation can be confirmed. No media SDK has been selected yet.
-3. Implement idempotent listener entry and global nickname locking in a database
-   transaction. Finish revocation outside the transaction; authorize the new
-   generation only after confirmed old delivery shutdown. Delayed work must
-   carry session ID and generation. Reconcile actual media participants.
+3. Connect the implemented idempotent entry and global nickname transactions to
+   real transport revocation. The coordinator already calls revocation outside
+   transactions and checks the current session/generation before authorization.
+   Its periodic sweep retries removals and expires silent sessions. Actual media
+   participant reconciliation and revocation proof are still required.
 4. Add the player WebSocket for authorized subtitles, list updates, and terminal
    messages. Restore current sessions after refresh; never re-enter replaced
    sessions automatically. Keep an uncertain removal visible as DISCONNECTING.

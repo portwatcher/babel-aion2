@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm'
+import type { TerminalReason } from '@babel/contracts'
 import {
   bigint,
   boolean,
@@ -33,7 +34,7 @@ export const room = pgTable('room', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
-// A future entry transaction must lock this global key before replacing a session.
+// All lifecycle mutations lock this global key before changing a session.
 export const nickname = pgTable('nickname', {
   key: text('key').primaryKey(),
   generation: bigint('generation', { mode: 'number' }).notNull().default(0),
@@ -53,14 +54,18 @@ export const listenerSession = pgTable(
       .references(() => nickname.key),
     nicknameGeneration: bigint('nickname_generation', { mode: 'number' }).notNull(),
     requestId: uuid('request_id').notNull().unique(),
+    requestFingerprint: text('request_fingerprint').notNull(),
     credentialHash: text('credential_hash').notNull().unique(),
     state: listenerState('state').notNull().default('JOINING'),
     outputLanguage: text('output_language'),
+    subscriptionVersion: integer('subscription_version').notNull().default(0),
     joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    deliveryStoppedAt: timestamp('delivery_stopped_at', { withTimezone: true }),
+    terminalReason: text('terminal_reason').$type<TerminalReason>(),
   },
   (table) => [
     index('listener_room_idx').on(table.roomId),

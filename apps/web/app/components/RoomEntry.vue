@@ -7,6 +7,12 @@ const nickname = ref('')
 const outputLanguage = ref<string | null>(null)
 const validationError = ref('')
 const submitting = ref(false)
+let pendingEntry: {
+  nickname: string
+  outputLanguage: string | null
+  requestId: string
+  credential: string
+} | null = null
 
 async function enter() {
   const result = nicknameSchema.safeParse(nickname.value)
@@ -17,12 +23,28 @@ async function enter() {
   submitting.value = true
   validationError.value = ''
   try {
-    await $fetch('/api/player/sessions', {
-      method: 'POST',
-      body: {
+    if (
+      pendingEntry?.nickname !== result.data ||
+      pendingEntry.outputLanguage !== outputLanguage.value
+    ) {
+      const bytes = crypto.getRandomValues(new Uint8Array(32))
+      pendingEntry = {
         nickname: result.data,
         outputLanguage: outputLanguage.value,
         requestId: crypto.randomUUID(),
+        credential: btoa(String.fromCharCode(...bytes))
+          .replaceAll('+', '-')
+          .replaceAll('/', '_')
+          .replace(/=+$/, ''),
+      }
+    }
+    await $fetch('/api/player/sessions', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${pendingEntry.credential}` },
+      body: {
+        nickname: pendingEntry.nickname,
+        outputLanguage: pendingEntry.outputLanguage,
+        requestId: pendingEntry.requestId,
       },
     })
   } catch {

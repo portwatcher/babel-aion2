@@ -8,9 +8,22 @@ are local-only. `npm run db:migrate` applies committed Drizzle migrations;
 running it again is safe. `npm run db:generate` creates migrations from schema
 changes and requires review before committing.
 
-The app opens its PostgreSQL pool lazily and closes it on server shutdown.
+The app opens its PostgreSQL pool on the first database operation or configured
+listener reconciliation sweep and closes it on server shutdown.
 Without database configuration the public lobby stays available; readiness and
 administrator sessions fail closed. No worker starts audio automatically.
+
+Apply migration `0001_panoramic_mad_thinker` before this web build. Readiness now
+checks the listener lifecycle columns as well as administrator tables. The
+migration preserves old rows and marks their entry fingerprints as legacy, so
+they cannot be adopted by an unbound retry. Do not roll back or truncate nickname
+generation/session records while old credentials could still exist.
+
+The listener reconciler checks every 30 seconds and expires sessions with no
+heartbeat for 120 seconds. Expiry revokes access first; uncertain transport
+shutdown stays visible. The current adapter is unavailable and never grants
+command access. See [listener operations](listener-sessions.md) for the API and
+remaining live transport work.
 
 ## Backup and restore procedure
 

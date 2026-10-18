@@ -5,12 +5,14 @@
   "type": "module",
   "exports": {
     ".": "./src/client.ts",
-    "./schema": "./src/schema/index.ts"
+    "./schema": "./src/schema/index.ts",
+    "./listeners": "./src/listeners/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@babel/contracts": "*",
     "drizzle-orm": "0.45.4",
     "pg": "8.23.1"
   }

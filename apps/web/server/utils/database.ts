@@ -3,7 +3,7 @@ import type { H3Event } from 'h3'
 
 let connection: ReturnType<typeof createDatabase> | undefined
 
-export function useDatabase(event: H3Event) {
+export function useDatabase(event?: H3Event) {
   if (!connection) {
     const config = useRuntimeConfig(event)
     if (!config.databaseUrl) {
