@@ -123,7 +123,8 @@ onBeforeUnmount(() => {
     </p>
     <p class="muted">
       音频会发送至 Soniox，识别文字会发送至
-      DeepL，可能产生服务费用。请选择获授权的样本；服务器不保存音频或测试文字。
+      DeepL，识别修订可能触发多次翻译并产生服务费用。请选择获授权的样本；服务器不保存音频或测试文字。
+      处理期间会持续识别和翻译，结果在结束后显示。
     </p>
     <div class="field">
       <label for="sample-recognition">语音识别配置</label>
@@ -234,7 +235,9 @@ onBeforeUnmount(() => {
             {{ segment.language === 'und' ? '语言未识别' : segment.language }}
           </p>
           <p>{{ segment.text || '原文已撤回' }}</p>
-          <p class="muted">译文</p>
+          <p class="muted">
+            {{ segment.translationIsFinal ? '稳定译文' : '未稳定译文' }}
+          </p>
           <p>
             {{
               segment.failure

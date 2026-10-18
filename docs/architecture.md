@@ -27,7 +27,7 @@ and restores encrypted history as a new version. Candidate connection changes
 must pass a probe before replacing saved settings. Database leases prevent
 duplicate tests across replicas and version checks reject late results.
 The audio-sample form holds two candidate test leases while Soniox recognizes
-a bounded authorized PCM WAV and DeepL translates stable original utterances.
+a bounded authorized PCM WAV and DeepL translates current utterance revisions.
 The result is restricted to the administrator and does not enable player delivery.
 The term editor persists a versioned catalog with source alternatives and separate
 output expressions. Sample processing reads one catalog snapshot, passes enabled
@@ -75,9 +75,13 @@ tables and are not Better Auth user accounts.
 `@babel/providers` implements bounded DeepL text requests and Soniox WebSocket
 recognition with provisional/final tokens, revisions, utterance endpoints and known
 sample-relative timestamps. Connection probes reuse these adapters. The sample
-comparison preserves PCM pauses and translates stable utterances after recognition.
-Both adapters use fixed official destinations, safe error classifications and
-deadlines. Shared recognition/translation work and player subtitles remain absent.
+comparison preserves PCM pauses and uses the shared streaming engine to translate
+while recognition continues. The engine shares recognition per source and
+translation work per output language, bounds pending revisions, cancels obsolete
+requests and releases unused lanes. Both adapters use fixed official destinations,
+safe error classifications and deadlines. The Discord worker and authorized
+player delivery are not yet connected to the engine; player subtitles remain
+unavailable. See [streaming processing](streaming-subtitles.md).
 See [provider configuration](providers-and-languages.md) for probe and sample limits.
 
 ## Next implementation gates
@@ -103,8 +107,10 @@ See [provider configuration](providers-and-languages.md) for probe and sample li
    and the administrator sample comparison are implemented; connection success
    alone does not validate a subtitle path or speech quality.
    Add language-path configuration and validation before enabling any language.
-6. Add one shared processing path per commander and active output language,
-   revision fencing, bounded queues, and independent failure recovery.
+6. Connect the shared processing engine to the Discord worker and actual
+   language demand, with source-generation fencing and independent reconnects.
+   Runtime revision fencing, bounded translation queues and unused-stream release
+   are implemented and exercised by the sample path and local protocol tests.
 7. Add feature-detected Document PiP from a player action, sharing the same
    listener session and audio output. Test actual game display modes.
 8. Complete deployment, transport, restore, rollback, and real-network evidence

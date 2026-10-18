@@ -80,14 +80,31 @@ export async function transcribePcm(
   signal: AbortSignal,
   context?: RecognitionContext,
 ) {
-  const cancellation = new AbortController()
-  const combined = AbortSignal.any([signal, cancellation.signal])
   const stream = openSonioxStream(settings, credential, {
     sampleRate: audio.sampleRate,
     onTranscript,
-    signal: combined,
+    signal,
     context,
   })
+  try {
+    return await sendPcmAudio(stream, audio, signal)
+  } finally {
+    stream.close()
+  }
+}
+
+export async function sendPcmAudio<T>(
+  stream: {
+    ready: Promise<void>
+    finished: Promise<T>
+    write: (pcm: Uint8Array, sampleOffset: number) => void
+    end: () => Promise<T>
+  },
+  audio: PcmAudio,
+  signal: AbortSignal,
+) {
+  const cancellation = new AbortController()
+  const combined = AbortSignal.any([signal, cancellation.signal])
   try {
     await stream.ready
     const sending = (async () => {
@@ -113,6 +130,5 @@ export async function transcribePcm(
     throw new ProviderFailure(signal.aborted ? 'TIMEOUT' : 'UNAVAILABLE')
   } finally {
     cancellation.abort()
-    stream.close()
   }
 }

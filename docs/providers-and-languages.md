@@ -13,9 +13,11 @@ Local validation substitutes loopback HTTP/WebSocket servers only in test proces
 No real provider credential or authorized battle speech sample has been supplied;
 live access, latency, quality and provider selection remain **NOT RUN**.
 The Soniox recognition adapter handles real-time transcript revisions and utterance
-endpoints. Its audio-sample operation passes stable original utterances to the
-separate DeepL adapter. Shared commander/language jobs and the authorized player
-subtitle path are not implemented.
+endpoints. Its audio-sample operation feeds current utterance revisions to the
+separate DeepL adapter while recognition continues. The [shared processing engine](streaming-subtitles.md)
+coalesces revisions and shares work among language subscribers. The Discord
+worker, language-demand coordinator and authorized player subtitle path are not
+yet connected to it.
 
 ## Candidate APIs and test scope
 
@@ -59,12 +61,17 @@ which lets DeepL detect the source instead of inventing an intermediate language
 Each utterance is bounded to 4096 characters/tokens and each sample to 32 utterances.
 These are processing limits, not an acceptance sample-count requirement.
 
-After recognition finishes, stable nonempty utterances are translated once each.
-The page shows original/translated text, finality, known sample times, configuration
+Current utterances are translated during recognition. Provisional updates are
+coalesced; corrected source clears and supersedes an obsolete translation. An
+unchanged text can reuse its translation when only finality changes. The page
+returns the comparison after processing ends and shows original/translated text,
+separate source/translation finality, known sample times, configuration
 versions and elapsed processing time. This elapsed time is not a measurement of
 live subtitle latency. `PASS` means the request finished with valid responses;
 the administrator must still compare accuracy, negation, numbers and terminology.
-`NO_SPEECH` makes no translation request. Safe provider failures remain visible
+An entirely empty transcript makes no translation request. `NO_SPEECH` means no
+stable nonempty utterance remains; a provisional utterance withdrawn later may
+already have incurred a translation request. Safe provider failures remain visible
 with any partial original text. The operation does not enable configurations,
 modify connection-test evidence, create a language or send anything to players.
 
@@ -177,7 +184,7 @@ when its writing system is compatible. Tests include `ja-JP` â†’ `ja`, `ko-KR` â
 The player supplies browser preferences and saves explicit choices locally.
 Changing a subscription preserves the listener session/generation. Production
 languages still remain empty. Language-path administration, full validation,
-shared recognition/translation work, delayed-result fencing and PiP are unfinished.
+worker/player integration of shared processing and PiP are unfinished.
 
 Before enabling `zh-Hans`, `ja`, `ko` or another language, implement and validate
 its whole path with authorized samples, compare measured candidates, then expose

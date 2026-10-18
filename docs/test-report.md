@@ -1,6 +1,35 @@
 # Validation
 
-## Editable terminology and sample context — 2026-10-18
+## Shared streaming subtitle processing — 2026-10-18
+
+The administrator sample now runs recognition and translation concurrently through
+the shared source/language engine. This is executable processing used by the
+application, but the Discord worker and authorized player-delivery boundary are
+not yet connected to it. Production languages and providers remain disabled.
+
+| Check                                                 | Status                    | Evidence                                                                                                                                                                                                         |
+| ----------------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                              | PASS                      | `npm run ci:local`; 131 first-party source files, largest 494 lines, strict types, 14 tests, builds and unconfigured HTTP boundaries                                                                             |
+| Shared requests and independent languages             | PASS                      | Local protocol test: two Japanese subscribers plus one Korean subscriber use one recognition connection and two translations per language for two utterances                                                     |
+| Audio input during slow translation                   | PASS                      | All 50 PCM frames and stream termination reach recognition while Japanese translation is held; Korean completes independently. This verifies provider input, not browser original-audio playback                 |
+| Revisions, retraction and finality                    | PASS                      | Corrected text cancels the actual older HTTP request; withdrawn text clears immediately; an unchanged final transcript reuses its existing translation without an extra request                                  |
+| Path replacement and source failure                   | PASS                      | Higher path version clears queued work and rejects late results without restarting recognition; a dropped recognition connection cancels its HTTP work and a fresh source receives only its own results          |
+| New subscribers and release                           | PASS                      | A subscriber joining while a prior request is held receives no earlier result; the remaining subscriber continues; the last unsubscribe leads to physical recognition socket closure after the grace period      |
+| Bounded translation queue                             | PASS                      | A held request followed by 40 synthetic utterances discards obsolete queued work, marks discontinuity and retains the newest 32; delayed work never overwrites a newer revision                                  |
+| Configuration normalization regression                | PASS                      | Reordered keys in equivalent path settings first caused INVALID_CONFIGURATION; canonical validation now shares the same lane                                                                                     |
+| Total cancellation regression                         | PASS                      | Cancelling after recognition had finished first left translation running; the owner deadline now aborts the actual held HTTP request and rejects with TIMEOUT                                                    |
+| Built sample HTTP and persistence guards              | PASS                      | `npm run test:samples:db` on disposable PostgreSQL 16; upload bounds, PCM/pauses, source revisions, terminology and opt-out, failures, pair leases, stale provider/catalog rejection and safe audit remain valid |
+| Related provider and catalog regressions              | PASS                      | `test:providers:db` and `test:terms:db` pass against built servers and fresh migrated PostgreSQL                                                                                                                 |
+| Browser sample upload and result rendering            | NOT RUN                   | Previously blocked by the Chrome extension's lack of file-URL access. Stable/provisional translation labels were updated; no complete browser sample-result success is claimed                                   |
+| Real provider access, speech quality and live latency | NOT RUN                   | Requests in these checks use loopback protocol fixtures with synthetic speech text and translations                                                                                                              |
+| Discord original audio and core production acceptance | WAITING FOR CONFIGURATION | Bot token location and guild/channel/commander IDs remain pending; media, worker integration, player subtitles, PiP and network/game acceptance remain incomplete                                                |
+
+No new deployment was made. Provider processing bounds are implementation guards,
+not measured battle latency or supported-player capacity. The shared engine's
+subscriber callbacks are server-internal; these tests do not replace player
+WebSocket authorization or media-revocation tests. See [streaming subtitles](streaming-subtitles.md).
+
+## Editable terminology and sample context — 2026-10-18 (historical)
 
 Administrators can now create, edit, disable, delete and search versioned game
 terms. Authorized sample comparisons can send enabled terms through Soniox and

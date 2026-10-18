@@ -8,6 +8,7 @@ export async function createProviderFixture() {
   const credentials = new Map()
   const observations = []
   const holds = new Map()
+  const speechSockets = new Map()
   const listener = createServer(async (request, response) => {
     if (request.url !== '/v2/translate') {
       observations.push({ protocol: 'redirect' })
@@ -20,7 +21,17 @@ export async function createProviderFixture() {
       chunks.push(chunk)
     }
     const body = JSON.parse(Buffer.concat(chunks).toString())
-    observations.push({ protocol: 'deepl', method: request.method, key, body })
+    const observation = {
+      protocol: 'deepl',
+      method: request.method,
+      key,
+      body,
+      closed: false,
+    }
+    observations.push(observation)
+    response.on('close', () => {
+      observation.closed = true
+    })
     const mode = credentials.get(key) ?? 'invalid'
     const hold = holds.get(key)
     hold?.started.resolve()
@@ -53,7 +64,7 @@ export async function createProviderFixture() {
       JSON.stringify({
         translations: [
           {
-            text: `fixture:${body.target_lang}`,
+            text: `fixture:${body.target_lang}${mode === 'echo' ? `:${body.text[0]}` : ''}`,
             detected_source_language: body.source_lang ?? 'EN',
           },
         ],
@@ -80,8 +91,16 @@ export async function createProviderFixture() {
       configuration: null,
       frames: [],
       end: false,
+      closed: false,
     }
     observations.push(observation)
+    speechSockets.set(key, socket)
+    socket.on('close', () => {
+      observation.closed = true
+      if (speechSockets.get(key) === socket) {
+        speechSockets.delete(key)
+      }
+    })
     if (mode === 'invalid' || mode === 'model' || mode === 'quota') {
       socket.send(
         JSON.stringify({
@@ -170,6 +189,16 @@ export async function createProviderFixture() {
     },
     setMode(key, mode) {
       credentials.set(key, mode)
+    },
+    transcript(key, tokens) {
+      const socket = speechSockets.get(key)
+      if (!socket) {
+        throw new Error('No fixture recognition connection')
+      }
+      socket.send(JSON.stringify({ tokens }))
+    },
+    disconnect(key) {
+      speechSockets.get(key)?.close()
     },
     hold(key) {
       const started = Promise.withResolvers()

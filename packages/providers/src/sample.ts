@@ -1,14 +1,14 @@
-import type {
-  ProviderSampleResult,
-  SampleSegment,
-  SonioxSettings,
-  DeepLSettings,
-  TerminologySnapshot,
+import {
+  sampleSegmentSchema,
+  type ProviderSampleResult,
+  type SampleSegment,
+  type SonioxSettings,
+  type DeepLSettings,
+  type TerminologySnapshot,
 } from '@babel/contracts'
-import { translateDeepL } from './deepl.ts'
 import { ProviderFailure } from './errors.ts'
-import { transcribePcm, type PcmAudio } from './pcm.ts'
-import { recognitionTerminology, translationTerminology } from './terminology.ts'
+import { sendPcmAudio, type PcmAudio } from './pcm.ts'
+import { openSharedSubtitleStream } from './subtitle-stream.ts'
 
 export async function previewSubtitleSample(input: {
   recognition: { settings: SonioxSettings; credential: string; version: number }
@@ -22,56 +22,43 @@ export async function previewSubtitleSample(input: {
   const segments = new Map<string, SampleSegment>()
   let code: ProviderSampleResult['code'] = 'PASS'
   try {
-    const context = recognitionTerminology(input.terminology?.terms ?? [])
-    await transcribePcm(
-      input.recognition.settings,
-      input.recognition.credential,
-      input.audio,
-      (transcript) => {
-        if (!segments.has(transcript.utteranceId) && segments.size >= 32) {
-          throw new ProviderFailure('INVALID_RESPONSE')
-        }
-        segments.set(transcript.utteranceId, {
-          ...transcript,
-          translatedText: '',
-          translationRevision: 0,
-          translationTermCount: 0,
-          failure: null,
-        })
-      },
-      deadline,
-      context,
-    )
+    const stream = openSharedSubtitleStream({
+      recognition: input.recognition,
+      sampleRate: input.audio.sampleRate,
+      terminology: input.terminology,
+      signal: deadline,
+    })
+    try {
+      stream.subscribe(
+        {
+          outputLanguage: input.outputLanguage,
+          settings: input.translation.settings,
+          credential: input.translation.credential,
+          version: input.translation.version,
+        },
+        (event) => {
+          if (event.type !== 'subtitle') {
+            return
+          }
+          const segment = sampleSegmentSchema.parse(event.value)
+          if (!segments.has(segment.utteranceId) && segments.size >= 32) {
+            throw new ProviderFailure('INVALID_RESPONSE')
+          }
+          segments.set(segment.utteranceId, segment)
+        },
+      )
+      await sendPcmAudio(stream, input.audio, deadline)
+    } finally {
+      stream.close()
+    }
     const finalized = [...segments.values()].filter(
       (segment) => segment.isFinal && segment.text.trim(),
     )
     if (!finalized.length) {
       code = 'NO_SPEECH'
     }
-    // This is a bounded, isolated comparison of a supplied sample. Translate
-    // confirmed utterances once; do not treat provisional hypotheses as evidence.
-    for (const segment of finalized) {
-      try {
-        const terms = translationTerminology(
-          input.terminology?.terms ?? [],
-          segment.language,
-          input.outputLanguage,
-        )
-        segment.translationTermCount = terms.count
-        segment.translatedText = await translateDeepL(
-          input.translation.settings,
-          input.translation.credential,
-          {
-            text: segment.text,
-            sourceLanguage: segment.language,
-            outputLanguage: input.outputLanguage,
-            context: terms.context,
-          },
-          deadline,
-        )
-        segment.translationRevision = 1
-      } catch (error) {
-        segment.failure = error instanceof ProviderFailure ? error.code : 'UNAVAILABLE'
+    for (const segment of segments.values()) {
+      if (segment.failure) {
         code = segment.failure
       }
     }

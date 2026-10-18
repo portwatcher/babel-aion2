@@ -32,6 +32,7 @@ export const transcriptSchema = z.object({
 export const sampleSegmentSchema = transcriptSchema.extend({
   translatedText: z.string().max(16_384),
   translationRevision: z.number().int().nonnegative(),
+  translationIsFinal: z.boolean(),
   translationTermCount: z.number().int().nonnegative(),
   failure: providerTestCodeSchema.exclude(['PASS']).nullable(),
 })

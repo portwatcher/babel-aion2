@@ -20,6 +20,8 @@ An authorized PCM WAV sample can be recognized through Soniox and translated
 through DeepL for an administrator-only comparison of source and translated text.
 Administrators can edit versioned game terms and compare samples with or without
 their source and output-language terminology context.
+Samples use the shared streaming processor: recognition and translation overlap,
+and obsolete revisions are cancelled before they can replace current text.
 These candidates remain disabled for production subtitles; no live provider
 quality or Discord audio has been validated.
 
@@ -109,6 +111,7 @@ See [AGENTS.md](AGENTS.md) for worktree, cleanup, security, and interface rules.
 - [Listener lifecycle and API](docs/listener-sessions.md)
 - [Providers and output languages](docs/providers-and-languages.md)
 - [Game terms and sample terminology context](docs/game-terms.md)
+- [Shared streaming subtitle processing](docs/streaming-subtitles.md)
 - [Production deployment](docs/deployment.md)
 - [Operations, backup, and rollback](docs/operations.md)
 - [Validation and unfinished live checks](docs/test-report.md)
