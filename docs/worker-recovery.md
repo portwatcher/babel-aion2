@@ -1,67 +1,86 @@
-# Confirmed worker process recovery
+# Confirmed application process recovery
 
-The worker entry point supervises a separate runtime process. The runtime owns
-Discord/DAVE, native Opus decoders, WebRTC peers and subtitle jobs. The supervisor
-owns no delivery sockets. Every runtime incarnation receives a new UUID over a
-private IPC channel after its `runtime_owner` row has been registered.
+Web and voice-worker entry points share the supervisor in `@babel/processes`.
+Each runs its application in a separate child process. The web child owns player
+WebSockets; the voice child owns Discord/DAVE, Opus, WebRTC and subtitle jobs.
+Supervisors own no delivery sockets. Each child receives a fresh UUID through
+private IPC after its `runtime_owner` row has been registered.
 
-Media negotiations and voice-source claims use that same incarnation ID. Their
-transactions hold a shared owner-row lock until registration commits. Confirming
-exit takes the exclusive lock and atomically records the owner's exit and closes
-only its still-open media and voice registrations. A delayed registration either
-commits before this reconciliation and is included, or sees the exited owner and
-is rejected. Registering an exited UUID again cannot reactivate it.
+Player sockets, media negotiations and voice-source claims record their owning
+incarnation. Their registration transactions hold a shared owner-row lock until
+commit. Exit reconciliation takes the exclusive lock and atomically marks the
+owner exited and closes only its open registrations. A delayed registration
+commits before reconciliation and is included, or sees the exited owner and is
+rejected. An exited UUID cannot be registered again. A connection for the same
+listener on another live web process is unaffected.
 
 ## Exit and restart
 
-Only the supervisor's own child `exit` event confirms physical process shutdown.
-At that point its sockets and native threads have stopped. A failed spawn also
-has no transports to retire. Heartbeat expiry, advisory-lock loss, elapsed time
-and a PID lookup never provide this receipt.
+Only a supervisor observing its own child `exit` event confirms physical process
+shutdown. The child's sockets and native threads have stopped at that point.
+A failed spawn also has no transports to retire. Heartbeat expiry, advisory-lock
+loss, elapsed time and a PID lookup never supply this receipt.
 
-After an unexpected exit, the supervisor persists the receipt before starting a
-replacement. Storage operations have a two-second query deadline and retry after
-one second; a blocked or unavailable database leaves the service unavailable.
-Repeated crashes back off from one to thirty seconds. A runtime that survives
-one minute resets that backoff. The replacement uses persisted room intent,
-obtains normal exclusive source control and advances the source generation.
-Stopped rooms remain stopped. Listener credentials and nickname generations do
-not change; their existing media retry path negotiates a new peer.
+The supervisor persists closure before starting a replacement. Storage queries
+have a two-second deadline and retry after one second. A blocked or unavailable
+database prevents restart. Repeated crashes back off from one to thirty seconds;
+a runtime surviving one minute resets the backoff.
 
-SIGTERM/SIGINT first asks the child to close normally. If it has not exited after
-five seconds, the supervisor terminates that child and still waits for the OS
-exit event before writing its receipt. The runtime also starts shutdown if its
-private parent IPC channel disappears. No public or private HTTP endpoint can
-submit an exit acknowledgement or choose a runtime owner.
+A restarted web child accepts the saved listener identity and nickname generation.
+If a different browser claims that nickname during shutdown, it remains JOINING
+until both subtitle and media receipts are confirmed. Old credentials then receive
+only their terminal state. A restarted voice child obtains normal exclusive source
+control and advances source generation. Persisted stopped rooms remain stopped.
+Original audio and provider processing still have independent recovery paths.
+
+SIGTERM/SIGINT requests normal child shutdown. Web shutdown stops admission and
+starts closing player sockets immediately, before Nitro waits for connections to
+drain. Its normal close code is 1012. The close hook waits for ongoing work, removes
+signal handlers and closes PostgreSQL. If a child has not exited after five seconds,
+its supervisor terminates it but still waits for the OS exit event before
+acknowledging that incarnation. Private IPC disconnection also initiates child
+shutdown. No HTTP endpoint can submit an exit receipt or choose an owner ID.
 
 ## Operations and limits
 
-Apply migration `0010_cheerful_fenris` before starting this worker version. Build
-and deploy both `dist/index.mjs` and `dist/runtime.mjs`; `npm run build` and the
-existing Docker `voice-worker` target do this. Continue to launch `index.mjs`.
-The runtime file refuses standalone startup. Allow at least fifteen seconds for
-normal container termination; a storage outage can prevent acknowledgement
-within that period and must remain fail-closed.
+Apply migrations through `0011_tough_psylocke` before starting these versions.
+Migration 0010 creates runtime ownership; 0011 adds an indexed nullable owner to
+player connections. Existing rows remain unknown rather than receiving an invented
+owner. Never infer that these historical sockets have stopped from their age.
 
-This recovers a runtime crash while its supervising parent survives. It does not
-prove exit of an old parent/container/host after both processes disappear. Old
-unregistered owners and unknown owners remain untouched. An orchestrator-level
-shutdown proof and durable reconciliation are still required for that case.
-Never clear these rows because they appear old. Web-owned player WebSocket
-registrations have a separate lifecycle; their orphan recovery is also unfinished.
-The current control endpoint still targets one worker and does not route media
-between multiple workers.
+`npm run build` generates all entry points. Start the web app with `npm run start`
+or `node --env-file=.env apps/web/.output/server/supervisor.mjs`. Its Docker image
+also launches the supervisor. Start the voice worker with
+`node --env-file=.env apps/voice-worker/dist/index.mjs`. Deploy both worker bundles
+and the complete web `.output`. The framework's raw `server/index.mjs` is not the
+supported configured production entry point. Bootstrap identity is internal and
+is not a user-configured `.env` setting.
+
+Without database configuration, the web entry point serves the public lobby with
+entry and readiness unavailable. With a database, `/api/health/ready` verifies
+runtime ownership and schema readiness; `/api/health/live` alone does not prove
+player admission is ready. Nuxt development mode registers its own incarnation
+and uses the same socket/authorization checks. It is not supervised: a hard dev
+crash leaves an unknown owner. Administrator Access has no development bypass.
+
+Allow at least fifteen seconds for normal container termination. A storage outage
+can prevent acknowledgement within that period and must remain fail-closed.
+Recovery here requires a surviving supervisor. If the supervisor/container/host
+itself disappears, proving old transport shutdown and reconciling its unknown
+owners still requires orchestration-level evidence. Multi-worker media routing
+also remains unfinished.
 
 ## Evidence
 
-`npm run test:recovery:db` creates its own disposable loopback PostgreSQL database,
-starts built worker and web processes, negotiates actual ICE/DTLS connections and
-kills one runtime with SIGKILL. It verifies OS UDP socket release, blocked receipt
-persistence and timeout/retry, automatic recovery with the same listener identity,
-rejection of an obsolete negotiation and survival of another runtime's peer.
-It never supplies a simulated transport-close receipt.
+`npm run test:recovery:db` uses isolated loopback databases and built processes.
+The worker case exercises real ICE/DTLS, SIGKILL, OS UDP release, blocked receipt
+timeout/retry, same-listener recovery and another runtime's surviving peer.
+The web case exercises actual sockets across two processes: SIGKILL and close
+receipts, same-session reconnection, a surviving connection for that same listener
+on another process, blocked nickname replacement, old-credential denial and normal
+SIGTERM close code 1012. Neither test supplies simulated transport-close receipts.
 
-The database suite separately checks the transaction race between pending
-registration and exit, refusal to reuse a terminated UUID, voice-source generation
-recovery and harmless repeated old-owner confirmation. Those are storage tests;
-they do not claim live Discord shutdown. See the [test report](test-report.md).
+Database tests separately protect delayed registration, terminated-ID rejection,
+source generation, repeated old-owner confirmation and untouched legacy unknown
+player rows. Those tests exercise storage, not live Discord shutdown. See the
+[test report](test-report.md) for current platform evidence and limits.

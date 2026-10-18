@@ -6,7 +6,11 @@ import { eq } from 'drizzle-orm'
 import type { PoolClient } from 'pg'
 import { createDatabase } from '../src/client.ts'
 import { createCredentialCipher } from '../src/credentials.ts'
-import { createListenerService, openMediaConnection } from '../src/listeners/index.ts'
+import {
+  createListenerService,
+  openMediaConnection,
+  openPlayerConnection,
+} from '../src/listeners/index.ts'
 import { startRoom, updateRoomSettings } from '../src/room-settings.ts'
 import { claimVoiceSource } from '../src/voice-sources.ts'
 import { room } from '../src/schema/rooms.ts'
@@ -76,6 +80,20 @@ test('an exit receipt waits for pending registration, fences late requests and r
       outputLanguage: null,
       requestId: randomUUID(),
     },
+    credential,
+  )
+  const playerId = randomUUID()
+  const legacyId = randomUUID()
+  // Legacy registrations deliberately have no invented process identity.
+  await database.pool.query(
+    'insert into player_connection(id,session_id,nickname_generation) values($1,$2,$3)',
+    [legacyId, session.sessionId, session.nicknameGeneration],
+  )
+  await openPlayerConnection(
+    database.db,
+    playerId,
+    ownerId,
+    session.sessionId,
     credential,
   )
   const configured = await updateRoomSettings(
@@ -165,6 +183,32 @@ test('an exit receipt waits for pending registration, fences late requests and r
   assert.ok(closed.closed_at, 'Exit missed a registration committed during shutdown')
   await assert.rejects(
     registerRuntimeOwner(database.db, ownerId),
+    RuntimeOwnerUnavailable,
+  )
+  assert.deepEqual(
+    (
+      await database.pool.query(
+        'select owner_id,closed_at from player_connection where id=$1',
+        [legacyId],
+      )
+    ).rows[0],
+    { owner_id: null, closed_at: null },
+  )
+  assert.ok(
+    (
+      await database.pool.query('select closed_at from player_connection where id=$1', [
+        playerId,
+      ])
+    ).rows[0].closed_at,
+  )
+  await assert.rejects(
+    openPlayerConnection(
+      database.db,
+      randomUUID(),
+      ownerId,
+      session.sessionId,
+      credential,
+    ),
     RuntimeOwnerUnavailable,
   )
   await assert.rejects(

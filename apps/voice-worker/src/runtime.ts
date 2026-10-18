@@ -1,3 +1,4 @@
+import { receiveRuntimeOwner } from '@babel/processes'
 import { createDatabase } from '@babel/database'
 import { createCredentialCipher } from '@babel/database/credentials'
 import { runtimeOwnerActive } from '@babel/database/runtime-owners'
@@ -7,29 +8,11 @@ import { VoiceSources } from './voice-sources.ts'
 import { SubtitleService } from './subtitle-service.ts'
 import { createMediaNetwork } from './media-network.ts'
 
-// Incarnation IDs come only from the supervisor's private IPC channel. Running
-// this file directly never creates an unsupervised transport owner.
-if (process.connected) {
-  process.once('message', (message: unknown) => {
-    if (
-      typeof message !== 'object' ||
-      message === null ||
-      !('type' in message) ||
-      message.type !== 'start' ||
-      !('ownerId' in message) ||
-      typeof message.ownerId !== 'string' ||
-      !/^[\da-f]{8}(-[\da-f]{4}){3}-[\da-f]{12}$/.test(message.ownerId)
-    ) {
-      process.exit(1)
-    }
-    void start(message.ownerId).catch(() => {
-      console.error('Babel runtime could not start.')
-      process.exit(1)
-    })
-  })
-} else {
-  console.error('Babel runtime requires its supervisor.')
-  process.exitCode = 1
+try {
+  await start(await receiveRuntimeOwner())
+} catch {
+  console.error('Babel runtime could not start.')
+  process.exit(1)
 }
 
 async function start(ownerId: string) {

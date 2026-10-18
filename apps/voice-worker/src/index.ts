@@ -1,5 +1,5 @@
 import { createMediaNetwork } from './media-network.ts'
-import { superviseWorker } from './supervisor.ts'
+import { superviseRuntime } from '@babel/processes'
 
 const databaseUrl = process.env.DATABASE_URL
 const secret = process.env.MEDIA_CONTROL_SECRET
@@ -15,7 +15,12 @@ if (!databaseUrl || !secret) {
 } else {
   try {
     createMediaNetwork(process.env)
-    await superviseWorker(databaseUrl)
+    const extension = import.meta.url.endsWith('.ts') ? 'ts' : 'mjs'
+    await superviseRuntime({
+      databaseUrl,
+      moduleUrl: new URL(`./runtime.${extension}`, import.meta.url),
+      component: 'voice-worker',
+    })
   } catch {
     console.error('Babel worker configuration is invalid.')
     process.exitCode = 1

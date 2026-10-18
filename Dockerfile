@@ -35,4 +35,4 @@ COPY --from=build --chown=node:node /app/packages/database/dist/migrate.mjs ./da
 COPY --from=build --chown=node:node /app/packages/database/migrations ./migrations
 USER node
 EXPOSE 3000
-CMD ["node", ".output/server/index.mjs"]
+CMD ["node", ".output/server/supervisor.mjs"]

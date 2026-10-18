@@ -4,8 +4,9 @@ Persistent transactions, HTTP operations, player WebSockets, browser restoration
 and the public list are implemented. The optional media worker now provides
 revocable receive-only WebRTC admission. With it configured, entry becomes ACTIVE
 only after older subtitle sockets and media peers confirm closure; otherwise it
-stays JOINING. The track has no Discord source and actual subtitles remain
-unimplemented. This is not proof of end-to-end audio/subtitle replacement.
+stays JOINING. Configured sources publish Discord original audio and shared member
+subtitles. Live speech/provider quality still needs separate acceptance; see
+[original audio](original-audio.md) and [subtitle delivery](streaming-subtitles.md).
 
 ## Entry and credentials
 
@@ -78,11 +79,11 @@ checks do not replace ingress connection/message limits.
 The server sends session snapshots, complete room lists, public configuration,
 heartbeat challenges and bounded error codes. It polls persisted state once per
 second, sends a ping every 15 seconds and closes after 90 seconds without a valid
-pong. A valid pong updates the current generation's last-seen time. There are no
-subtitle frames or administrator commands on this channel yet.
+pong. A valid pong updates the current generation's last-seen time. Authorized
+subtitle frames share this channel; administrator commands use protected HTTP.
 
-Each authenticated socket registers in `player_connection` under the same nickname
-lock used for replacement. This prevents an old handshake from registering after
+Each authenticated socket records its runtime owner in `player_connection`, under
+the shared owner lock and the same nickname lock used for replacement. This prevents an old handshake from registering after
 revocation has observed no sockets. Other web instances observe the terminal
 session and close their sockets too. The physical close hook, not the close
 request, sets `closedAt`. A slow close is force-terminated after 1.5 seconds.
@@ -98,10 +99,12 @@ and nickname generation must match before a snapshot is accepted. Public player
 lists also refresh over HTTP every five seconds while no authenticated socket is
 connected; late HTTP responses cannot overwrite newer WebSocket snapshots.
 
-Graceful web-process shutdown closes connections before closing PostgreSQL. A
-hard kill can leave an unconfirmed registration. Resolving that state requires
-proof that its owning transport has stopped; an operational recovery mechanism
-is still unfinished. Do not turn an elapsed timeout into a revocation receipt.
+Normal web shutdown stops admission and closes sockets with code 1012 before
+closing PostgreSQL. A surviving supervisor observes a killed child’s OS exit and
+reconciles only that incarnation’s registrations before restarting it. Same-listener
+connections on other processes survive. Unknown owners after supervisor or host
+loss remain unconfirmed; never turn elapsed time into a receipt. See
+[process recovery](worker-recovery.md).
 
 ## HTTP API
 

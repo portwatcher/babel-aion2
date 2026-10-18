@@ -3,6 +3,7 @@ import type { Database } from './client.ts'
 import { mediaConnection } from './schema/media-connections.ts'
 import { voiceSourceRun } from './schema/voice-sources.ts'
 import { runtimeOwner } from './schema/runtime-owners.ts'
+import { playerConnection } from './schema/player-connections.ts'
 
 export class RuntimeOwnerUnavailable extends Error {
   constructor() {
@@ -52,6 +53,10 @@ export async function confirmRuntimeExit(db: Database, id: string) {
     }
     const now = new Date()
     await tx.update(runtimeOwner).set({ exitedAt: now }).where(eq(runtimeOwner.id, id))
+    await tx
+      .update(playerConnection)
+      .set({ closedAt: now })
+      .where(and(eq(playerConnection.ownerId, id), isNull(playerConnection.closedAt)))
     await tx
       .update(mediaConnection)
       .set({ closedAt: now })

@@ -47,9 +47,11 @@ shutdown stays visible. Player WebSocket pings run every 15 seconds, allow 90
 seconds without a valid pong, and renew only the authenticated current session.
 Graceful shutdown closes sockets before the database pool; a physical close is
 required before the socket registration is acknowledged. Hard crashes or storage
-faults may leave open registrations: never clear these by age alone. Operational
-recovery must first establish that the owning transport cannot deliver anymore.
-This orphan-recovery tool is not yet implemented. The optional media worker now
+faults may leave open registrations: never clear these by age alone. Web and voice
+supervisors reconcile their own child’s confirmed OS exit before restarting it;
+unknown supervisor/host owners still need independent orchestration evidence.
+See [process recovery](worker-recovery.md) for supported entry points, migrations
+and readiness. The optional media worker now
 closes actual peers and confirms them before replacement; configured sources
 carry Discord original audio and independent subtitles. Graceful media restart
 is tested. See [media admission](media-admission.md)

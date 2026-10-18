@@ -4,6 +4,7 @@ import { once } from 'node:events'
 import { createServer } from 'node:net'
 import { setTimeout } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { createInterface } from 'node:readline'
 
 export async function startTestServer(databaseUrl = '', options = {}) {
   const root = fileURLToPath(new URL('..', import.meta.url))
@@ -18,7 +19,7 @@ export async function startTestServer(databaseUrl = '', options = {}) {
   const imports = (options.nodeImports ?? []).flatMap((path) => ['--import', path])
   const processHandle = spawn(
     process.execPath,
-    [...imports, 'apps/web/.output/server/index.mjs'],
+    [...imports, 'apps/web/.output/server/supervisor.mjs'],
     {
       cwd: root,
       env: {
@@ -39,7 +40,18 @@ export async function startTestServer(databaseUrl = '', options = {}) {
   )
   // Never include server logs or request data in assertions: a failing adapter
   // may accidentally log a secret. Report status/exit code only.
-  processHandle.stdout.resume()
+  let runtime = { pid: processHandle.pid }
+  const lines = createInterface({ input: processHandle.stdout })
+  lines.on('line', (line) => {
+    try {
+      const event = JSON.parse(line)
+      if (event.webRuntimeStarted && Number.isInteger(event.runtimePid)) {
+        runtime = { pid: event.runtimePid, ownerId: event.ownerId }
+      }
+    } catch {
+      /* Raw logs are deliberately not exposed to assertions. */
+    }
+  })
   processHandle.stderr.resume()
   const exited = once(processHandle, 'exit')
   async function close() {
@@ -47,7 +59,7 @@ export async function startTestServer(databaseUrl = '', options = {}) {
       return
     }
     processHandle.kill('SIGTERM')
-    await Promise.race([exited, setTimeout(3_000, undefined, { ref: false })])
+    await Promise.race([exited, setTimeout(10_000, undefined, { ref: false })])
     if (processHandle.exitCode === null && processHandle.signalCode === null) {
       processHandle.kill('SIGKILL')
       await exited
@@ -58,7 +70,7 @@ export async function startTestServer(databaseUrl = '', options = {}) {
     for (let attempt = 0; attempt < 100; attempt += 1) {
       try {
         ready = (
-          await fetch(`${origin}/api/health/live`, {
+          await fetch(`${origin}/api/health/${databaseUrl ? 'ready' : 'live'}`, {
             signal: AbortSignal.timeout(1_000),
           })
         ).ok
@@ -72,7 +84,7 @@ export async function startTestServer(databaseUrl = '', options = {}) {
       await setTimeout(100)
     }
     assert.ok(ready, 'Built server did not become ready')
-    return { origin, close }
+    return { origin, close, runtime: () => runtime }
   } catch (error) {
     await close()
     throw error

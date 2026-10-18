@@ -67,9 +67,10 @@ See [original audio](original-audio.md) and
 Explicit [STUN/TURN configuration](media-network.md) issues separate temporary
 worker/browser relay credentials. Expiry and renewal use existing media attempts;
 the worker acknowledges closure only after the actual peer stops.
-The worker supervisor also acknowledges a whole incarnation after observing its
-child's OS exit. Shared owner locks fence delayed registrations; storage failure
-blocks restart until the receipt commits. See [worker recovery](worker-recovery.md).
+Web and voice entry points share `@babel/processes`. A supervisor acknowledges
+only its own child’s confirmed OS exit. Shared owner locks fence delayed player,
+media and source registration; storage failure blocks restart until the receipt
+commits. See [process recovery](worker-recovery.md).
 
 ## Shared code
 
@@ -137,9 +138,10 @@ See [provider configuration](providers-and-languages.md) for probe and sample li
    worker routing before scaling beyond one configured control endpoint.
    Child-runtime crashes now recover after confirmed OS exit and durable scoped
    cleanup, preserving listener identity. Unknown owners remain fail-closed.
-4. Recover orphaned player socket registrations after a confirmed hard process
-   failure. Authorized subtitle delivery, generation/revision fencing and actual
-   socket closure are implemented; unknown owners remain fail-closed.
+4. Complete recovery of player socket owners after supervisor/container/host loss.
+   Child-web crashes now recover through scoped exit receipts; same-listener
+   connections on other web processes survive. Legacy unknown owners remain
+   fail-closed, and live browser/background recovery still needs acceptance.
 5. Validate the recognition and translation candidates against
    live provider credentials and authorized speech samples. Dynamic settings,
    destination restrictions, connection probes, encrypted versions and audits

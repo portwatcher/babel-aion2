@@ -8,8 +8,12 @@ import {
   registerRuntimeOwner,
 } from '@babel/database/runtime-owners'
 
-export async function superviseWorker(databaseUrl: string) {
-  const database = createDatabase(databaseUrl, { queryTimeoutMs: 2_000 })
+export async function superviseRuntime(options: {
+  databaseUrl: string
+  moduleUrl: URL
+  component: 'voice-worker' | 'web'
+}) {
+  const database = createDatabase(options.databaseUrl, { queryTimeoutMs: 2_000 })
   database.pool.on('error', () => {
     console.error('Babel supervisor storage connection unavailable.')
   })
@@ -59,8 +63,7 @@ export async function superviseWorker(databaseUrl: string) {
         break
       }
       const startedAt = performance.now()
-      const extension = import.meta.url.endsWith('.ts') ? 'ts' : 'mjs'
-      child = fork(fileURLToPath(new URL(`./runtime.${extension}`, import.meta.url)), {
+      child = fork(fileURLToPath(options.moduleUrl), {
         stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
       })
       const current = child
@@ -89,7 +92,8 @@ export async function superviseWorker(databaseUrl: string) {
       child = undefined
       console.log(
         JSON.stringify({
-          workerRuntimeExited: true,
+          runtimeExited: true,
+          component: options.component,
           ownerId,
           exitCode: current.exitCode,
           signal: current.signalCode,

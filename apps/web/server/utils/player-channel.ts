@@ -20,6 +20,7 @@ import { useDatabase } from './database'
 import { publicRoomConfiguration } from './room-configuration'
 import { mediaReady, revokeMedia } from './media-control'
 import { createSubtitleRelay } from './subtitle-relay'
+import { playerRuntimeOwner, playerRuntimeReady } from './runtime-owner'
 
 interface Connection {
   peer: Peer
@@ -86,7 +87,7 @@ async function persistClose(connection: Connection) {
     return
   }
   if (connection.session) {
-    await closePlayerConnection(useDatabase(), connection.peer.id)
+    await closePlayerConnection(useDatabase(), connection.peer.id, playerRuntimeOwner())
   }
   connections.delete(connection.peer.id)
   connection.acknowledgeClose()
@@ -165,7 +166,6 @@ export function startPlayerChannels() {
 export async function stopPlayerChannels() {
   clearInterval(timer)
   timer = undefined
-  await running
   const closing = [...connections.values()]
   for (const connection of closing) {
     end(connection, 1012, 'Server restarting')
@@ -178,11 +178,12 @@ export async function stopPlayerChannels() {
     }),
   ])
   clearTimeout(deadline)
+  await running
   // Keep unconfirmed registrations in PostgreSQL if a shutdown cannot be proved.
 }
 
 export const playerListenerDelivery: ListenerDelivery = {
-  ready: mediaReady,
+  ready: async () => (await playerRuntimeReady()) && mediaReady(),
   revokeMedia,
   async revokeSubtitles(reference) {
     for (const connection of connections.values()) {
@@ -198,15 +199,20 @@ export const playerListenerDelivery: ListenerDelivery = {
 }
 
 export const playerWebSocketHooks: Partial<Hooks> = {
-  upgrade(request) {
+  async upgrade(request) {
     try {
       assertSameOrigin(request.headers.get('origin'), useRuntimeConfig().siteUrl)
     } catch {
       return new Response('Forbidden', { status: 403 })
     }
-    if (!useRuntimeConfig().databaseUrl) {
-      return new Response('Unavailable', { status: 503 })
+    try {
+      if (await playerRuntimeReady()) {
+        return
+      }
+    } catch {
+      /* Storage failure cannot authorize an unverified transport owner. */
     }
+    return new Response('Unavailable', { status: 503 })
   },
   open(peer) {
     let acknowledgeClose = () => {}
@@ -267,6 +273,7 @@ export const playerWebSocketHooks: Partial<Hooks> = {
           const session = await openPlayerConnection(
             useDatabase(),
             peer.id,
+            playerRuntimeOwner(),
             input.data.sessionId,
             input.data.credential,
           )
@@ -288,7 +295,7 @@ export const playerWebSocketHooks: Partial<Hooks> = {
         }
         connection.nonce = null
         connection.pongAt = Date.now()
-        await renewPlayerConnection(useDatabase(), peer.id)
+        await renewPlayerConnection(useDatabase(), peer.id, playerRuntimeOwner())
       }
     } catch (error) {
       const code =

@@ -77,9 +77,10 @@ then run `npm run build` and, in a separate terminal,
 configuration changes. No capture permission is requested. See
 [media admission](docs/media-admission.md) for recovery limits and
 [media networking](docs/media-network.md) for STUN/TURN, TLS and UDP port settings.
-The entry point supervises a child runtime and reconciles its confirmed exit
-before restarting it. Apply all migrations first; see
-[worker recovery](docs/worker-recovery.md) for storage fencing and host-crash limits.
+Both services supervise a child runtime and reconcile its confirmed exit before
+restarting it. The web production entry is `apps/web/.output/server/supervisor.mjs`
+(`npm run start` and the Docker image use it). Apply all migrations first; see
+[process recovery](docs/worker-recovery.md) for storage fencing and host-crash limits.
 
 The `/admin` page fails closed until Access is configured. Set
 `NUXT_ACCESS_TEAM_DOMAIN`, `NUXT_ACCESS_AUDIENCE`, and a random
@@ -110,6 +111,7 @@ are for the local Compose service only.
 | `packages/database`               | Drizzle schema, migrations, listener transactions and revocation coordinator                   |
 | `packages/contracts`              | Browser-safe nickname, language, room, and subtitle contracts                                  |
 | `packages/providers`              | Server-only Soniox recognition, DeepL translation, probes and sample comparison                |
+| `packages/processes`              | Shared child-process supervision, private bootstrap and confirmed exit reconciliation          |
 | `.agents/skills/better-interface` | The requested interface review skill                                                           |
 | `scripts`                         | Source size checks, worktree inventory, built HTTP smoke checks                                |
 
@@ -123,15 +125,15 @@ runs in a separate worker.
 | Command                      | Purpose                                                                                                                                                                               |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `npm run dev`                | Start the local Nuxt app                                                                                                                                                              |
-| `npm run build`              | Build the web app, standalone migrations, and worker entry point                                                                                                                      |
-| `npm start`                  | Run the built Nuxt server                                                                                                                                                             |
+| `npm run build`              | Build the web app, standalone migrations, and supervised web/worker entry points                                                                                                      |
+| `npm start`                  | Run the supervised built Nuxt server                                                                                                                                                  |
 | `npm run ci:local`           | Source limits, formatting, types, unit tests, build, HTTP smoke                                                                                                                       |
 | `npm run test:db`            | Real PostgreSQL administrator sessions, listener lifecycle, source start/stop and exclusive ownership tests                                                                           |
 | `npm run test:http:db`       | Built server + local PostgreSQL: entry, replacement, isolation and restart; run after build/migrations                                                                                |
 | `npm run test:ws:db`         | Two built servers + local PostgreSQL: real player WebSockets, replacement, shutdown and recovery                                                                                      |
 | `npm run test:media:db`      | Real Opus publication and source fencing; two built servers + worker/PostgreSQL admission, revocation and recovery                                                                    |
 | `npm run test:network:db`    | Real Coturn UDP/TCP/TLS, UDP fallback, credential expiry and bounded ICE ports; requires Docker and OpenSSL, creates its own disposable database                                      |
-| `npm run test:recovery:db`   | Isolated PostgreSQL and built processes: SIGKILL, real UDP release, blocked exit receipts, scoped cleanup and automatic reconnection                                                  |
+| `npm run test:recovery:db`   | Isolated PostgreSQL and built web/voice processes: SIGKILL, real socket release, blocked receipts, scoped recovery, old credentials and normal shutdown                               |
 | `npm run test:subtitles:db`  | Built web + real private worker HTTP/player WebSockets, isolated PostgreSQL and loopback provider protocols: shared PCM, language changes, source/provider replacement and revocation |
 | `npm run test:management:db` | Built servers + local PostgreSQL: signed admin login, encrypted room settings, conflicts, stop and removal                                                                            |
 | `npm run test:providers:db`  | Built servers + local PostgreSQL: provider history, encrypted credentials, replacement and test leases; local provider fixtures                                                       |

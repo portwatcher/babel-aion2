@@ -1,5 +1,52 @@
 # Validation
 
+## Confirmed web-player process recovery — 2026-10-19
+
+Both production services now use the shared `@babel/processes` supervisor. Each
+player socket registers its process owner while holding the owner's row lock.
+Only an observed child exit permits scoped cleanup and a new incarnation. Legacy
+rows without an owner and owners lost with their supervisor remain unconfirmed.
+The production web entry is now `apps/web/.output/server/supervisor.mjs`; migration
+0011 adds nullable player ownership without inventing an identity for old rows.
+
+| Check                     | Result  | Evidence                                                                                                                                                                                                                                                                  |
+| ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                  | PASS    | Final `npm run ci:local`: 211 first-party sources, maximum 495 lines; formatting, strict types including both runtime wrappers, 18 tests, builds and built HTTP smoke                                                                                                     |
+| Database ownership        | PASS    | Ten `test:db` cases in disposable PostgreSQL. Owned player registrations close with the confirmed owner; legacy rows stay open with null ownership; an exited owner cannot register another player connection                                                             |
+| Actual process recovery   | PASS    | Final `test:recovery:db` passes both worker and web regressions. Real web SIGKILL closes the socket, persists its receipt and restarts automatically; reconnect retains the session ID and nickname generation                                                            |
+| Scoped revocation         | PASS    | The same listener's socket on another web process survives the first crash. A locked receipt keeps nickname replacement JOINING until persistence succeeds; obsolete credentials receive only the terminal state, and an unrelated listener remains connected             |
+| Normal shutdown           | PASS    | Actual SIGTERM sends close code 1012 and persists closure. This assertion failed with code 1006 before signal-time socket shutdown was added                                                                                                                              |
+| Linux ARM64 images        | PASS    | Rebuilt web and worker images run as UID 1000, read-only, with capabilities dropped and no-new-privileges. Actual container WebSocket SIGKILL, receipt, same-identity reconnect, Access denial and normal SIGTERM exit 0 pass; normal socket close is 1012                |
+| Development runtime       | PASS    | An isolated Nuxt development process registers a unique owner, reaches readiness and serves an authorized player socket. Missing/forged Access assertions remain denied. Development hard-crash recovery is deliberately not claimed                                      |
+| Application regression    | PASS    | After the final build, isolated `test:db`, `test:http:db`, `test:ws:db`, `test:media:db`, `test:management:db`, `test:providers:db`, `test:samples:db`, `test:terms:db` and `test:languages:db` all pass                                                                  |
+| Subtitle transport        | PASS    | Final `test:subtitles:db` passes real registered player delivery, independent original audio, authorization and stream cancellation using loopback providers                                                                                                              |
+| Integrated Discord speech | NOT RUN | The separate authorized preview remains LISTENING, but its current generation still records zero speakers/frames and the real browser's audio energy is zero. Discord currently shows only the bot in the test channel. Earlier isolated DAVE speech is separate evidence |
+| Supervisor/host recovery  | NOT RUN | Unknown owners after parent/container/host loss stay fail-closed. Multi-worker routing, production deployment and live Discord-to-browser speech acceptance remain outstanding                                                                                            |
+
+The new WebSocket crash regression failed before supervision because its durable
+registration never closed after the OS killed the process. Its final form also
+protects other-process ownership, delayed receipts, replaced credentials and
+normal shutdown. The existing database case owns storage fencing; it is not
+presented as physical transport proof. No test-only production endpoint was added.
+
+An early reconnect check used liveness while asynchronous Nitro initialization
+was still running; the fixture now waits for readiness when a database is
+configured. A development fixture initially omitted Access configuration and
+correctly received 503; after supplying the normal test configuration, access
+denial checks pass. One language regression failed during a concurrent output
+rebuild; a stable-build retry passed. The cause of that initial startup failure
+was not established from the suppressed server logs.
+
+The existing five-case Coturn networking suite passed before the final web
+shutdown adjustment. It covers real UDP/TCP/TLS relay, fallback, expiry, renewal,
+invalid settings and bounded UDP allocation; it does not establish public-network
+reachability. No release, production migration or deployment was performed.
+
+Production/tooling changes total +268/-53 lines; tests and test support total
++254/-6, excluding documentation, generated migrations and the lockfile. The
+disposable databases, containers, image tags and development processes were
+removed; the separate active Discord/browser fixture remains available.
+
 ## Confirmed runtime crash recovery — 2026-10-19
 
 A worker supervisor now observes its own child process exiting, persists scoped

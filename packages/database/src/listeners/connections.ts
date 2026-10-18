@@ -4,14 +4,17 @@ import type { Database } from '../client.ts'
 import { playerConnection } from '../schema/player-connections.ts'
 import { listenerSession, nickname } from '../schema/rooms.ts'
 import { ListenerError, snapshot, verifyCredential } from './model.ts'
+import { lockRuntimeOwner } from '../runtime-owners.ts'
 
 export async function openPlayerConnection(
   db: Database,
   connectionId: string,
+  ownerId: string,
   sessionId: string,
   credential: string,
 ) {
   return db.transaction(async (tx) => {
+    await lockRuntimeOwner(tx, ownerId)
     const [record] = await tx
       .select()
       .from(listenerSession)
@@ -39,6 +42,7 @@ export async function openPlayerConnection(
       // cannot register after revocation has already observed zero connections.
       await tx.insert(playerConnection).values({
         id: connectionId,
+        ownerId,
         sessionId,
         nicknameGeneration: fresh.nicknameGeneration,
       })
@@ -64,14 +68,22 @@ export async function readPlayerConnection(db: Database, reference: ListenerRefe
   return record ? snapshot(record) : null
 }
 
-export async function renewPlayerConnection(db: Database, connectionId: string) {
+export async function renewPlayerConnection(
+  db: Database,
+  connectionId: string,
+  ownerId: string,
+) {
   return db.transaction(async (tx) => {
     const [record] = await tx
       .select({ listener: listenerSession })
       .from(playerConnection)
       .innerJoin(listenerSession, eq(listenerSession.id, playerConnection.sessionId))
       .where(
-        and(eq(playerConnection.id, connectionId), isNull(playerConnection.closedAt)),
+        and(
+          eq(playerConnection.id, connectionId),
+          eq(playerConnection.ownerId, ownerId),
+          isNull(playerConnection.closedAt),
+        ),
       )
     if (!record) {
       return
@@ -105,12 +117,20 @@ export async function renewPlayerConnection(db: Database, connectionId: string) 
   })
 }
 
-export async function closePlayerConnection(db: Database, connectionId: string) {
+export async function closePlayerConnection(
+  db: Database,
+  connectionId: string,
+  ownerId: string,
+) {
   await db
     .update(playerConnection)
     .set({ closedAt: new Date() })
     .where(
-      and(eq(playerConnection.id, connectionId), isNull(playerConnection.closedAt)),
+      and(
+        eq(playerConnection.id, connectionId),
+        eq(playerConnection.ownerId, ownerId),
+        isNull(playerConnection.closedAt),
+      ),
     )
 }
 
