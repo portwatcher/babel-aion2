@@ -175,6 +175,10 @@ See [AGENTS.md](AGENTS.md) for worktree, cleanup, security, and interface rules.
 - [Validation and unfinished live checks](docs/test-report.md)
 - [Interface skill installation](docs/interface-skills.md)
 
-The deployed scaffold URLs are `https://babel.juryquinn.com` and
+The deployed web URLs are `https://babel.juryquinn.com` and
 `https://babel.juryquinn.com/admin`. Releases and production configuration live in
-the separate private infra repository. See [source and secret boundaries](docs/source-and-secrets.md).
+the separate private infra repository. The current web release passed production
+migrations, replica readiness, public HTTP and Access-boundary checks. Production
+voice-worker networking and live audio/subtitle acceptance remain unfinished;
+see [deployment evidence](docs/deployment.md) and
+[source and secret boundaries](docs/source-and-secrets.md).

@@ -50,11 +50,41 @@ and authorized shared subtitles are implemented. Live audio/provider acceptance,
 native PiP/game behavior and production networking remain unfinished. A JOINING
 connection cannot receive commands. Production may start with an empty language
 list; the administrator later validates and enables configured paths.
-See [validation](test-report.md) for local evidence;
-these changes do not establish a successful production rollout.
+See [validation](test-report.md) for local and production evidence. The web
+rollout below is verified; production voice-worker deployment and live media
+acceptance remain separate gates.
 
 Verify Access, database readiness, routing, and actual rollout state separately.
 Use the private infra runbook for operational credentials, backup and recovery.
+
+## Current web release verification — 2026-10-19
+
+Source `bbe9fc204d61b37a46284581416504bc172cb46e` was released through the
+existing private workflow after PR #1 merged. The self-hosted Linux AMD64 run
+passed local-equivalent CI, 18 tests, ten PostgreSQL tests, migration checks and
+the non-root container smoke check before publication. ArgoCD completed the
+production migration hook, then rolled both web replicas to the published image.
+The application is Synced / Healthy; both replicas are ready with zero restarts
+and the same published digest:
+`sha256:100414b36f271318c67784f9915580bea41b0c5f31df81dee6eda3f1301239aa`.
+
+The lobby, player configuration, liveness, readiness and 19 frontend assets return 200. Real Chrome displays the updated lobby with an empty online list and no
+console errors. Nickname entry is available; the source remains UNCONFIGURED and
+languages remain empty. Without a production media worker, listener admission
+stays JOINING and cannot deliver commands. No production test listeners were made.
+
+Administrator pages, management APIs and administrator auth endpoints redirect to
+Access. Direct origin requests reject missing assertions, email headers and
+cookies alone with 401, and a forged assertion with 403. The running application
+retrieves Access signing keys successfully. Runtime-side checks found none of the
+five configured sensitive values in the lobby, public configuration or 19 assets;
+those values were not copied into reports.
+
+Authenticated administrator use, production voice/TURN routing, provider quality,
+capacity, disaster recovery and rollback remain unverified. Configure database
+pool budgets in private infra for worker replicas and rolling-update overlap
+before enabling production command delivery. This web release does not establish
+those acceptance results.
 
 ## Initial release verification
 
