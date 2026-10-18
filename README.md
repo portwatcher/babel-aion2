@@ -1,6 +1,8 @@
 # Babel · AION2 深渊站
 
 Nuxt 4 + Better Auth + PostgreSQL project scaffold for AION2 Steam Global / Asia.
+Repository: [portwatcher/babel-aion2](https://github.com/portwatcher/babel-aion2),
+private today and prepared for eventual open source.
 The player interface is a dark, low-distraction battle panel. The original
 requirements are preserved verbatim in [design.md](design.md) and [GOAL.md](GOAL.md).
 
@@ -68,7 +70,7 @@ will run in a separate worker.
 | Command                      | Purpose                                                                                                    |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `npm run dev`                | Start the local Nuxt app                                                                                   |
-| `npm run build`              | Build the web app and worker entry point                                                                   |
+| `npm run build`              | Build the web app, standalone migrations, and worker entry point                                           |
 | `npm start`                  | Run the built Nuxt server                                                                                  |
 | `npm run ci:local`           | Source limits, formatting, types, unit tests, build, HTTP smoke                                            |
 | `npm run test:db`            | Real PostgreSQL administrator sessions and listener lifecycle tests                                        |
@@ -92,11 +94,11 @@ See [AGENTS.md](AGENTS.md) for worktree, cleanup, security, and interface rules.
 - [Room settings and protected Discord credentials](docs/room-configuration.md)
 - [Listener lifecycle and API](docs/listener-sessions.md)
 - [Providers and output languages](docs/providers-and-languages.md)
-- [Deployment handoff](docs/deployment.md)
+- [Production deployment](docs/deployment.md)
 - [Operations, backup, and rollback](docs/operations.md)
 - [Validation and unfinished live checks](docs/test-report.md)
 - [Interface skill installation](docs/interface-skills.md)
 
-The target production URLs are `https://babel.juryquinn.com` and
+The deployed scaffold URLs are `https://babel.juryquinn.com` and
 `https://babel.juryquinn.com/admin`. Releases and production configuration live in
 the separate private infra repository. See [source and secret boundaries](docs/source-and-secrets.md).

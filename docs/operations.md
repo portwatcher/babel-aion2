@@ -68,6 +68,9 @@ GitOps release method. Confirm schema compatibility first. Do not reverse a
 destructive migration without an explicit data recovery plan. Verify probes,
 Access boundaries, sessions, and live media after the rollback.
 
+Use only previously published, verified image references. An initial deployment
+has no earlier deployed Babel version to restore.
+
 These implementation checks do not establish a production rollback. Local process
 restart preserves the room's stopped state, configuration version, encrypted bot
 credential, administrator session and listener generations. Provider settings and
