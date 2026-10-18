@@ -4,11 +4,11 @@ Nuxt 4 + Better Auth + PostgreSQL project scaffold for AION2 Steam Global / Asia
 The player interface is a dark, low-distraction battle panel. The original
 requirements are preserved verbatim in [design.md](design.md) and [GOAL.md](GOAL.md).
 
-Listener storage and HTTP lifecycle operations now implement atomic global
-nickname replacement, idempotent entry, restoration, language subscriptions,
-removal and reconciliation. Live Discord audio, media revocation, the player
-WebSocket and browser session lifecycle, provider configuration, subtitles, and
-PiP remain unfinished. No transport is presented as available before it works.
+Listener storage, HTTP operations and player WebSockets implement atomic global
+nickname replacement, idempotent entry, browser restoration, language subscription
+metadata, removal and reconciliation. The browser preserves its current session
+across refresh/reconnection and stops after replacement. Live Discord audio, media
+revocation, provider configuration, subtitle delivery and PiP remain unfinished.
 
 ## Start locally
 
@@ -24,11 +24,11 @@ npm run dev
 ```
 
 Open `http://localhost:3000`. The page starts with no enabled subtitle languages.
-Listener entry remains disabled until the media and session revocation paths
-exist. With a migrated database, direct API entry can persist a `JOINING` session
-and returns HTTP 202; it cannot grant command delivery with the current unavailable
-transport adapters. Without database configuration it returns 503. The player page
-does not require an account or Access login.
+With a migrated database, a player can enter the waiting room as `JOINING`
+(HTTP 202), view the current list and keep the session connected. This does not
+grant command delivery: the media adapter remains unavailable, and no session
+becomes ACTIVE. Without database configuration entry is disabled and the API
+returns 503. The player page does not require an account or Access login.
 
 The `/admin` page fails closed until Access is configured. Set
 `NUXT_ACCESS_TEAM_DOMAIN`, `NUXT_ACCESS_AUDIENCE`, and a random
@@ -44,7 +44,7 @@ are for the local Compose service only.
 
 | Path                              | Responsibility                                                               |
 | --------------------------------- | ---------------------------------------------------------------------------- |
-| `apps/web`                        | Nuxt player page, administrator page, Nitro HTTP APIs                        |
+| `apps/web`                        | Nuxt player/administrator pages, Nitro HTTP APIs and player WebSockets       |
 | `apps/voice-worker`               | Explicitly stopped entry point for the future audio worker                   |
 | `packages/auth`                   | Cloudflare JWT verification and administrator Better Auth sessions           |
 | `packages/database`               | Drizzle schema, migrations, listener transactions and revocation coordinator |
@@ -67,6 +67,7 @@ will run in a separate worker.
 | `npm run ci:local`       | Source limits, formatting, types, unit tests, build, HTTP smoke                                        |
 | `npm run test:db`        | Real PostgreSQL administrator sessions and listener lifecycle tests                                    |
 | `npm run test:http:db`   | Built server + local PostgreSQL: entry, replacement, isolation and restart; run after build/migrations |
+| `npm run test:ws:db`     | Two built servers + local PostgreSQL: real player WebSockets, replacement, shutdown and recovery       |
 | `npm run db:generate`    | Generate a migration after schema changes                                                              |
 | `npm run db:migrate`     | Apply committed migrations using `.env`                                                                |
 | `npm run db:studio`      | Open the local schema browser using `.env`                                                             |

@@ -13,17 +13,22 @@ listener reconciliation sweep and closes it on server shutdown.
 Without database configuration the public lobby stays available; readiness and
 administrator sessions fail closed. No worker starts audio automatically.
 
-Apply migration `0001_panoramic_mad_thinker` before this web build. Readiness now
-checks the listener lifecycle columns as well as administrator tables. The
-migration preserves old rows and marks their entry fingerprints as legacy, so
+Apply migrations through `0002_majestic_galactus` before this web build. Readiness
+checks listener lifecycle columns and player socket registrations as well as
+administrator tables. Migration 0001 preserves old rows and marks their entry fingerprints as legacy, so
 they cannot be adopted by an unbound retry. Do not roll back or truncate nickname
 generation/session records while old credentials could still exist.
 
 The listener reconciler checks every 30 seconds and expires sessions with no
 heartbeat for 120 seconds. Expiry revokes access first; uncertain transport
-shutdown stays visible. The current adapter is unavailable and never grants
-command access. See [listener operations](listener-sessions.md) for the API and
-remaining live transport work.
+shutdown stays visible. Player WebSocket pings run every 15 seconds, allow 90
+seconds without a valid pong, and renew only the authenticated current session.
+Graceful shutdown closes sockets before the database pool; a physical close is
+required before the socket registration is acknowledged. Hard crashes or storage
+faults may leave open registrations: never clear these by age alone. Operational
+recovery must first establish that the owning transport cannot deliver anymore.
+This recovery tool and actual media revocation are not yet implemented. The media
+adapter never grants command access. See [listener operations](listener-sessions.md).
 
 ## Backup and restore procedure
 

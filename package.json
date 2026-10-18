@@ -26,6 +26,7 @@
     "ci:local": "npm run check && npm run build && npm run test:http",
     "test:http": "node scripts/smoke.mjs",
     "test:http:db": "node --env-file=.env scripts/listener-smoke.mjs",
+    "test:ws:db": "node --env-file=.env scripts/player-websocket-smoke.mjs",
     "db:up": "docker compose up -d --wait postgres",
     "db:down": "docker compose down",
     "db:generate": "drizzle-kit generate --config packages/database/drizzle.config.ts",
@@ -40,7 +41,8 @@
     "prettier": "3.9.10",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
+    "vue-router": "5.4.0",
     "vue-tsc": "3.3.13",
-    "vue-router": "5.4.0"
+    "ws": "8.22.0"
   }
 }

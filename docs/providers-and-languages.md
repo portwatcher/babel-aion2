@@ -38,10 +38,12 @@ in order, then the configured default, then the first enabled language, then
 when its writing system is compatible. The tests include `ja-JP` → `ja`, `ko-KR`
 → `ko`, and `zh-CN` → `zh-Hans`. Traditional and Simplified Chinese remain distinct.
 
-The future player session implementation must supply `navigator.languages`, or
-`navigator.language` if the list is unavailable. It must persist explicit choices,
-validate selections on the server, fence delayed subtitle results, and update
-the main page and PiP without replacing the listener session or audio connection.
+The player page supplies `navigator.languages`, or `navigator.language` if the
+list is unavailable, and saves explicit choices locally. HTTP changes validate
+the selection on the server and preserve the listener session and generation.
+The player connection accepts updated public configuration and requests a fallback
+when its selected language is disabled. Production languages still remain empty.
+Actual subtitle filtering, delayed-result fencing and PiP updates remain unfinished.
 
 ## Enabling Chinese, Japanese, and Korean later
 

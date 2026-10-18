@@ -3,9 +3,9 @@ import {
   listenerOperation,
   requireListenerCredential,
   requirePlayerOrigin,
-  useListenerRoom,
   useListeners,
 } from '../../utils/listeners'
+import { useListenerRoom } from '../../utils/room-configuration'
 
 export default defineEventHandler(async (event) => {
   requirePlayerOrigin(event)

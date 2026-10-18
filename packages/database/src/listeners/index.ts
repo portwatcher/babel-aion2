@@ -15,6 +15,13 @@ import {
 import { snapshot, type ListenerRecord } from './model.ts'
 export { ListenerError } from './model.ts'
 export {
+  openPlayerConnection,
+  readPlayerConnection,
+  renewPlayerConnection,
+  closePlayerConnection,
+  subtitleConnectionsStopped,
+} from './connections.ts'
+export {
   isDeliveryAuthorized,
   listManagementListeners,
   listPublicListeners,

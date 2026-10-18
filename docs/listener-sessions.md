@@ -1,9 +1,11 @@
 # Listener lifecycle
 
-Implemented on 2026-10-18: persistent session transactions and HTTP operations.
-Discord, media and the player WebSocket are not connected. Browser entry remains
-disabled, and the production coordinator cannot authorize a listener. This is
-progress toward design.md sections 6–9, not proof of end-to-end replacement.
+Implemented on 2026-10-18: persistent transactions, HTTP operations, player
+WebSockets, browser entry/restoration and the public list. With a migrated
+database, entry opens a JOINING waiting-room session. Discord and media are not
+connected, and the coordinator cannot authorize command delivery. Actual subtitle
+traffic is not implemented. This is progress toward design.md sections 6–9, not
+proof of end-to-end audio/subtitle replacement.
 
 ## Entry and credentials
 
@@ -18,9 +20,14 @@ The request ID and credential must be reused for a retry of that entry. A change
 payload with the same request ID returns 409. A credential cannot be reused for a
 different request. Retrying an old entry returns its original terminal session
 without replacing a newer entry. A network retry is not a new nickname claim.
-The scaffold entry control now retains its request ID and credential between
-retries within that mounted component. Browser refresh storage, terminal-state
-rendering, and the complete listening interface remain to be implemented.
+The browser saves pending requests and current credentials in per-tab
+`sessionStorage` before issuing an entry request. Refresh restores the same
+session; an unconfirmed entry requires an explicit retry with its saved request.
+Replacement clears current access and displays the required Chinese notice.
+Terminal sessions never trigger automatic entry. Explicit leave stops the local
+socket first and persists the leave intention; a failed leave is retried after
+refresh instead of restoring its connection. Storage failures do not trigger an
+unbound entry request. The non-secret output-language preference uses `localStorage`.
 
 The request lock is acquired first, followed by the credential lock and global
 nickname row lock. One transaction creates JOINING, increments the generation,
@@ -52,8 +59,47 @@ Every 30 seconds the web process retries pending shutdowns and considers session
 with no heartbeat for 120 seconds expired. It rechecks last-seen time under the
 nickname lock, preventing a stale sweep from expiring a just-renewed session.
 Sweeps do not overlap; shutdown clears the timer and waits for ongoing work.
-There is no actual-media participant comparison yet. Background-tab heartbeat
-delivery must be proven with the future WebSocket before enabling browser entry.
+There is no actual-media participant comparison yet. Browser heartbeats respond
+to server messages instead of depending on foreground animation frames. Suspended
+devices may still expire; network recovery cannot resurrect an expired session.
+
+## Player WebSocket
+
+`/api/player/ws` requires the configured same-origin `Origin` and a database. The
+first frame must authenticate a session ID and credential within five seconds;
+the credential is never included in a query string. Production requires WSS.
+Only authentication and matching pong messages are accepted from a player.
+Malformed frames, repeated authentication, client publication and frames larger
+than 2 KiB are rejected. Outgoing connections with more than 64 KiB already
+buffered are closed instead of accumulating further state. These application
+checks do not replace ingress connection/message limits.
+
+The server sends session snapshots, complete room lists, public configuration,
+heartbeat challenges and bounded error codes. It polls persisted state once per
+second, sends a ping every 15 seconds and closes after 90 seconds without a valid
+pong. A valid pong updates the current generation's last-seen time. There are no
+subtitle frames or administrator commands on this channel yet.
+
+Each authenticated socket registers in `player_connection` under the same nickname
+lock used for replacement. This prevents an old handshake from registering after
+revocation has observed no sockets. Other web instances observe the terminal
+session and close their sockets too. The physical close hook, not the close
+request, sets `closedAt`. A slow close is force-terminated after 1.5 seconds.
+Failed close persistence is retried; unconfirmed rows are never expired by TTL.
+An old credential can receive its terminal snapshot but cannot register a live
+connection. Media shutdown still returns false, so this socket proof alone never
+authorizes a replacement listener or removes its predecessor from the public list.
+
+The browser reconnects only its saved session, with a capped 1–15 second backoff.
+Connection-generation checks discard callbacks from obsolete sockets. Session ID
+and nickname generation must match before a snapshot is accepted. Public player
+lists also refresh over HTTP every five seconds while no authenticated socket is
+connected; late HTTP responses cannot overwrite newer WebSocket snapshots.
+
+Graceful web-process shutdown closes connections before closing PostgreSQL. A
+hard kill can leave an unconfirmed registration. Resolving that state requires
+proof that its owning transport has stopped; an operational recovery mechanism
+is still unfinished. Do not turn an elapsed timeout into a revocation receipt.
 
 ## HTTP API
 
@@ -84,8 +130,14 @@ checks. Its transport port supplies controlled acknowledgements and failures; it
 cannot prove actual media revocation. `npm run test:http:db` runs the built server
 against loopback PostgreSQL and checks HTTP authorization, origin rejection,
 replacement, public response fields, restart restoration and terminal sessions.
+`npm run test:ws:db` runs two actual built Node servers, exercising origin/credential
+rejection, pong renewal, cross-process replacement and physical closure, old-token
+reconnect denial, forbidden publication and graceful restart recovery.
 `npm run ci:local` also checks unconfigured fail-closed behavior and Access boundaries.
 
-Live old-token reconnect, websocket termination, browser sound shutdown, PiP,
-Discord DAVE and real-network tests remain NOT RUN. Do not enable the transport
-adapter or set `entryAvailable` true on the strength of these simulated receipts.
+Chrome checks on macOS cover waiting-room entry, refresh, literal nickname display,
+two-tab replacement, old-page reload without re-entry, process restart, interrupted
+leave followed by refresh, and a 320px layout without horizontal overflow. Database
+queries confirmed unchanged generations and the expected physical connection counts.
+Browser sound shutdown, actual subtitles, PiP, Discord DAVE and real-player-network
+tests remain NOT RUN. Waiting-room availability does not establish those results.

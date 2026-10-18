@@ -7,6 +7,7 @@ export default defineEventHandler(async (event) => {
     await useDatabase(event).execute(
       sql`select request_fingerprint, subscription_version, delivery_stopped_at, terminal_reason from listener_session limit 1`,
     )
+    await useDatabase(event).execute(sql`select id from player_connection limit 1`)
     return { status: 'ok' }
   } catch {
     throw createError({

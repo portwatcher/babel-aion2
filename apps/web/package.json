@@ -17,6 +17,7 @@
     "@primeuix/themes": "2.0.3",
     "@primevue/nuxt-module": "4.5.4",
     "better-auth": "1.7.10",
+    "crossws": "0.3.5",
     "drizzle-orm": "0.45.4",
     "nuxt": "4.6.2",
     "primevue": "4.5.4",

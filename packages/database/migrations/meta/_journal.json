@@ -15,6 +15,13 @@
       "when": 1792315829678,
       "tag": "0001_panoramic_mad_thinker",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792316762964,
+      "tag": "0002_majestic_galactus",
+      "breakpoints": true
     }
   ]
 }

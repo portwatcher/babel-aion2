@@ -8,6 +8,7 @@ export default defineNuxtConfig({
   typescript: { strict: true },
   build: { transpile: ['@babel/contracts'] },
   nitro: {
+    experimental: { websocket: true },
     preset: 'node-server',
     externals: { inline: ['@babel/auth', '@babel/database', '@babel/contracts'] },
   },

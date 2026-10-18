@@ -8,6 +8,38 @@ export const listenerReferenceSchema = z.object({
 })
 export const languageChangeSchema = z.object({ outputLanguage: z.string().nullable() })
 
+export const listenerSnapshotSchema: z.ZodType<ListenerSnapshot> = z.object({
+  ...listenerReferenceSchema.shape,
+  roomId: z.uuid(),
+  nickname: z.string(),
+  state: z.enum([
+    'JOINING',
+    'ACTIVE',
+    'DISCONNECTING',
+    'REPLACED',
+    'REMOVED',
+    'EXPIRED',
+  ]),
+  terminalReason: z
+    .enum([
+      'DUPLICATE_NICKNAME_REPLACED',
+      'ADMINISTRATOR_REMOVED',
+      'PLAYER_LEFT',
+      'CONNECTION_EXPIRED',
+    ])
+    .nullable(),
+  outputLanguage: z.string().nullable(),
+  subscriptionVersion: z.number().int().nonnegative(),
+  joinedAt: z.iso.datetime({ offset: true }),
+})
+
+export const publicListenerSchema: z.ZodType<PublicListener> = z.object({
+  sessionId: z.uuid(),
+  nickname: z.string(),
+  joinedAt: z.iso.datetime({ offset: true }),
+  state: z.enum(['JOINING', 'ACTIVE', 'DISCONNECTING']),
+})
+
 export type TerminalReason =
   | 'DUPLICATE_NICKNAME_REPLACED'
   | 'ADMINISTRATOR_REMOVED'

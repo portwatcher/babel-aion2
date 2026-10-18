@@ -1,5 +1,5 @@
 import { listPublicListeners } from '@babel/database/listeners'
-import { useListenerRoom } from '../../utils/listeners'
+import { useListenerRoom } from '../../utils/room-configuration'
 
 export default defineEventHandler(async (event) => {
   setResponseHeader(event, 'Cache-Control', 'no-store')

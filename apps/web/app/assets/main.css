@@ -138,6 +138,54 @@ small {
 .form-error:empty {
   display: none;
 }
+.listener-panel {
+  display: grid;
+  gap: 24px;
+}
+.listener-panel h2 {
+  margin-bottom: 0;
+  overflow-wrap: anywhere;
+}
+.subtitle-empty {
+  display: grid;
+  gap: 8px;
+  padding-block: 20px;
+  border-block: 1px solid var(--babel-border);
+}
+.session-notice,
+.session-feedback {
+  margin-bottom: 24px;
+}
+.session-feedback {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.player-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.player-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 16px;
+  border-bottom: 1px solid var(--babel-border);
+}
+.player-identity {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+.player-identity strong {
+  overflow-wrap: anywhere;
+}
+.player-identity time {
+  font-size: 0.875rem;
+}
 .room-detail {
   display: grid;
   gap: 16px;

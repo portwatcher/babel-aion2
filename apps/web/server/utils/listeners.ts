@@ -1,27 +1,12 @@
 import { assertSameOrigin } from '@babel/auth/access'
 import { listenerCredentialSchema } from '@babel/contracts'
-import {
-  createListenerService,
-  ListenerError,
-  unavailableListenerDelivery,
-} from '@babel/database/listeners'
-import { room } from '@babel/database/schema'
+import { createListenerService, ListenerError } from '@babel/database/listeners'
 import type { H3Event } from 'h3'
 import { useDatabase } from './database'
-
-export const DEFAULT_ROOM_ID = '00000000-0000-4000-8000-000000000001'
-
-export async function useListenerRoom(event: H3Event) {
-  const database = useDatabase(event)
-  await database
-    .insert(room)
-    .values({ id: DEFAULT_ROOM_ID, name: 'AION2 深渊站' })
-    .onConflictDoNothing()
-  return { database, roomId: DEFAULT_ROOM_ID }
-}
+import { playerListenerDelivery } from './player-channel'
 
 export function useListeners(event: H3Event) {
-  return createListenerService(useDatabase(event), unavailableListenerDelivery)
+  return createListenerService(useDatabase(event), playerListenerDelivery)
 }
 
 export function requireListenerCredential(event: H3Event) {

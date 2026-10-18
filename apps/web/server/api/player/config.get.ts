@@ -1,13 +1,6 @@
-import type { PublicRoomConfiguration } from '@babel/contracts'
-import { DEFAULT_ROOM_ID } from '../../utils/listeners'
+import { publicRoomConfiguration } from '../../utils/room-configuration'
 
-export default defineEventHandler((event): PublicRoomConfiguration => {
+export default defineEventHandler((event) => {
   setResponseHeader(event, 'Cache-Control', 'no-store')
-  // No adapter is implemented, so no processing path can be advertised yet.
-  return {
-    room: { id: DEFAULT_ROOM_ID, name: 'AION2 深渊站', audioState: 'UNCONFIGURED' },
-    outputLanguages: [],
-    defaultOutputLanguage: null,
-    entryAvailable: false,
-  }
+  return publicRoomConfiguration(event)
 })

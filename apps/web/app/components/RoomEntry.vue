@@ -1,57 +1,54 @@
 <script setup lang="ts">
-import { ENTRY_NOTICE, nicknameSchema } from '@babel/contracts'
-import type { PublicRoomConfiguration } from '@babel/contracts'
+import {
+  ENTRY_NOTICE,
+  nicknameSchema,
+  selectOutputLanguage,
+  type PublicRoomConfiguration,
+} from '@babel/contracts'
+import { loadPendingEntry, savedLanguage, saveLanguage } from '~/utils/listener-client'
 
-const props = defineProps<{ configuration: PublicRoomConfiguration }>()
+const props = defineProps<{
+  configuration: PublicRoomConfiguration
+  submitting: boolean
+}>()
+const emit = defineEmits<{ enter: [nickname: string, outputLanguage: string | null] }>()
 const nickname = ref('')
 const outputLanguage = ref<string | null>(null)
 const validationError = ref('')
-const submitting = ref(false)
-let pendingEntry: {
-  nickname: string
-  outputLanguage: string | null
-  requestId: string
-  credential: string
-} | null = null
 
-async function enter() {
-  const result = nicknameSchema.safeParse(nickname.value)
-  if (!result.success) {
-    validationError.value = result.error.issues[0]?.message ?? '请检查昵称'
-    return
-  }
-  submitting.value = true
-  validationError.value = ''
-  try {
-    if (
-      pendingEntry?.nickname !== result.data ||
-      pendingEntry.outputLanguage !== outputLanguage.value
-    ) {
-      const bytes = crypto.getRandomValues(new Uint8Array(32))
-      pendingEntry = {
-        nickname: result.data,
-        outputLanguage: outputLanguage.value,
-        requestId: crypto.randomUUID(),
-        credential: btoa(String.fromCharCode(...bytes))
-          .replaceAll('+', '-')
-          .replaceAll('/', '_')
-          .replace(/=+$/, ''),
-      }
+function selectLanguage() {
+  outputLanguage.value = selectOutputLanguage(
+    props.configuration.outputLanguages,
+    navigator.languages?.length ? navigator.languages : [navigator.language],
+    savedLanguage(),
+    props.configuration.defaultOutputLanguage,
+  )
+}
+onMounted(() => {
+  nickname.value = loadPendingEntry()?.request.nickname ?? ''
+  selectLanguage()
+})
+watch(
+  () => props.configuration.outputLanguages,
+  () => {
+    if (import.meta.client) {
+      selectLanguage()
     }
-    await $fetch('/api/player/sessions', {
-      method: 'POST',
-      headers: { authorization: `Bearer ${pendingEntry.credential}` },
-      body: {
-        nickname: pendingEntry.nickname,
-        outputLanguage: pendingEntry.outputLanguage,
-        requestId: pendingEntry.requestId,
-      },
-    })
-  } catch {
-    validationError.value = '暂时无法进入收听，请稍后重试。'
-  } finally {
-    submitting.value = false
+  },
+)
+
+function enter() {
+  const result = nicknameSchema.safeParse(nickname.value)
+  validationError.value = result.success
+    ? ''
+    : (result.error.issues[0]?.message ?? '请检查昵称')
+  if (result.success) {
+    emit('enter', result.data, outputLanguage.value)
   }
+}
+function changeLanguage(value: string | null) {
+  outputLanguage.value = value
+  saveLanguage(value)
 }
 </script>
 
@@ -67,36 +64,29 @@ async function enter() {
           autocomplete="off"
           placeholder="输入你的角色名"
           :invalid="Boolean(validationError)"
-          aria-describedby="nickname-limit nickname-notice entry-error"
+          :disabled="submitting"
+          aria-describedby="nickname-limit nickname-notice nickname-error"
         />
         <small id="nickname-limit" class="muted">最多 32 个字符，区分大小写。</small>
+        <p id="nickname-error" class="form-error" role="alert">{{ validationError }}</p>
       </div>
-      <div class="field">
-        <label for="output-language">字幕语言</label>
-        <Select
-          v-model="outputLanguage"
-          input-id="output-language"
-          :options="props.configuration.outputLanguages"
-          option-label="name"
-          option-value="code"
-          :disabled="!props.configuration.outputLanguages.length"
-          placeholder="字幕尚未启用"
-          aria-describedby="language-notice"
-        />
-        <small id="language-notice" class="muted"
-          >管理员配置完成后，可在这里选择字幕语言。</small
-        >
-      </div>
+      <OutputLanguageSelect
+        :model-value="outputLanguage"
+        :languages="configuration.outputLanguages"
+        :disabled="submitting"
+        @update:model-value="changeLanguage"
+      />
       <p id="nickname-notice" class="entry-notice muted">{{ ENTRY_NOTICE }}</p>
-      <p id="entry-error" class="form-error" role="alert">{{ validationError }}</p>
       <Button
         type="submit"
-        :label="props.configuration.entryAvailable ? '进入收听' : '尚未开放收听'"
-        :disabled="!props.configuration.entryAvailable"
+        :label="configuration.entryAvailable ? '进入房间' : '暂时无法进入'"
+        :disabled="!configuration.entryAvailable"
         :loading="submitting"
         aria-describedby="availability-notice"
       />
-      <small id="availability-notice" class="muted">等待语音频道接通后再进入。</small>
+      <small id="availability-notice" class="muted"
+        >语音尚未接通。进入后可查看在线名单，并等待收听通道就绪。</small
+      >
     </form>
   </section>
 </template>

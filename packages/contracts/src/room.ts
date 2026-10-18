@@ -1,4 +1,17 @@
 import type { OutputLanguage } from './languages.ts'
+import { z } from 'zod'
+
+export const publicRoomConfigurationSchema: z.ZodType<PublicRoomConfiguration> =
+  z.object({
+    room: z.object({
+      id: z.uuid(),
+      name: z.string(),
+      audioState: z.enum(['UNCONFIGURED', 'STOPPED']),
+    }),
+    outputLanguages: z.array(z.object({ code: z.string(), name: z.string() })),
+    defaultOutputLanguage: z.string().nullable(),
+    entryAvailable: z.boolean(),
+  })
 
 export interface PublicRoomConfiguration {
   room: { id: string; name: string; audioState: 'UNCONFIGURED' | 'STOPPED' }

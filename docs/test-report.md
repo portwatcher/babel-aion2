@@ -1,10 +1,38 @@
 # Validation
 
-## Listener implementation — 2026-10-18
+## Player WebSocket and browser sessions — 2026-10-18
 
-Scope: persistent listener lifecycle, guarded HTTP operations, and local PostgreSQL.
-The full design.md objective is still incomplete. Production entry remains disabled
-because no real subtitle/media revocation adapter is connected.
+Current scope: persistent listeners plus real player sockets and the waiting-room
+interface. With a migrated database, entry is available as JOINING. Original audio,
+actual subtitle delivery and media revocation remain unavailable; no listener is
+authorized for command delivery. The full design.md objective remains incomplete.
+
+| Check                                                                                        | Status  | Evidence                                                                                                                                                                          |
+| -------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source limits, formatting, strict types, unit tests, builds and unconfigured HTTP boundaries | PASS    | `npm run ci:local`; 72 first-party source files, largest 318 lines; seven unit tests                                                                                              |
+| Database coordinator and HTTP regressions                                                    | PASS    | `npm run test:db` (seven tests) and `npm run test:http:db` against disposable PostgreSQL 16                                                                                       |
+| Real player WebSocket authorization                                                          | PASS    | `npm run test:ws:db`; foreign Origin rejected at upgrade, invalid credential receives no session/list, client subtitle publication closes the connection                          |
+| Cross-process replacement and close confirmation                                             | PASS    | Same suite uses two built Node processes sharing PostgreSQL; replacement on B sends terminal state and closes A's socket; old credentials cannot register a live socket           |
+| Heartbeat, recovery and graceful server shutdown                                             | PASS    | Real nonce/pong renews the database heartbeat; socket closure and graceful process shutdown leave no open registration; reconnection retains session/generation                   |
+| Browser entry, refresh and public list                                                       | PASS    | Chrome on macOS; entry renders JOINING, nickname `<前排>验证-1018` is literal text, a fresh tab reads the existing list; refresh preserves the original session ID and generation |
+| Browser replacement and obsolete-page refresh                                                | PASS    | Second tab takes generation 2; first tab displays the required replacement notice; refreshing it creates no third session or generation                                           |
+| Browser recovery and pending leave                                                           | PASS    | Local server restart restores one socket on generation 2; a leave during outage survives refresh, ends generation 2 and opens no replacement socket                               |
+| Narrow layout                                                                                | PASS    | Chrome viewport and document width both 320px; entry/listener controls and list remain readable; screenshots retained in local task artifacts                                     |
+| Migration 0002                                                                               | PASS    | `npm run db:migrate` applied `player_connection` on PostgreSQL 16; schema used by the real socket and browser checks                                                              |
+| Hard-crash registration recovery                                                             | NOT RUN | Unconfirmed sockets remain fail-closed; an operational method to prove owning transport shutdown and reconcile orphaned rows is still required                                    |
+| Live Discord, original audio, actual subtitles, providers and PiP                            | NOT RUN | No live audio/provider credentials have been used and no media adapter is enabled; these results cannot establish sound shutdown or translation quality                           |
+| Production/network/game-mode acceptance                                                      | NOT RUN | These implementation checks used loopback HTTP/WebSocket on macOS, not a player network or AION2                                                                                  |
+
+The browser checks are functional checks, not a complete accessibility audit.
+The list intentionally retains DISCONNECTING rows while media shutdown is
+unconfirmed. No test fixture or enabled language is seeded into production.
+The waiting-room WebSocket sends no battle commands or subtitle history.
+
+## Persistent HTTP stage — 2026-10-18 (historical)
+
+Scope of the preceding implementation stage: persistent listener lifecycle,
+guarded HTTP operations and local PostgreSQL. At that stage browser entry was
+disabled. The current waiting-room status and later checks are recorded above.
 
 | Check                                                                                                  | Status  | Evidence                                                                                                                                                                                                |
 | ------------------------------------------------------------------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -26,11 +54,10 @@ and database state, not actual audio stop, old-token rejection or subtitle deliv
 The public lobby still advertises zero languages/providers and unavailable entry.
 There is no claim that live Cloudflare policy or production media has passed.
 
-The implementation is retained in the dedicated Codex-managed `babel-implementation`
-worktree. During this work, another active deployment task configured `origin` as
-`https://github.com/portwatcher/babel-aion2.git`. A final `git fetch origin` succeeded
-but returned no integration branch; remote HEAD was still unknown. These task
-commits are not yet remotely integrated, so the worktree is retained.
+At the end of that stage, the implementation was retained in the dedicated
+Codex-managed `babel-implementation` worktree. The newly configured GitHub remote
+had no integration branch yet. Remote main was created during the later WebSocket
+stage; worktree cleanup still requires verified remote integration of task commits.
 
 ## Scaffold baseline
 
