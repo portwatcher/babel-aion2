@@ -155,8 +155,13 @@ See [provider configuration](providers-and-languages.md) for probe and sample li
 7. Verify native PiP rendering, background updates and actual game display modes
    with live speech. Main-page and PiP subtitle content share state and one media
    output. See [PiP scope and evidence](picture-in-picture.md).
-8. Complete deployment, transport, restore, rollback, and real-network evidence
-   from `design.md`. Optional character lookup remains outside core delivery.
+8. Complete production voice deployment, transport, restore, rollback and
+   real-network evidence from `design.md`. The production web rollout, isolated
+   database restoration and published-image rollback rehearsal have passed;
+   those checks do not establish production command delivery or disaster recovery.
+   Optional character lookup remains disabled because the source's published
+   crawler policy excludes its search and API paths. See the
+   [source probe](test-report.md#optional-character-source-probe--2026-10-19).
 
 The production language list may stay empty during initial deployment. Live
 audio and provider quality need their own evidence; the scaffold tests do not
