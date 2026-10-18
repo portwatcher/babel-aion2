@@ -12,7 +12,8 @@
   },
   "scripts": {
     "dev": "npm run dev --workspace=@babel/web",
-    "build": "npm run build --workspace=@babel/web && npm run build --workspace=@babel/voice-worker",
+    "build": "npm run build --workspace=@babel/web && npm run build:migrations && npm run build --workspace=@babel/voice-worker",
+    "build:migrations": "node scripts/build-migrations.mjs",
     "start": "npm run start --workspace=@babel/web",
     "dev:worker": "npm run dev --workspace=@babel/voice-worker",
     "prepare": "npm run prepare --workspace=@babel/web",
@@ -38,6 +39,7 @@
     "@types/node": "24.19.2",
     "@types/pg": "8.23.1",
     "drizzle-kit": "0.31.11",
+    "esbuild": "0.28.2",
     "prettier": "3.9.10",
     "tsx": "4.23.15",
     "typescript": "6.0.3",

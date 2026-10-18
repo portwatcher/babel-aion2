@@ -9,7 +9,7 @@ authorized for command delivery. The full design.md objective remains incomplete
 
 | Check                                                                                        | Status  | Evidence                                                                                                                                                                          |
 | -------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Source limits, formatting, strict types, unit tests, builds and unconfigured HTTP boundaries | PASS    | `npm run ci:local`; 72 first-party source files, largest 318 lines; seven unit tests                                                                                              |
+| Source limits, formatting, strict types, unit tests, builds and unconfigured HTTP boundaries | PASS    | `npm run ci:local`; 73 first-party source files, largest 318 lines; seven unit tests                                                                                              |
 | Database coordinator and HTTP regressions                                                    | PASS    | `npm run test:db` (seven tests) and `npm run test:http:db` against disposable PostgreSQL 16                                                                                       |
 | Real player WebSocket authorization                                                          | PASS    | `npm run test:ws:db`; foreign Origin rejected at upgrade, invalid credential receives no session/list, client subtitle publication closes the connection                          |
 | Cross-process replacement and close confirmation                                             | PASS    | Same suite uses two built Node processes sharing PostgreSQL; replacement on B sends terminal state and closes A's socket; old credentials cannot register a live socket           |
@@ -27,6 +27,11 @@ The browser checks are functional checks, not a complete accessibility audit.
 The list intentionally retains DISCONNECTING rows while media shutdown is
 unconfirmed. No test fixture or enabled language is seeded into production.
 The waiting-room WebSocket sends no battle commands or subtitle history.
+
+The branch incorporates remote main's migration packaging at `09bbb8b`. A clean
+`npm ci` followed by all four validation commands above passed after integration.
+Gitleaks 8.30.1 scanned the full available Git history with redaction and reported
+no leaks. The source specification files remain byte-identical.
 
 ## Persistent HTTP stage — 2026-10-18 (historical)
 
@@ -122,8 +127,9 @@ selection remains reserved for configuration after deployment.
 
 The project started as an empty directory and was initialized as a Git repository.
 Application files were authored and validated in the Codex-managed
-`babel-scaffold` worktree. There is no configured remote, so remote integration
-cannot be verified and the managed worktree must be retained under AGENTS.md.
+`babel-scaffold` worktree. At the scaffold baseline there was no configured remote, so remote integration
+could not be verified. The implementation branch now incorporates origin/main;
+its task commits must be merged remotely before the worktree can be removed.
 Local integration into the primary checkout is recorded in Git history.
 
 Temporary preview and container processes are stopped at completion. Local task

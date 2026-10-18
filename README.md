@@ -90,4 +90,5 @@ See [AGENTS.md](AGENTS.md) for worktree, cleanup, security, and interface rules.
 - [Interface skill installation](docs/interface-skills.md)
 
 The target production URLs are `https://babel.juryquinn.com` and
-`https://babel.juryquinn.com/admin`. This scaffolding task does not deploy them.
+`https://babel.juryquinn.com/admin`. Releases and production configuration live in
+the separate private infra repository. See [source and secret boundaries](docs/source-and-secrets.md).

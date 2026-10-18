@@ -11,6 +11,11 @@
   domain modules, conventional commits, and deterministic local checks.
 - Use the related `../infra` repository for production resources and established
   deployment methods. Never copy credentials or private runtime configuration.
+- `portwatcher/babel-aion2` is private today but intended for future open source.
+  Keep source and Git history free of real credentials, private network addresses,
+  production database names, Access application identities, and deployment keys.
+  Development-only `.env.example` files are allowed. Production configuration and
+  release automation belong in the separate private infra repository.
 - Respond in clear, direct language. State actual test results and limitations.
 
 ## Worktree management
@@ -103,8 +108,9 @@
   contracts and credible failure modes; do not mirror source or add test-only seams.
 - Update the README and relevant docs when behavior, commands, or limits change.
   Record PASS, FAIL, NOT RUN, or WAITING FOR CONFIGURATION with evidence.
-- Use conventional commits and a coding-agent coauthor trailer. Do not create
-  a remote repository, publish a release, or deploy as part of scaffolding.
+- Use conventional commits and a coding-agent coauthor trailer. Publish releases
+  or deploy only when requested. Build and publish production images through the
+  established GitHub Actions release workflow in the private infra repository.
 - If GitHub Actions are added, follow Perohub's runner policy:
   `[self-hosted, Linux, X64, ser7-homelab]`. Keep local/CI checks equivalent.
 - Production manifests belong in `../infra`; reuse public-edge, Access policy,
