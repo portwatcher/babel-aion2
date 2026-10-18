@@ -1,5 +1,30 @@
 # Validation
 
+## Production web release — 2026-10-19
+
+PR #1 merged as `bbe9fc204d61b37a46284581416504bc172cb46e`. The existing
+private release workflow (run 39161245803) published this exact source and updated
+only the web Deployment and migration Job image references. After a targeted
+repository-cache refresh, ArgoCD observed the new Git revision and performed the
+migration and rollout.
+
+| Check                            | Result                    | Evidence                                                                                                                                                                                                                                               |
+| -------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Release pipeline                 | PASS                      | Linux AMD64 self-hosted run: local-equivalent CI, 18 tests, ten real PostgreSQL tests, repeated migrations and non-root image smoke; publication and job cleanup succeed                                                                               |
+| Production migration and rollout | PASS                      | Migration hook Succeeded; 12 applied migrations. ArgoCD Synced / Healthy; two new ready replicas, zero restarts, and both image digests match publication                                                                                              |
+| Public application               | PASS                      | Lobby, player configuration, liveness, readiness and 19 frontend assets return 200. Real Chrome renders the updated lobby without console errors                                                                                                       |
+| Administrator boundaries         | PASS                      | Public administrator page, nested page, management API and auth API redirect to Access. Direct origin requests without assertions, with email only or cookie only return 401; a forged assertion returns 403. Runtime Access key retrieval returns 200 |
+| Sensitive configuration          | PASS                      | A check inside the running pod compares five configured sensitive values against the HTML, public configuration and 19 assets: zero matches. Values never leave that process in the report                                                             |
+| Configuration and ownership      | PASS                      | Both web runtime owners are registered. No production listeners, provider configurations or languages were seeded. Nickname entry is available; the source remains UNCONFIGURED and languages remain empty                                             |
+| Live production commands         | WAITING FOR CONFIGURATION | Voice worker, private control routing, public TURN, pool budgets, real provider configuration and live Discord-to-browser speech remain outstanding                                                                                                    |
+| Operational acceptance           | NOT RUN                   | Authenticated human administrator use, capacity, supervisor/host-loss recovery, production restore and release rollback are not established by this release                                                                                            |
+
+The default Python HTTP user agent received Cloudflare 1010. The real Chrome
+check and HTTP probes with a browser user agent passed; no Cloudflare policy was
+changed. These are web deployment and access-boundary checks, not proof of audio,
+subtitles, game-window behavior or production disaster recovery.
+See [deployment details](deployment.md) for the immutable source and digest.
+
 ## Actual PostgreSQL backup restoration — 2026-10-19
 
 The restore rehearsal uses real `pg_dump -Fc` and `pg_restore` with matching
