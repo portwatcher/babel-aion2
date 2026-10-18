@@ -86,6 +86,13 @@ this is not a deployment rollback or proof of live media recovery.
 Log service state and safe error codes, never credentials, JWTs, cookies,
 connection strings, full provider responses, or complete battle recordings.
 The worker currently logs only its stopped state.
+Administrator audio-sample comparisons hold both provider test slots for at most
+the 35-second lease, with a 30-second processing deadline and the existing test
+cooldown. A crashed process releases its slots through lease expiry. Sample
+requests and results are not durable jobs: a page reload loses the comparison.
+Audits retain only candidate IDs/versions and safe result codes; do not add audio
+or transcript logging when investigating a sample failure. See the
+[sample format and provider scope](providers-and-languages.md#audio-sample-comparison).
 
 At task completion, stop owned preview servers and test processes and inspect
 worktrees with `npm run worktree:audit`. Follow `AGENTS.md` before any removal.

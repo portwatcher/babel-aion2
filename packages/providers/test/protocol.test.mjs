@@ -15,15 +15,16 @@ test('provider protocols preserve language scripts, bound failures and complete 
   }
   const soniox = { type: 'soniox', model: 'stt-rt-v5', timeoutMs: 3_000 }
   try {
-    for (const [outputLanguage, expected] of [
-      ['zh-CN', 'ZH-HANS'],
-      ['zh-TW', 'ZH-HANT'],
-      ['ja-JP', 'JA'],
-      ['ko-KR', 'KO'],
+    for (const [outputLanguage, expected, sourceLanguage] of [
+      ['zh-CN', 'ZH-HANS', 'zh-Hans'],
+      ['zh-TW', 'ZH-HANT', 'zh-Hans'],
+      ['ja-JP', 'JA', 'zh-Hans'],
+      ['ko-KR', 'KO', 'zh-Hans'],
+      ['ja', 'JA', 'und'],
     ]) {
       const translated = await translateDeepL(deepl, fixture.credential(), {
         text: '指令',
-        sourceLanguage: 'zh-Hans',
+        sourceLanguage,
         outputLanguage,
         context: 'context',
       })
@@ -32,7 +33,7 @@ test('provider protocols preserve language scripts, bound failures and complete 
       assert.equal(request.method, 'POST')
       assert.deepEqual(request.body, {
         text: ['指令'],
-        source_lang: 'ZH',
+        ...(sourceLanguage === 'und' ? {} : { source_lang: 'ZH' }),
         target_lang: expected,
         model_type: 'prefer_quality_optimized',
         context: 'context',
@@ -81,9 +82,11 @@ test('provider protocols preserve language scripts, bound failures and complete 
     assert.equal(request.auth, 'soniox-api-key')
     assert.deepEqual(request.configuration, {
       model: 'stt-rt-v5',
-      audio_format: 's16le',
+      audio_format: 'pcm_s16le',
       sample_rate: 48_000,
       num_channels: 1,
+      enable_endpoint_detection: true,
+      enable_language_identification: true,
     })
     assert.equal(request.frames.length, 50)
     assert.ok(request.frames.every((frame) => frame.bytes === 1920 && frame.silence))

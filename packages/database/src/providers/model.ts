@@ -13,6 +13,8 @@ export class ProviderConfigurationError extends Error {
       | 'NOT_FOUND'
       | 'VERSION_CONFLICT'
       | 'INVALID_CONFIGURATION'
+      | 'INVALID_AUDIO'
+      | 'REQUEST_TOO_LARGE'
       | 'TYPE_IMMUTABLE'
       | 'TEST_IN_PROGRESS'
       | 'TEST_COOLDOWN'
@@ -29,6 +31,13 @@ export type ConnectionProbe = (
   settings: ProviderSettings,
   credential: string,
 ) => Promise<Omit<ProviderTestResult, 'configurationVersion'>>
+
+export interface ProtectedProvider {
+  id: string
+  version: number
+  settings: ProviderSettings
+  credential: string
+}
 
 export function settingsOf(stored: StoredProvider) {
   const result = providerSettingsSchema.safeParse(stored.publicSettings)

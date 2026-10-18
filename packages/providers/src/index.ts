@@ -5,6 +5,8 @@ import { probeSoniox } from './soniox.ts'
 
 export { translateDeepL } from './deepl.ts'
 export { ProviderFailure } from './errors.ts'
+export { readPcmWave } from './pcm.ts'
+export { previewSubtitleSample } from './sample.ts'
 
 export async function testProviderConnection(
   settings: ProviderSettings,

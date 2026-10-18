@@ -21,6 +21,12 @@ export function providerFailure(error: unknown) {
   const data =
     details && typeof details === 'object' && 'data' in details ? details.data : null
   if (data && typeof data === 'object' && 'code' in data) {
+    if (data.code === 'INVALID_AUDIO') {
+      return '请检查语言代码，并选择 0.2–10 秒的单声道、16 位 PCM WAV（16 或 48 kHz）。'
+    }
+    if (data.code === 'REQUEST_TOO_LARGE') {
+      return '样本文件过大，请选择不超过 1 MB 的 WAV。'
+    }
     if (data.code === 'CONNECTION_TEST_FAILED' && 'testCode' in data) {
       const code = providerTestCodeSchema.safeParse(data.testCode)
       if (code.success) {

@@ -12,16 +12,17 @@ speech/subtitle quality. There is no enable operation or player-defined endpoint
 Local validation substitutes loopback HTTP/WebSocket servers only in test processes.
 No real provider credential or authorized battle speech sample has been supplied;
 live access, latency, quality and provider selection remain **NOT RUN**.
-The Soniox recognition stream, shared language jobs and speech-to-subtitle path
-are not implemented. The DeepL text function is used by its connection test but
-is not connected to a subtitle pipeline.
+The Soniox recognition adapter handles real-time transcript revisions and utterance
+endpoints. Its audio-sample operation passes stable original utterances to the
+separate DeepL adapter. Shared commander/language jobs and the authorized player
+subtitle path are not implemented.
 
 ## Candidate APIs and test scope
 
-| Candidate | Implemented request                                                                                                              | What a successful test establishes                                                              |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Soniox    | Fixed `wss://stt-rt.soniox.com/transcribe-websocket`, API-key subprotocol, configurable realtime model, raw mono s16le at 48 kHz | One second of generated silence is acknowledged as processed, followed by a finished response   |
-| DeepL     | `POST /v2/translate` on the official Free or Pro origin, `DeepL-Auth-Key` header, explicit model type                            | The fixed short sentence “Wait here.” produces one valid English-to-German translation response |
+| Candidate | Implemented request                                                                                                                    | What a successful test establishes                                                              |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Soniox    | Fixed `wss://stt-rt.soniox.com/transcribe-websocket`, API-key subprotocol, configurable realtime model, raw mono `pcm_s16le` at 48 kHz | One second of generated silence is acknowledged as processed, followed by a finished response   |
+| DeepL     | `POST /v2/translate` on the official Free or Pro origin, `DeepL-Auth-Key` header, explicit model type                                  | The fixed short sentence “Wait here.” produces one valid English-to-German translation response |
 
 Both tests can incur provider charges. Saving a new candidate does not send a
 request. Testing saved settings, changing an existing connection parameter/key,
@@ -37,20 +38,61 @@ Soniox consumes audio and reports processing completion; DeepL consumes text and
 has distinct Free/Pro origins and model choices. These are candidates for separate
 recognition and translation stages, not a measured ranking or final selection.
 
+## Audio-sample comparison
+
+In **音频样本测试**, select a saved Soniox candidate, a separate saved DeepL
+candidate, an output-language code and an authorized WAV file. The format is mono,
+16-bit little-endian PCM at 16 or 48 kHz, 0.2–10 seconds, at most 1,000,000 bytes.
+The server rejects invalid RIFF/chunk sizes, duplicate format/data chunks,
+compressed or stereo audio, unsupported sample rates and excessive duration.
+It bounds the JSON request to 1,400,000 bytes while reading, including chunked input.
+The sample operation has a total 30-second provider deadline.
+
+Audio is sent to Soniox in paced 20 ms frames; silence is retained. Text and
+sample-relative audio timestamps come from the provider. Final tokens accumulate
+once, each response replaces its provisional tokens, and `<end>`/`<fin>` closes an
+utterance. Revisions replace earlier text under the same utterance ID. Missing
+timestamps remain `null`; absent or mixed source-language evidence becomes `und`,
+which lets DeepL detect the source instead of inventing an intermediate language.
+Each utterance is bounded to 4096 characters/tokens and each sample to 32 utterances.
+These are processing limits, not an acceptance sample-count requirement.
+
+After recognition finishes, stable nonempty utterances are translated once each.
+The page shows original/translated text, finality, known sample times, configuration
+versions and elapsed processing time. This elapsed time is not a measurement of
+live subtitle latency. `PASS` means the request finished with valid responses;
+the administrator must still compare accuracy, negation, numbers and terminology.
+`NO_SPEECH` makes no translation request. Safe provider failures remain visible
+with any partial original text. The operation does not enable configurations,
+modify connection-test evidence, create a language or send anything to players.
+
+Audio reaches Soniox and recognized text reaches DeepL, so use authorized samples
+and expect provider charges. Babel keeps sample content only in request memory
+and the current page; it does not persist audio, transcript or translated text.
+The audit records only configuration IDs/versions and the safe result code.
+Provider retention policies are separate from Babel's storage behavior.
+The browser can play the selected local file without uploading it until the
+administrator starts the test.
+
+This bounded comparison is not continuous live subtitle delivery. It follows the
+Soniox [token update protocol](https://soniox.com/docs/stt/rt/real-time-transcription)
+and [endpoint markers](https://soniox.com/docs/stt/rt/endpoint-detection).
+
 ## Administration and persistence
 
 All operations require a verified Access JWT, its matching persisted Better Auth
 session, and the configured same origin for mutations. Responses are private and
 not cacheable. The UI uses HTTP; it adds no administrator WebSocket.
 
-| Operation                                           | Route and body                                                                               |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| List configurations and latest 20 history summaries | `GET /api/management/providers`                                                              |
-| Create with a client-generated UUID                 | `PUT /api/management/providers/:id`, `expectedVersion: 0`, name, settings and credential     |
-| Update                                              | Same PUT with the current positive version; omit credential to retain it                     |
-| Test saved settings                                 | `POST /api/management/providers/:id/test`, current `expectedVersion`                         |
-| Restore old settings                                | `POST /api/management/providers/:id/restore`, current `expectedVersion` and `restoreVersion` |
-| Remove configuration and encrypted history          | `DELETE /api/management/providers/:id`, current `expectedVersion`                            |
+| Operation                                           | Route and body                                                                                                                                 |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| List configurations and latest 20 history summaries | `GET /api/management/providers`                                                                                                                |
+| Create with a client-generated UUID                 | `PUT /api/management/providers/:id`, `expectedVersion: 0`, name, settings and credential                                                       |
+| Update                                              | Same PUT with the current positive version; omit credential to retain it                                                                       |
+| Test saved settings                                 | `POST /api/management/providers/:id/test`, current `expectedVersion`                                                                           |
+| Restore old settings                                | `POST /api/management/providers/:id/restore`, current `expectedVersion` and `restoreVersion`                                                   |
+| Compare an audio sample                             | `POST /api/management/providers/sample`, `recognition: {id, version}`, `translation: {id, version}`, `outputLanguage`, canonical `audioBase64` |
+| Remove configuration and encrypted history          | `DELETE /api/management/providers/:id`, current `expectedVersion`                                                                              |
 
 Provider type cannot change within a configuration. Create another configuration
 for a different provider. DeepL selects Free/Pro origin and one of its three
@@ -72,6 +114,10 @@ the one-second audio stream and final response finish. Concurrent tests return
 409, cooldown violations 429, and stale versions 409. A late result cannot update
 a replaced configuration or a lease owned by a different request. A crashed
 process's lease expires without changing the last accepted configuration.
+An audio sample acquires both configurations' test leases and uses the same
+cooldown. It checks both versions and lease owners after processing; an obsolete
+result returns 409 instead of being presented as current evidence. Leases are
+released on success or failure. Audio validation happens before provider requests.
 
 Deletion refuses configurations referenced by any output-language row, including
 disabled rows, and refuses an active test lease. It deletes all historical
@@ -95,7 +141,12 @@ bounded to 64 KiB while reading and require exactly one nonempty translation.
 The language mapping preserves Chinese writing systems; unsupported provider
 language combinations still require path validation.
 
-Soniox sends 20 ms frames and stops if its pending send buffer exceeds 500 ms.
+Soniox sends frames of at most 20 ms and stops if its pending send buffer exceeds
+500 ms. Input sample offsets must be contiguous; a discontinuity fails the stream
+instead of silently joining separate fragments. A paused open stream sends a
+documented keepalive every 10 seconds. It ends after 295 minutes, before the
+documented 300-minute session limit; the future continuous worker must replace
+that generation. There is no automatic replay of old audio.
 The probe requires a finished response after all frames, with at least 1000 ms
 processed; early completion, malformed responses and timeout fail. Soniox
 responses over 64 KiB are rejected. HTTP translation redirects are rejected to

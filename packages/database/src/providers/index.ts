@@ -4,6 +4,7 @@ import {
   providerSaveSchema,
   type ProviderSave,
   type ProviderTestResult,
+  type ProviderSampleResult,
 } from '@babel/contracts'
 import type { Database } from '../client.ts'
 import type { CredentialCipher } from '../credentials.ts'
@@ -20,6 +21,7 @@ import {
   settingsOf,
   type ConnectionProbe,
   type StoredProvider,
+  type ProtectedProvider,
 } from './model.ts'
 
 export { ProviderConfigurationError } from './model.ts'
@@ -348,12 +350,75 @@ export function createProviderService(
       })
     })
   }
+  async function sample(
+    references: Array<{ id: string; version: number }>,
+    actor: string,
+    operation: (providers: ProtectedProvider[]) => Promise<ProviderSampleResult>,
+  ) {
+    const leased: Array<{ id: string; version: number; leaseId: string }> = []
+    const providers: ProtectedProvider[] = []
+    try {
+      // A sample holds the same test slots as ordinary connection tests. The
+      // 30-second sample deadline fits inside their 35-second database lease.
+      for (const reference of [...references].sort((a, b) =>
+        a.id.localeCompare(b.id),
+      )) {
+        const row = expected(await stored(reference.id), reference.version)
+        const credential = protection().decrypt(
+          row.encryptedCredential,
+          context(row.id),
+        )
+        providers.push({
+          id: row.id,
+          version: row.version,
+          settings: settingsOf(row),
+          credential,
+        })
+      }
+      if (
+        providers.length !== 2 ||
+        new Set(providers.map((value) => value.settings.type)).size !== 2
+      ) {
+        throw new ProviderConfigurationError('INVALID_CONFIGURATION')
+      }
+      for (const provider of providers) {
+        const leaseId = await acquireTest(provider.id, provider.version)
+        leased.push({ id: provider.id, version: provider.version, leaseId })
+      }
+      const result = await operation(providers)
+      await db.transaction(async (tx) => {
+        for (const lease of leased) {
+          const [row] = await tx
+            .select()
+            .from(providerConfiguration)
+            .where(eq(providerConfiguration.id, lease.id))
+            .for('update')
+          const fresh = expected(row, lease.version)
+          if (fresh.testLeaseId !== lease.leaseId) {
+            throw new ProviderConfigurationError('VERSION_CONFLICT')
+          }
+        }
+        await tx.insert(auditEvent).values({
+          actorSubject: actor,
+          action: 'provider.sample',
+          metadata: {
+            configurations: leased.map(({ id, version }) => ({ id, version })),
+            code: result.code,
+          },
+        })
+      })
+      return result
+    } finally {
+      await Promise.all(leased.map((lease) => releaseTest(lease.id, lease.leaseId)))
+    }
+  }
   return {
     read,
     save,
     test,
     restore,
     remove,
+    sample,
     async list() {
       const rows = await db
         .select({ id: providerConfiguration.id })

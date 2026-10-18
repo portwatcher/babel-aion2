@@ -66,7 +66,9 @@ export async function translateDeepL(
       },
       body: JSON.stringify({
         text: [input.text],
-        source_lang: language(input.sourceLanguage, false),
+        ...(input.sourceLanguage === 'und'
+          ? {}
+          : { source_lang: language(input.sourceLanguage, false) }),
         target_lang: language(input.outputLanguage, true),
         model_type: valid.data.model,
         ...(input.context ? { context: input.context } : {}),

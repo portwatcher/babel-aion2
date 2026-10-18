@@ -16,6 +16,8 @@ with server-side encryption, persist a stopped room, and remove a specific liste
 generation. Saving these settings does not connect Discord or enable audio.
 The administrator can also save encrypted Soniox/DeepL candidate configurations,
 run connection probes, replace credentials, and test/restore historical versions.
+An authorized PCM WAV sample can be recognized through Soniox and translated
+through DeepL for an administrator-only comparison of source and translated text.
 These candidates remain disabled for production subtitles; no live provider
 quality or Discord audio has been validated.
 
@@ -56,16 +58,16 @@ are for the local Compose service only.
 
 ## Workspace
 
-| Path                              | Responsibility                                                               |
-| --------------------------------- | ---------------------------------------------------------------------------- |
-| `apps/web`                        | Nuxt player/administrator pages, Nitro HTTP APIs and player WebSockets       |
-| `apps/voice-worker`               | Explicitly stopped entry point for the future audio worker                   |
-| `packages/auth`                   | Cloudflare JWT verification and administrator Better Auth sessions           |
-| `packages/database`               | Drizzle schema, migrations, listener transactions and revocation coordinator |
-| `packages/contracts`              | Browser-safe nickname, language, room, and subtitle contracts                |
-| `packages/providers`              | Server-only DeepL translation requests and Soniox connection probes          |
-| `.agents/skills/better-interface` | The requested interface review skill                                         |
-| `scripts`                         | Source size checks, worktree inventory, built HTTP smoke checks              |
+| Path                              | Responsibility                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------------- |
+| `apps/web`                        | Nuxt player/administrator pages, Nitro HTTP APIs and player WebSockets          |
+| `apps/voice-worker`               | Explicitly stopped entry point for the future audio worker                      |
+| `packages/auth`                   | Cloudflare JWT verification and administrator Better Auth sessions              |
+| `packages/database`               | Drizzle schema, migrations, listener transactions and revocation coordinator    |
+| `packages/contracts`              | Browser-safe nickname, language, room, and subtitle contracts                   |
+| `packages/providers`              | Server-only Soniox recognition, DeepL translation, probes and sample comparison |
+| `.agents/skills/better-interface` | The requested interface review skill                                            |
+| `scripts`                         | Source size checks, worktree inventory, built HTTP smoke checks                 |
 
 The structure follows the related `perohub-monorepo` repository. Shared domain
 code lives in packages. Production resources belong in the existing `infra`
@@ -74,22 +76,23 @@ will run in a separate worker.
 
 ## Commands
 
-| Command                      | Purpose                                                                                                                         |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev`                | Start the local Nuxt app                                                                                                        |
-| `npm run build`              | Build the web app, standalone migrations, and worker entry point                                                                |
-| `npm start`                  | Run the built Nuxt server                                                                                                       |
-| `npm run ci:local`           | Source limits, formatting, types, unit tests, build, HTTP smoke                                                                 |
-| `npm run test:db`            | Real PostgreSQL administrator sessions and listener lifecycle tests                                                             |
-| `npm run test:http:db`       | Built server + local PostgreSQL: entry, replacement, isolation and restart; run after build/migrations                          |
-| `npm run test:ws:db`         | Two built servers + local PostgreSQL: real player WebSockets, replacement, shutdown and recovery                                |
-| `npm run test:management:db` | Built servers + local PostgreSQL: signed admin login, encrypted room settings, conflicts, stop and removal                      |
-| `npm run test:providers:db`  | Built servers + local PostgreSQL: provider history, encrypted credentials, replacement and test leases; local provider fixtures |
-| `npm run db:generate`        | Generate a migration after schema changes                                                                                       |
-| `npm run db:migrate`         | Apply committed migrations using `.env`                                                                                         |
-| `npm run db:studio`          | Open the local schema browser using `.env`                                                                                      |
-| `npm run db:down`            | Stop the local database without deleting its volume                                                                             |
-| `npm run worktree:audit`     | Show worktrees and remote availability without deleting anything                                                                |
+| Command                      | Purpose                                                                                                                                                     |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`                | Start the local Nuxt app                                                                                                                                    |
+| `npm run build`              | Build the web app, standalone migrations, and worker entry point                                                                                            |
+| `npm start`                  | Run the built Nuxt server                                                                                                                                   |
+| `npm run ci:local`           | Source limits, formatting, types, unit tests, build, HTTP smoke                                                                                             |
+| `npm run test:db`            | Real PostgreSQL administrator sessions and listener lifecycle tests                                                                                         |
+| `npm run test:http:db`       | Built server + local PostgreSQL: entry, replacement, isolation and restart; run after build/migrations                                                      |
+| `npm run test:ws:db`         | Two built servers + local PostgreSQL: real player WebSockets, replacement, shutdown and recovery                                                            |
+| `npm run test:management:db` | Built servers + local PostgreSQL: signed admin login, encrypted room settings, conflicts, stop and removal                                                  |
+| `npm run test:providers:db`  | Built servers + local PostgreSQL: provider history, encrypted credentials, replacement and test leases; local provider fixtures                             |
+| `npm run test:samples:db`    | Built servers + local PostgreSQL: authorized WAV sample processing, transcript revisions, upload limits and stale-result rejection; local provider fixtures |
+| `npm run db:generate`        | Generate a migration after schema changes                                                                                                                   |
+| `npm run db:migrate`         | Apply committed migrations using `.env`                                                                                                                     |
+| `npm run db:studio`          | Open the local schema browser using `.env`                                                                                                                  |
+| `npm run db:down`            | Stop the local database without deleting its volume                                                                                                         |
+| `npm run worktree:audit`     | Show worktrees and remote availability without deleting anything                                                                                            |
 
 Source files should remain below 600 lines; 800 is the enforced maximum.
 Configuration, generated migrations, lockfiles, and vendored skills are exempt.

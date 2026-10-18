@@ -34,6 +34,8 @@ export async function providerOperation<T>(
         NOT_FOUND: 404,
         VERSION_CONFLICT: 409,
         INVALID_CONFIGURATION: 400,
+        INVALID_AUDIO: 400,
+        REQUEST_TOO_LARGE: 413,
         TYPE_IMMUTABLE: 409,
         TEST_IN_PROGRESS: 409,
         TEST_COOLDOWN: 429,

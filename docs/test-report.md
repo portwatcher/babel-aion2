@@ -1,6 +1,39 @@
 # Validation
 
-## Provider candidates and configuration history — 2026-10-18
+## Recognition adapter and audio-sample comparison — 2026-10-18
+
+This stage adds Soniox recognition with token revisions and utterance endpoints,
+plus an administrator-only authorized WAV comparison using saved Soniox and
+DeepL candidates. It does not enable production providers/languages or player
+subtitles. No live credential or authorized speech sample was supplied, and this
+implementation task has not deployed these changes.
+
+| Check                                                | Status                    | Evidence                                                                                                                                                                                                                            |
+| ---------------------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                             | PASS                      | `npm run ci:local`; 115 first-party source files, largest 430 lines, strict types, eight tests, web/migration/worker builds and unconfigured HTTP boundaries                                                                        |
+| Soniox wire format regression                        | PASS                      | The protocol test first failed with actual `s16le` versus documented `pcm_s16le`; the shared recognizer now sends the correct format and passes the same test                                                                       |
+| Authorized sample HTTP and input limits              | PASS                      | `npm run test:samples:db`; signed Access plus persisted session and same origin; truncated/stereo/overlong WAV rejected before network use; JSON above 1,400,000 bytes returns 413                                                  |
+| PCM timing and transcript revisions                  | PASS                      | A generated tone/paused sample reaches a real loopback WebSocket byte-for-byte, including silence; a protocol fixture revises “Attack” to “Do not attack,” finalizes two utterances, and known versus missing times remain distinct |
+| Separate translation and safe outcomes               | PASS                      | Stable utterances produce one DeepL request each with the selected output script; no-speech makes no translation request; quota failures retain original text with a safe classification                                            |
+| Pair leases, stale evidence and audit privacy        | PASS                      | Two built servers verify both configurations are locked during sample processing; replacing one after lease expiry makes the old result return 409; audits omit audio, text and credentials                                         |
+| Existing regression checks                           | PASS                      | `test:db` (seven tests), `test:http:db`, `test:ws:db`, `test:management:db`, and `test:providers:db` against disposable PostgreSQL 16                                                                                               |
+| Browser sample form and responsive layout            | PASS                      | Chrome: saved candidates selectable, output-language input editable, submission disabled without a file; viewport and document width both 320 px, no captured browser errors/warnings                                               |
+| Browser file selection and complete sample UI result | NOT RUN                   | The Chrome extension lacks file-URL access; automated file selection was rejected before upload. The real HTTP upload/processing path passed separately; no browser-result success is claimed                                       |
+| Live provider access, quality and latency            | NOT RUN                   | Local fixture text is deterministic test data. No actual Soniox/DeepL access or recognition/translation quality has been established                                                                                                |
+| Discord source and original audio                    | WAITING FOR CONFIGURATION | Dedicated bot exists; token storage location and guild/channel/commander IDs remain pending                                                                                                                                         |
+| Full design acceptance and release                   | NOT RUN                   | Shared live jobs, language administration, media revocation, player subtitles and PiP remain unfinished; no deployment                                                                                                              |
+
+The sample HTTP test also first reproduced rejection of Soniox's documented
+`translation_status: none` source tokens as `INVALID_RESPONSE`. The parser now
+accepts both documented source-token statuses (`none` and `original`) while
+rejecting translated tokens on this recognition-only stream.
+
+No production test flags, alternate provider destinations or identity bypasses
+were introduced. Browser screenshots are ignored local artifacts. The sample
+does not store recordings or transcript text and does not overwrite a saved
+configuration's connection-test result. `design.md` and `GOAL.md` remain identical.
+
+## Provider candidates and configuration history — 2026-10-18 (historical)
 
 Current branch additions include encrypted provider candidates, real connection
 request implementations, configuration history, tested replacement/restore, and

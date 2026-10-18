@@ -302,6 +302,20 @@ small {
   transform: translateY(0);
 }
 
+.sample-segments {
+  padding-inline-start: 1.5rem;
+}
+.sample-segments li {
+  margin-block: 1.5rem;
+  overflow-wrap: anywhere;
+}
+.sample-result,
+.field input[type='file'],
+.field audio {
+  min-width: 0;
+  max-width: 100%;
+}
+
 @media (max-width: 720px) {
   .site-shell {
     padding-inline: 20px;

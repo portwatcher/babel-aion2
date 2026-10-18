@@ -268,6 +268,11 @@ onBeforeUnmount(() => {
         @click="restore"
       />
     </div>
+    <ProviderSample
+      :providers="providers"
+      :disabled="busy || !loaded || !protectionReady"
+      @busy="busy = $event"
+    />
     <div
       v-if="removing"
       class="management-confirmation"

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { createServer } from 'node:http'
 import { WebSocketServer } from 'ws'
@@ -54,7 +54,7 @@ export async function createProviderFixture() {
         translations: [
           {
             text: `fixture:${body.target_lang}`,
-            detected_source_language: body.source_lang,
+            detected_source_language: body.source_lang ?? 'EN',
           },
         ],
       }),
@@ -66,6 +66,8 @@ export async function createProviderFixture() {
     maxPayload: 128 * 1024,
   })
   sockets.on('connection', (socket, request) => {
+    const hash = createHash('sha256')
+    const opened = performance.now()
     const [auth, key] =
       request.headers['sec-websocket-protocol']
         ?.split(',')
@@ -92,12 +94,44 @@ export async function createProviderFixture() {
     }
     socket.on('message', (data, binary) => {
       if (binary) {
+        hash.update(data)
         observation.frames.push({
           bytes: data.length,
           silence: data.every((value) => value === 0),
         })
+        if (mode === 'speech') {
+          const token = (text, is_final, times = {}) => ({
+            text,
+            is_final,
+            translation_status: 'none',
+            language: 'en',
+            ...times,
+          })
+          const steps = [
+            [token('Attack', false)],
+            [token('Do not attack', false)],
+            [
+              token('Do not ', true, { start_ms: 0, end_ms: 180 }),
+              token('attack', false),
+            ],
+            [
+              token('attack', true, { start_ms: 180, end_ms: 320 }),
+              token('<end>', true),
+            ],
+            [token('Wait 3', false)],
+            [token('Wait 3 seconds.', true), token('<end>', true)],
+          ]
+          const tokens = steps[observation.frames.length - 1]
+          if (tokens) {
+            socket.send(JSON.stringify({ tokens }))
+          }
+        }
       } else if (data.length) {
-        observation.configuration = JSON.parse(data.toString())
+        const message = JSON.parse(data.toString())
+        if (message.type === 'keepalive') {
+          return
+        }
+        observation.configuration = message
         if (mode === 'malformed') {
           socket.send('not JSON')
         }
@@ -106,11 +140,17 @@ export async function createProviderFixture() {
         }
       } else {
         observation.end = true
+        observation.audioDigest = hash.digest('hex')
+        observation.elapsedMs = performance.now() - opened
         if (mode !== 'timeout') {
           socket.send(
             JSON.stringify({
               finished: true,
-              total_audio_proc_ms: observation.frames.length * 20,
+              total_audio_proc_ms:
+                (observation.frames.reduce((sum, frame) => sum + frame.bytes, 0) /
+                  2 /
+                  observation.configuration.sample_rate) *
+                1000,
             }),
           )
         }
