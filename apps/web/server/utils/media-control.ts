@@ -1,10 +1,11 @@
 import {
   mediaOfferSchema,
+  voiceSourceStatusSchema,
   type ListenerReference,
   type MediaRequest,
 } from '@babel/contracts'
 
-async function control(path: string, body?: unknown) {
+async function control(path: string, body?: unknown, timeout = 8_000) {
   const config = useRuntimeConfig()
   if (!config.mediaControlUrl || !config.mediaControlSecret) {
     return null
@@ -21,7 +22,7 @@ async function control(path: string, body?: unknown) {
         'content-type': 'application/json',
       },
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(8_000),
+      signal: AbortSignal.timeout(timeout),
       redirect: 'error',
     })
     const data: unknown = await response.json()
@@ -45,6 +46,15 @@ function flag(data: unknown, key: string) {
 export async function mediaReady() {
   const result = await control('/ready')
   return result?.status === 200 && flag(result.data, 'ready')
+}
+
+export async function voiceSourceStatus(roomId: string) {
+  const result = await control('/source', { roomId }, 2_000)
+  if (result?.status !== 200) {
+    return null
+  }
+  const parsed = voiceSourceStatusSchema.safeParse(result.data)
+  return parsed.success && parsed.data.roomId === roomId ? parsed.data : null
 }
 
 export async function revokeMedia(reference: ListenerReference) {

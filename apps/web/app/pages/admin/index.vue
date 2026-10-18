@@ -38,15 +38,15 @@ const providers = shallowRef<ProviderSummary[]>([])
         aria-labelledby="services-title"
       >
         <h2 id="services-title">服务接入</h2>
-        <p class="muted">以下服务尚未接通。保存房间设置不会启用这些通道。</p>
+        <p class="muted">原声连接状态显示在房间设置中。字幕服务需分别配置和验证。</p>
         <dl class="service-list">
           <div>
             <dt>Discord 指挥原声</dt>
-            <dd>尚未接入</dd>
+            <dd>由房间来源控制</dd>
           </div>
           <div>
             <dt>玩家音频分发</dt>
-            <dd>尚未接入</dd>
+            <dd>通过收听通道分发</dd>
           </div>
           <div>
             <dt>识别与翻译服务</dt>

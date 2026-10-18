@@ -8,6 +8,7 @@ export default defineEventHandler(async (event) => {
       sql`select request_fingerprint, subscription_version, delivery_stopped_at, terminal_reason from listener_session limit 1`,
     )
     await useDatabase(event).execute(sql`select id from player_connection limit 1`)
+    await useDatabase(event).execute(sql`select id from voice_source_run limit 1`)
     await useDatabase(event).execute(
       sql`select configuration_version, capture_mode, encrypted_discord_credential from room limit 1`,
     )

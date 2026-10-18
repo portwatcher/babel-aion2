@@ -1,13 +1,13 @@
 # Media admission
 
 The optional worker implements real, receive-only WebRTC admission with Werift
-0.25.1. It sends an empty Opus track: no Discord capture, PCM publication or live
-command audio is implemented yet. A connected peer therefore means transport
-connectivity, not audible commands. The UI states this explicitly.
+0.25.1. A configured running Discord source publishes original audio into the
+room's track; see [original audio](original-audio.md). A connected peer alone
+means transport connectivity and does not prove audible commands.
 
 ## Configuration and local use
 
-Apply migrations through `0007_dear_omega_red`. Use the same database for web
+Apply migrations through `0009_mysterious_phantom_reporter`. Use the same database for web
 (`NUXT_DATABASE_URL`) and worker (`DATABASE_URL`). Generate a separate random
 secret with at least 32 characters and put it in both `MEDIA_CONTROL_SECRET` and
 `NUXT_MEDIA_CONTROL_SECRET`, only in ignored local configuration or the private
@@ -24,8 +24,8 @@ node --env-file=.env apps/voice-worker/dist/index.mjs
 Start or restart the web app with the corresponding private configuration. When
 control is absent or unready, new listeners remain JOINING. When available, the
 current listener may become ACTIVE after every older delivery confirms shutdown.
-Private `/ready` reports `audioState: STOPPED`; it checks media registration
-storage and does not claim that a commander source is ready.
+Private `/ready` checks media registration storage; `/source` reports the
+independent Discord source state. Readiness does not claim live audio receipt.
 
 The `voice-worker` Docker target packages the built worker and runtime
 dependencies, runs as UID 1000 and listens on port 3100. The default final Docker
@@ -43,7 +43,7 @@ to 80 KiB and use the shared contract:
 - `close`: the exact connection ID.
 
 The web server derives session ID/generation from authenticated storage and calls
-the private worker. `/media`, `/revoke` and `/ready` all require its control
+the private worker. `/media`, `/revoke`, `/ready` and `/source` all require its control
 credential. Calls have bounded timeouts, reject redirects and expose only safe
 errors. Credentials, SDP, private endpoints and raw exceptions are not logged.
 The browser receives a send-only server offer and negotiates receive-only audio;
@@ -91,15 +91,12 @@ in [the test report](test-report.md).
 
 Hard-killed owners or failed close persistence can leave open registrations.
 Unknown owners remain fail-closed; confirmed orphan recovery is unfinished.
-Current control targets one worker URL. Owner routing, exclusive guild control,
-public ICE/TURN, Linux amd64 target testing, capacity and actual player networks
-remain unvalidated. Local direct ICE uses no external STUN by default.
+Current control targets one worker URL. Owner routing,
+public ICE/TURN, native AMD64 performance, capacity and actual player networks
+remain unvalidated. Source-boundary tests pass on Linux ARM64 and emulated AMD64. Local direct ICE uses no external STUN by default.
 
-The next audio integration must decode each selected speaker's Opus separately
-and branch decoded PCM to media and recognition as specified in `design.md`.
-Source-generation fencing, independent audio/provider recovery, real pauses,
-bounded PCM queues, commander mixing for playback and original-audio latency
-still need implementation and live evidence. Room configuration supports selected
-member IDs or automatic all-channel scope; automatic discovery is not yet wired
-to the worker. Candidate synthetic decoding alone
-does not satisfy those gates.
+The worker now decodes speakers independently, bounds PCM queues, mixes playback
+and closes old peers on source changes. Exclusive PostgreSQL ownership and
+automatic all-channel discovery are implemented. The separate recognition branch,
+real-network reception and original-audio latency still need evidence; candidate
+synthetic decoding alone does not satisfy those gates.

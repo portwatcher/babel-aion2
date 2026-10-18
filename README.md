@@ -13,14 +13,16 @@ across refresh/reconnection and stops after replacement. A feature-detected
 Document PiP window shares the page's current subtitle/connection status and text
 size; it does not open another listener session or media connection. The optional
 media worker now authorizes receive-only WebRTC and confirms actual peer closure
-before replacement. Live Discord audio and the complete subtitle pipeline remain
-unfinished; a connected media track currently carries no audio.
+before replacement. A configured Discord source now decodes each speaker
+independently and publishes mixed original audio to that room. The complete
+subtitle pipeline and production-network acceptance remain unfinished.
 Administrators can save versioned room/Discord settings, protect the bot credential
 with server-side encryption, persist a stopped room, and remove a specific listener
-generation. Saving these settings does not connect Discord or enable audio.
+generation. Saving a changed source stops it; the separate start action requests
+connection and the page polls actual worker status.
 Discord scope can be either selected member IDs or all speaking members of the
 configured channel. All-channel mode requires no prefilled commander IDs;
-per-member reception/decoding still needs the live Discord integration.
+the worker discovers speakers by Discord user ID and shows received frame counts.
 The administrator can also save encrypted Soniox/DeepL candidate configurations,
 run connection probes, replace credentials, and test/restore historical versions.
 An authorized PCM WAV sample can be recognized through Soniox and translated
@@ -32,8 +34,9 @@ and obsolete revisions are cancelled before they can replace current text.
 Administrators can prepare output-language paths, order them, choose a default,
 and save sample validation tied to the exact provider and terminology revisions.
 Player-language activation stays unavailable until authorized delivery is implemented.
-These candidates remain disabled for production subtitles; no live provider
-quality or Discord audio has been validated.
+These candidates remain disabled for production subtitles; live provider quality
+is unvalidated. Isolated real DAVE receipt and rejoin passed with one member;
+see the test report for the separate application and browser evidence.
 Isolated [media compatibility checks](docs/media-compatibility.md) record native
 cleanup, actual synthetic audio reception and the self-hosted LiveKit token-reuse
 failure. Werift 0.25.1 is now used by the worker after these checks and actual
@@ -57,7 +60,8 @@ With a migrated database, a player can enter the waiting room as `JOINING`
 (HTTP 202), view the current list and keep the session connected. With the optional
 private media worker configured, the current session can become ACTIVE after all
 older transports confirm closure. This authorizes a receive-only connection;
-Discord audio remains STOPPED. Without database configuration entry is disabled and the API
+Discord audio stays stopped until an administrator starts a configured source.
+Without database configuration entry is disabled and the API
 returns 503. The player page does not require an account or Access login.
 
 To exercise local media admission, generate a separate random secret of at least
@@ -74,7 +78,11 @@ The `/admin` page fails closed until Access is configured. Set
 proxy to test administrator sign-in. There is no development authentication
 bypass. `NUXT_SITE_URL` must match the browser origin.
 To save a bot credential, set `NUXT_PROVIDER_ENCRYPTION_KEY` to a protected,
-base64-encoded 32-byte random key. See [room configuration](docs/room-configuration.md)
+base64-encoded 32-byte random key, and set the worker's `PROVIDER_ENCRYPTION_KEY`
+to that same protected value. Configure the guild, ordinary voice channel and
+capture scope through `/admin`, then select **启动房间**. Only View Channel and
+Connect permissions are required; private channel overrides must also allow the
+bot. See [original audio](docs/original-audio.md) and [room configuration](docs/room-configuration.md)
 for field limits, version conflicts, and credential recovery requirements. The same
 protected key encrypts provider credentials and their history; see
 [provider configuration](docs/providers-and-languages.md) for test scope and limits.
@@ -85,21 +93,21 @@ are for the local Compose service only.
 
 ## Workspace
 
-| Path                              | Responsibility                                                                  |
-| --------------------------------- | ------------------------------------------------------------------------------- |
-| `apps/web`                        | Nuxt player/administrator pages, Nitro HTTP APIs and player WebSockets          |
-| `apps/voice-worker`               | Private revocable WebRTC admission; Discord audio is still stopped              |
-| `packages/auth`                   | Cloudflare JWT verification and administrator Better Auth sessions              |
-| `packages/database`               | Drizzle schema, migrations, listener transactions and revocation coordinator    |
-| `packages/contracts`              | Browser-safe nickname, language, room, and subtitle contracts                   |
-| `packages/providers`              | Server-only Soniox recognition, DeepL translation, probes and sample comparison |
-| `.agents/skills/better-interface` | The requested interface review skill                                            |
-| `scripts`                         | Source size checks, worktree inventory, built HTTP smoke checks                 |
+| Path                              | Responsibility                                                                                 |
+| --------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `apps/web`                        | Nuxt player/administrator pages, Nitro HTTP APIs and player WebSockets                         |
+| `apps/voice-worker`               | Exclusive Discord reception, per-member decoding, bounded playback mixing and revocable WebRTC |
+| `packages/auth`                   | Cloudflare JWT verification and administrator Better Auth sessions                             |
+| `packages/database`               | Drizzle schema, migrations, listener transactions and revocation coordinator                   |
+| `packages/contracts`              | Browser-safe nickname, language, room, and subtitle contracts                                  |
+| `packages/providers`              | Server-only Soniox recognition, DeepL translation, probes and sample comparison                |
+| `.agents/skills/better-interface` | The requested interface review skill                                                           |
+| `scripts`                         | Source size checks, worktree inventory, built HTTP smoke checks                                |
 
 The structure follows the related `perohub-monorepo` repository. Shared domain
 code lives in packages. Production resources belong in the existing `infra`
 repository. The application runs as a Node server; continuous Discord audio
-will run in a separate worker.
+runs in a separate worker.
 
 ## Commands
 
@@ -109,10 +117,10 @@ will run in a separate worker.
 | `npm run build`              | Build the web app, standalone migrations, and worker entry point                                                                                            |
 | `npm start`                  | Run the built Nuxt server                                                                                                                                   |
 | `npm run ci:local`           | Source limits, formatting, types, unit tests, build, HTTP smoke                                                                                             |
-| `npm run test:db`            | Real PostgreSQL administrator sessions and listener lifecycle tests                                                                                         |
+| `npm run test:db`            | Real PostgreSQL administrator sessions, listener lifecycle, source start/stop and exclusive ownership tests                                                 |
 | `npm run test:http:db`       | Built server + local PostgreSQL: entry, replacement, isolation and restart; run after build/migrations                                                      |
 | `npm run test:ws:db`         | Two built servers + local PostgreSQL: real player WebSockets, replacement, shutdown and recovery                                                            |
-| `npm run test:media:db`      | Two built servers + real worker/PostgreSQL: actual WebRTC, closure, old-credential denial and concurrent recovery                                           |
+| `npm run test:media:db`      | Real Opus publication and source fencing; two built servers + worker/PostgreSQL admission, revocation and recovery                                          |
 | `npm run test:management:db` | Built servers + local PostgreSQL: signed admin login, encrypted room settings, conflicts, stop and removal                                                  |
 | `npm run test:providers:db`  | Built servers + local PostgreSQL: provider history, encrypted credentials, replacement and test leases; local provider fixtures                             |
 | `npm run test:samples:db`    | Built servers + local PostgreSQL: authorized WAV sample processing, transcript revisions, upload limits and stale-result rejection; local provider fixtures |
@@ -140,6 +148,7 @@ See [AGENTS.md](AGENTS.md) for worktree, cleanup, security, and interface rules.
 - [Shared streaming subtitle processing](docs/streaming-subtitles.md)
 - [Player subtitle window and browser limits](docs/picture-in-picture.md)
 - [Media admission, configuration and recovery limits](docs/media-admission.md)
+- [Discord original audio and source lifecycle](docs/original-audio.md)
 - [Media dependency compatibility evidence](docs/media-compatibility.md)
 - [Production deployment](docs/deployment.md)
 - [Operations, backup, and rollback](docs/operations.md)

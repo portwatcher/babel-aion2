@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto'
+import { randomInt, randomUUID } from 'node:crypto'
+import { performance } from 'node:perf_hooks'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { ListenerReference, MediaOffer } from '@babel/contracts'
 import type { Database } from '@babel/database'
@@ -15,6 +16,8 @@ import {
   MediaStreamTrack,
   RTCPeerConnection,
   RTCRtpCodecParameters,
+  RtpHeader,
+  RtpPacket,
   type PeerConfig,
 } from 'werift'
 
@@ -22,6 +25,11 @@ interface Entry {
   id: string
   attempt: number
   reference: ListenerReference
+  roomId: string
+  roomEpoch: number
+  sequence: number
+  timestamp: number
+  startedAt: number
   peer: RTCPeerConnection | null
   track: MediaStreamTrack | null
   registered: boolean
@@ -44,6 +52,7 @@ export class MediaPeerError extends Error {
 export class MediaPeers {
   private readonly ownerId = randomUUID()
   private readonly entries = new Map<string, Entry>()
+  private readonly roomEpochs = new Map<string, number>()
   private stopping = false
   private sweeping: Promise<void> | null = null
   private readonly timer: ReturnType<typeof setInterval>
@@ -85,7 +94,7 @@ export class MediaPeers {
     if (this.stopping) {
       throw new MediaPeerError('UNAVAILABLE')
     }
-    await authorizeMediaSession(this.db, reference, credential)
+    const listener = await authorizeMediaSession(this.db, reference, credential)
     if (this.stopping) {
       throw new MediaPeerError('UNAVAILABLE')
     }
@@ -109,6 +118,11 @@ export class MediaPeers {
       id,
       attempt,
       reference,
+      roomId: listener.roomId,
+      roomEpoch: this.roomEpochs.get(listener.roomId) ?? 0,
+      sequence: randomInt(65_536),
+      timestamp: randomInt(0x1_0000_0000),
+      startedAt: performance.now(),
       peer: null,
       track: null,
       registered: false,
@@ -136,10 +150,13 @@ export class MediaPeers {
   }
 
   private async authorized(entry: Entry) {
-    if (
-      entry.closing ||
-      !(await mediaConnectionAuthorized(this.db, entry.id, this.ownerId))
-    ) {
+    const authorized = await mediaConnectionAuthorized(this.db, entry.id, this.ownerId)
+    if (entry.closing || entry.roomEpoch !== (this.roomEpochs.get(entry.roomId) ?? 0)) {
+      // Retiring a source/peer does not revoke the listener. Let the browser
+      // negotiate again; a terminal 410 would permanently stop its recovery.
+      throw new MediaPeerError('BUSY')
+    }
+    if (!authorized) {
       throw new ListenerError('SESSION_ENDED')
     }
   }
@@ -301,6 +318,45 @@ export class MediaPeers {
       }
     }
     return mediaConnectionsStopped(this.db, reference)
+  }
+
+  publish(roomId: string, payload: Buffer) {
+    const now = performance.now()
+    for (const entry of this.entries.values()) {
+      if (
+        entry.roomId !== roomId ||
+        entry.closing ||
+        entry.closed ||
+        entry.roomEpoch !== (this.roomEpochs.get(roomId) ?? 0) ||
+        entry.peer?.connectionState !== 'connected' ||
+        !entry.track
+      ) {
+        continue
+      }
+      const elapsed = now - entry.startedAt
+      entry.timestamp =
+        (entry.timestamp + (elapsed > 40 ? Math.round(elapsed / 20) : 1) * 960) >>> 0
+      entry.startedAt = now
+      const header = new RtpHeader({
+        payloadType: 111,
+        sequenceNumber: entry.sequence++ % 65_536,
+        timestamp: entry.timestamp,
+      })
+      try {
+        entry.track.writeRtp(new RtpPacket(header, payload))
+      } catch {
+        void this.close(entry).catch(() => {})
+      }
+    }
+  }
+
+  async closeRoom(roomId: string) {
+    this.roomEpochs.set(roomId, (this.roomEpochs.get(roomId) ?? 0) + 1)
+    await Promise.all(
+      [...this.entries.values()]
+        .filter((entry) => entry.roomId === roomId)
+        .map((entry) => this.close(entry)),
+    )
   }
 
   private async sweep() {

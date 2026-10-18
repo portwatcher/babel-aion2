@@ -18,7 +18,8 @@ Without the optional private media worker, new sessions remain JOINING and entry
 returns 202. A configured worker can authorize the current listener after older
 socket and media closures are confirmed. The browser opens one receive-only peer
 and owns its playback/mute control; PiP adds no audio element. Entry returns 503
-without database configuration. No live Discord source is connected.
+without database configuration. A separately configured and started Discord
+source supplies original audio; subtitle delivery remains unfinished.
 
 Administration uses separate `/api/management/*` HTTP routes. Server middleware
 protects those routes, `/admin` and its descendants, and `/api/auth/*`.
@@ -31,8 +32,9 @@ source generation. The administrator list shares the player list component and
 removes the selected session/generation through the revocation coordinator.
 Capture scope is either selected member IDs or all channel speakers. Existing
 rooms retain selected mode; switching scope advances the source generation and
-persists stopped state. These settings do not start Discord reception or validate
-a live source. All-channel speaker discovery remains part of the Discord gate.
+persists stopped state. The separate start action requests reception and source
+status is polled every three seconds. All-channel discovery uses speaking member
+IDs and independent decoders; a saved configuration is not live audio proof.
 The provider editor saves disabled candidates, performs explicit connection tests,
 and restores encrypted history as a new version. Candidate connection changes
 must pass a probe before replacing saved settings. Database leases prevent
@@ -53,9 +55,13 @@ the worker-to-player path exists. See [output languages](output-languages.md).
 `apps/voice-worker` implements authenticated private media control and Werift
 0.25.1 receive-only admission. It rechecks persisted listener authorization,
 registers negotiations before creating peers, closes obsolete peers and persists
-the actual close acknowledgement. It has no Discord connection, exclusive guild
-lease, PCM publisher or provider job. Readiness reports audio STOPPED even when
-media admission is available. See [media admission](media-admission.md).
+the actual close acknowledgement. A PostgreSQL ownership session and durable
+source receipt exclude duplicate bot/guild controllers. The source controller
+connects Discord with DAVE, maintains separate member decoders and bounded PCM
+queues, and publishes mixed original audio independently of subtitle work. Source
+retirement closes old browser peers before acknowledging shutdown. Provider jobs
+are not connected yet. See [original audio](original-audio.md) and
+[media admission](media-admission.md).
 
 ## Shared code
 
@@ -67,7 +73,7 @@ subtitle output language.
 `@babel/database` uses Drizzle and `pg`. The schema contains Better Auth's four
 tables, rooms, global nickname generations, listener sessions, provider
 configurations and their encrypted revisions, output languages, audit events and
-player socket and media connection registrations.
+player socket, media connection and voice-source ownership registrations.
 The terminology tables use a catalog row lock to serialize edits, prevent
 ambiguous aliases and make snapshots consistent. The catalog revision also supplies
 entry versions, preventing version reuse after deletion/recreation. Lists are
@@ -108,14 +114,13 @@ See [provider configuration](providers-and-languages.md) for probe and sample li
 
 ## Next implementation gates
 
-1. Select a DAVE-compatible Discord voice library with an actual audio-receive
-   test. Add exclusive guild control using the established infra method. Use
-   one decoder per selected speaker and bounded audio queues, with automatic
-   membership/speaker discovery in all-channel mode.
-2. Add decoded PCM publication independently from subtitle work, with source
-   fencing and actual-network proof. Werift passes local synthetic decoding and
-   application admission/closure checks on macOS and Linux arm64; these do not
-   establish commander audio, TURN, Linux amd64 or capacity. See the
+1. Complete application live-audio acceptance with simultaneous speakers,
+   member re-entry, DAVE changes and configured Linux targets. Single-member
+   isolated receipt and rejoin are proven; per-member decoding, bounded mixing
+   and exclusive source control are implemented.
+2. Complete actual-network publication proof. Source fencing and local real
+   Opus publication pass on Linux ARM64 and emulated AMD64; these do not
+   establish TURN, native AMD64 performance, background/game behavior or capacity. See the
    [candidate evidence](media-compatibility.md).
 3. Implement confirmed recovery of orphan media registrations after hard crashes
    and worker routing before scaling beyond one configured control endpoint.

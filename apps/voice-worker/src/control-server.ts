@@ -1,8 +1,13 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
-import { mediaControlRequestSchema, listenerReferenceSchema } from '@babel/contracts'
+import {
+  mediaControlRequestSchema,
+  listenerReferenceSchema,
+  voiceSourceRequestSchema,
+} from '@babel/contracts'
 import { ListenerError } from '@babel/database/listeners'
 import { MediaPeerError, type MediaPeers } from './media-peers.ts'
+import type { VoiceSources } from './voice-sources.ts'
 
 function digest(value: string) {
   return createHash('sha256').update(value).digest()
@@ -27,7 +32,11 @@ function json(response: ServerResponse, status: number, value: unknown) {
   response.end(JSON.stringify(value))
 }
 
-export function createControlServer(peers: MediaPeers, secret: string) {
+export function createControlServer(
+  peers: MediaPeers,
+  secret: string,
+  sources: VoiceSources,
+) {
   const expected = digest(`Bearer ${secret}`)
   const server = createServer(async (request, response) => {
     if (!timingSafeEqual(digest(request.headers.authorization ?? ''), expected)) {
@@ -37,7 +46,16 @@ export function createControlServer(peers: MediaPeers, secret: string) {
     try {
       if (request.url === '/ready' && request.method === 'GET') {
         const ready = await peers.ready()
-        json(response, ready ? 200 : 503, { ready, audioState: 'STOPPED' })
+        json(response, ready ? 200 : 503, { ready })
+        return
+      }
+      if (request.url === '/source' && request.method === 'POST') {
+        const parsed = voiceSourceRequestSchema.safeParse(await input(request))
+        if (!parsed.success) {
+          json(response, 400, { code: 'INVALID_REQUEST' })
+          return
+        }
+        json(response, 200, sources.status(parsed.data.roomId))
         return
       }
       if (request.url === '/revoke' && request.method === 'POST') {

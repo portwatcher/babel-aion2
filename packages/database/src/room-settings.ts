@@ -8,6 +8,7 @@ import type { Database } from './client.ts'
 import type { CredentialCipher } from './credentials.ts'
 import { CredentialProtectionError } from './credentials.ts'
 import { auditEvent, room } from './schema/rooms.ts'
+import { voiceSourceConfigured } from './voice-sources.ts'
 
 type StoredRoom = typeof room.$inferSelect
 export class RoomConfigurationError extends Error {
@@ -122,6 +123,61 @@ export async function updateRoomSettings(
         version: updated.configurationVersion,
         sourceGeneration: updated.sourceGeneration,
         credentialChanged: stored.encryptedDiscordCredential !== encryptedCredential,
+      },
+    })
+    return publicSettings(updated)
+  })
+}
+
+export async function startRoom(
+  db: Database,
+  roomId: string,
+  expectedVersion: number,
+  actor: string,
+  cipher: CredentialCipher | null,
+) {
+  return db.transaction(async (tx) => {
+    const [stored] = await tx
+      .select()
+      .from(room)
+      .where(eq(room.id, roomId))
+      .for('update')
+    if (!stored) {
+      throw new RoomConfigurationError('NOT_FOUND')
+    }
+    if (stored.configurationVersion !== expectedVersion) {
+      throw new RoomConfigurationError('VERSION_CONFLICT')
+    }
+    if (!voiceSourceConfigured(stored)) {
+      throw new RoomConfigurationError('INVALID_CONFIGURATION')
+    }
+    if (!cipher || !stored.encryptedDiscordCredential) {
+      throw new CredentialProtectionError()
+    }
+    cipher.decrypt(stored.encryptedDiscordCredential, `room:${roomId}:discord`)
+    if (!stored.stopped) {
+      return publicSettings(stored)
+    }
+    const [updated] = await tx
+      .update(room)
+      .set({
+        stopped: false,
+        sourceGeneration: stored.sourceGeneration + 1,
+        configurationVersion: stored.configurationVersion + 1,
+        updatedAt: new Date(),
+      })
+      .where(eq(room.id, roomId))
+      .returning()
+    if (!updated) {
+      throw new RoomConfigurationError('NOT_FOUND')
+    }
+    await tx.insert(auditEvent).values({
+      actorSubject: actor,
+      action: 'room.start',
+      resourceId: roomId,
+      metadata: {
+        version: updated.configurationVersion,
+        sourceGeneration: updated.sourceGeneration,
       },
     })
     return publicSettings(updated)

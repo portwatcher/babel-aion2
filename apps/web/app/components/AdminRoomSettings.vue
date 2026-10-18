@@ -102,7 +102,7 @@ async function save() {
     )
     if (!disposed) {
       accept(next)
-      notice.value = '设置已保存。原声接入尚未完成，房间保持停止。'
+      notice.value = '设置已保存。来源变更后需要重新启动。'
     }
   } catch (failure) {
     if (!disposed) {
@@ -114,7 +114,7 @@ async function save() {
   }
 }
 
-async function stop() {
+async function setRunning(running: boolean) {
   if (!current.value || busy.value) {
     return
   }
@@ -122,14 +122,19 @@ async function stop() {
   error.value = ''
   try {
     const next = managementRoomSchema.parse(
-      await $fetch('/api/management/room/stop', {
-        method: 'POST',
-        body: { expectedVersion: current.value.version },
-      }),
+      await $fetch(
+        running ? '/api/management/room/start' : '/api/management/room/stop',
+        {
+          method: 'POST',
+          body: { expectedVersion: current.value.version },
+        },
+      ),
     )
     if (!disposed) {
       accept(next)
-      notice.value = '停止状态已保存。'
+      notice.value = running
+        ? '启动请求已保存，正在连接来源。'
+        : '停止请求已保存，正在关闭来源。'
     }
   } catch (failure) {
     if (!disposed) {
@@ -160,13 +165,14 @@ onBeforeUnmount(() => {
       <h2 id="room-settings-title">房间与 Discord 来源</h2>
       <Tag
         v-if="current"
-        :value="current.stopped ? '保持停止' : '运行中'"
+        :value="current.stopped ? '保持停止' : '已请求运行'"
         severity="secondary"
       />
     </div>
     <p class="muted">
-      原声通道尚未接通。可以先保存设置，当前不会连接 Discord 或播放声音。
+      保存来源设置后启动房间。连接状态和实际收到的成员音源会显示在下方。
     </p>
+    <AdminVoiceSource />
     <p v-if="notice" role="status">{{ notice }}</p>
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <form v-if="current" class="entry-form" @submit.prevent="save">
@@ -274,10 +280,16 @@ onBeforeUnmount(() => {
         <Button type="submit" label="保存设置" :loading="busy" />
         <Button label="重新载入" severity="secondary" :disabled="busy" @click="load" />
         <Button
+          label="启动房间"
+          severity="secondary"
+          :disabled="busy || !current.stopped || !current.sourceConfigured"
+          @click="setRunning(true)"
+        />
+        <Button
           label="停止房间"
           severity="danger"
           :disabled="busy || current.stopped"
-          @click="stop"
+          @click="setRunning(false)"
         />
       </div>
       <small class="muted"

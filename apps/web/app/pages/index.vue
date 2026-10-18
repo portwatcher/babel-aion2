@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PublicRoomConfiguration } from '@babel/contracts'
+import { audioStatus } from '~/utils/audio-status'
 const {
   data,
   error: configurationError,
@@ -32,6 +33,11 @@ const {
   leave,
   changeLanguage,
 } = usePlayerSession(configuration)
+let configurationTimer: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  configurationTimer = setInterval(() => void refresh(), 5_000)
+})
+onBeforeUnmount(() => clearInterval(configurationTimer))
 </script>
 
 <template>
@@ -95,9 +101,14 @@ const {
           <section class="room-detail" aria-labelledby="room-status-title">
             <div class="section-heading">
               <h2 id="room-status-title">频道状态</h2>
-              <Tag value="等待接入" severity="secondary" />
+              <Tag
+                :value="audioStatus[configuration.room.audioState].label"
+                severity="secondary"
+              />
             </div>
-            <p class="muted">指挥语音频道尚未接入。你可以先进入房间，保持页面连接。</p>
+            <p class="muted">
+              {{ audioStatus[configuration.room.audioState].description }}
+            </p>
           </section>
           <div class="detail-divider" />
           <PlayerList :players="players" :current="playersCurrent" />

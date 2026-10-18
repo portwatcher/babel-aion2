@@ -1,6 +1,35 @@
 # Validation
 
-## Configurable Discord capture scope — 2026-10-19
+## Original-audio worker integration — 2026-10-19
+
+The worker now connects configured Discord voice sources, independently decodes
+members and publishes bounded mixed playback over the existing revocable media
+transport. Start requests, source status and actual member frame counts are
+available in administration. Live provider subtitles and full product acceptance
+remain incomplete.
+
+| Check                                  | Result  | Evidence                                                                                                                                                                                                                                                                           |
+| -------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                               | PASS    | `npm run ci:local`; 179 first-party source files, largest 495 lines; formatting, strict types, 16 tests, production builds and HTTP smoke                                                                                                                                          |
+| Migration and ownership                | PASS    | Migration 0009 applied to disposable PostgreSQL 16; `test:db` passes nine tests including actual ownership-session termination, duplicate controller exclusion, unconfirmed-owner refusal and persisted start/stop                                                                 |
+| Mixer                                  | PASS    | Native Opus output independently decoded: 48 kHz stereo/960 samples per channel, separate speaker channels, 10 ms input assembly, pause preservation, 100 ms backlog bound and cessation after permission loss/close                                                               |
+| Publication and source retirement      | PASS    | Actual WebRTC peers receive nonzero synthetic PCM only in the correct room. Source retirement releases real UDP sockets, persists close receipts, fences a pending offer held on the real nickname lock, and permits the same listener to reconnect                                |
+| Built application regressions          | PASS    | `test:management:db`, `test:media:db`, `test:http:db` and `test:ws:db`; authenticated start/status boundaries, same-origin denial, old-credential refusal, replacement, concurrent recovery and graceful media-worker restart                                                      |
+| Linux ARM64 native boundary tests      | PASS    | Five bundled source-boundary tests run inside the Node 24.18.0/Alpine worker image as UID 1000 on a read-only filesystem: native mixing, PostgreSQL ownership and actual local WebRTC source retirement. Initial Opus compilation failed; the ARM64 declaration macro corrected it |
+| Linux AMD64 source-boundary tests      | PASS    | The final AMD64/Alpine image passes the same five native decoding, ownership and actual local WebRTC tests under Docker emulation on the ARM64 host. This is architecture compatibility evidence, not native AMD64 performance or live Discord receipt.                            |
+| Worker runtime packaging               | PASS    | The final ARM64 and emulated AMD64 images run as UID 1000 with a read-only filesystem, no capabilities and no-new-privileges. Built web entry, authenticated offer/close, persisted transport closure and SIGTERM exit 0 pass; this does not establish container-to-browser ICE.   |
+| Worker dependency audit                | PASS    | The Opus installer brought tar 6.2.1; root override and refreshed lock resolve 7.5.22. Actual installer resolution is checked and worker-only production npm audit reports zero findings. Broader workspace toolchain advisories are outside this worker-only result               |
+| Live application connection            | PASS    | Real encrypted bot configuration saved through authenticated local management API; start request reaches LISTENING and a real Chrome listener receives Opus silence with one audio element playing and no capture request                                                          |
+| Live source stop/restart               | PASS    | Browser management stop reaches STOPPED with no open source receipt; start advances source generation from 4 to 6 and rejoins Discord. The existing Chrome listener replaces its closed peer, resumes real Opus receipt and retains one audio element and the original entry time  |
+| Live application speech                | NOT RUN | Browser connection and silence are not proof of spoken audio. A further authorized sample is requested after the integrated receiver becomes ready                                                                                                                                 |
+| Multi-member and production acceptance | NOT RUN | Simultaneous speakers, matching nicknames, member re-entry, Go Live, native AMD64 performance, Linux live reception, production networking, background/game/PiP behavior and end-to-end latency/capacity remain open                                                               |
+
+The new mixer and publication tests own signal conversion and source retirement;
+the existing media suite continues to own HTTP admission and nickname revocation.
+Ownership tests exercise real PostgreSQL locks but do not simulate or claim
+physical Discord-close receipts. See [original audio](original-audio.md).
+
+## Configurable Discord capture scope — 2026-10-19 (historical)
 
 The administrator can select specific Discord members or every speaking channel
 member. All-channel configuration needs no commander IDs. The existing selected

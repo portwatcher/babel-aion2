@@ -3,6 +3,8 @@ import { room } from '@babel/database/schema'
 import { eq, sql } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import { useDatabase } from './database'
+import { voiceSourceConfigured } from '@babel/database/voice-sources'
+import { voiceSourceStatus } from './media-control'
 
 export const DEFAULT_ROOM_ID = '00000000-0000-4000-8000-000000000001'
 
@@ -33,6 +35,17 @@ export async function publicRoomConfiguration(
     const [saved] = await database.select().from(room).where(eq(room.id, roomId))
     if (saved) {
       configuration.room.name = saved.name
+      if (voiceSourceConfigured(saved)) {
+        const source = await voiceSourceStatus(roomId)
+        configuration.room.audioState = source?.state ?? 'UNAVAILABLE'
+        if (
+          saved.stopped &&
+          source &&
+          !['STOPPED', 'UNAVAILABLE'].includes(source.state)
+        ) {
+          configuration.room.audioState = 'STOPPING'
+        }
+      }
     }
     // Entry persists JOINING, independently of command-delivery authorization.
     configuration.entryAvailable = true

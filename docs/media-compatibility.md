@@ -101,13 +101,16 @@ room, releases native media objects, and lets the parent observe process exit.
 - The live candidate versions are `@discordjs/voice` 0.19.2, `discord.js` 14.27.0
   and `@discordjs/opus` 0.10.0 on Node 24.18.0/macOS arm64. One real member and
   bot rejoin are now validated; simultaneous sources, same-nickname users, member
-  re-entry, Go Live audio and Linux live receipt are not. The candidate remains
-  isolated from production dependencies until application source integration.
+  re-entry, Go Live audio and Linux live receipt are not. These pinned versions
+  are now application dependencies; the source controller, independent decoders
+  and bounded playback mixer are described in [original audio](original-audio.md).
 - Extend the implemented admission/close proof to confirmed hard-crash recovery
   and production worker routing. Graceful restart and in-flight replacement pass;
   unknown owner registrations remain fail-closed.
-- Integrate original audio independently from subtitle/provider work, then test
-  foreground/background playback, multiple commanders, source changes, and PiP.
+- Complete live original-audio validation independently from subtitle/provider
+  work: foreground/background playback, multiple commanders, source changes and
+  PiP. Actual local WebRTC publication and source retirement pass with identified
+  synthetic PCM; they are not a substitute for Discord-to-player speech evidence.
 - Validate the deployment platform, public ICE/TURN routes, actual player networks,
   and the source-device-to-player latency before claiming production readiness.
 

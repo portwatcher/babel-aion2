@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ListenerSnapshot, PublicRoomConfiguration } from '@babel/contracts'
+import { audioStatus } from '~/utils/audio-status'
 const props = defineProps<{
   session: ListenerSnapshot
   configuration: PublicRoomConfiguration
@@ -45,7 +46,7 @@ const languageName = computed(
     </div>
     <p v-if="session.state === 'JOINING'" role="status">正在等待收听通道就绪。</p>
     <p v-else role="status">会话已连接。</p>
-    <p class="muted">指挥原声尚未接入。当前不会播放声音。</p>
+    <p class="muted">{{ audioStatus[configuration.room.audioState].description }}</p>
     <p v-if="session.state === 'ACTIVE'" role="status">
       {{
         audioState === 'connected'

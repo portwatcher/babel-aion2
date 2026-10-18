@@ -63,7 +63,11 @@ function sealForContext(plaintext, context) {
 try {
   const server = await start()
   const auth = await fixture.signIn(server)
-  for (const path of ['/api/management/room', '/api/management/listeners']) {
+  for (const path of [
+    '/api/management/room',
+    '/api/management/room/source',
+    '/api/management/listeners',
+  ]) {
     assert.equal((await fetch(`${server.origin}${path}`)).status, 401)
     assert.equal(
       (
@@ -91,6 +95,41 @@ try {
   const initial = await initialResponse.json()
   let current = initial.room
   original = await saved(current.id)
+  const startBody = { expectedVersion: current.version }
+  assert.equal(
+    (await request(server, auth, '/api/management/room/source')).status,
+    503,
+    'Source status must report an unavailable worker honestly',
+  )
+  for (const overrides of [{ cookie: '' }, { 'cf-access-jwt-assertion': '' }]) {
+    assert.equal(
+      (
+        await request(
+          server,
+          auth,
+          '/api/management/room/start',
+          'POST',
+          startBody,
+          overrides,
+        )
+      ).status,
+      401,
+    )
+  }
+  assert.equal(
+    (
+      await request(server, auth, '/api/management/room/start', 'POST', startBody, {
+        origin: 'https://attacker.example',
+      })
+    ).status,
+    403,
+  )
+  assert.equal(
+    (await request(server, auth, '/api/management/room/start', 'POST', startBody))
+      .status,
+    503,
+  )
+  assert.equal((await saved(current.id)).stopped, true)
   assert.equal(
     original.encrypted_discord_credential,
     null,
