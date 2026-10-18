@@ -46,3 +46,23 @@ until validated processing paths and configuration management exist.
 
 Verify Access, database readiness, routing, and actual rollout state separately.
 Use the private infra runbook for operational credentials, backup and recovery.
+
+## Initial release verification
+
+The scaffold from source `09bbb8bf88600df29edea0f0e63792aaa746129e` was
+released on 2026-10-18 through the private self-hosted pipeline. ArgoCD completed
+the migration hook and reported Synced / Healthy with two ready web replicas.
+Both replicas ran the same digest verified in the registry after publication.
+
+Live HTTPS checks returned 200 for the lobby, frontend assets, public player
+configuration, liveness, and database readiness. The public configuration kept
+languages empty and entry disabled. No production secret values appeared in the
+checked HTML, configuration, or built frontend assets.
+
+Administrator pages and APIs redirected to Cloudflare Access. Direct origin
+checks rejected missing assertions, email headers and cookies alone, and forged
+assertions. The running application could retrieve Access signing keys. A browser
+check confirmed the dark lobby and the real Access sign-in page. Authenticated
+administrator sign-in still requires a real authorized human login and was not
+completed by this deployment check. Production restore and rollback were not
+rehearsed. See [the validation report](test-report.md) for the remaining limits.

@@ -40,7 +40,8 @@ GitOps release method. Confirm schema compatibility first. Do not reverse a
 destructive migration without an explicit data recovery plan. Verify probes,
 Access boundaries, sessions, and live media after the rollback.
 
-There is no production release to roll back yet. An application restart must
+Use only previously published, verified image references. An initial deployment
+has no earlier deployed Babel version to restore. An application restart must
 eventually preserve a stopped room, provider settings, and current generations.
 
 ## Logging and task cleanup
