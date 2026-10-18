@@ -4,11 +4,14 @@ import {
   listenerCredentialSchema,
   listenerReferenceSchema,
   listenerSnapshotSchema,
+  mediaOfferSchema,
+  type MediaRequest,
 } from '@babel/contracts'
 
 const savedSessionSchema = listenerReferenceSchema.extend({
   credential: listenerCredentialSchema,
   leaving: z.boolean().default(false),
+  mediaAttempt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).default(0),
 })
 const pendingEntrySchema = z.object({
   request: entryRequestSchema,
@@ -96,11 +99,12 @@ export class PlayerApiError extends Error {
   }
 }
 
-export async function listenerRequest(
+async function playerRequest(
   path: string,
   credential: string,
   method = 'GET',
   body?: unknown,
+  signal?: AbortSignal,
 ) {
   const response = await fetch(path, {
     method,
@@ -109,10 +113,38 @@ export async function listenerRequest(
       ...(body ? { 'content-type': 'application/json' } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
-    signal: AbortSignal.timeout(10_000),
+    signal: signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(10_000)])
+      : AbortSignal.timeout(10_000),
   })
   if (!response.ok) {
     throw new PlayerApiError(response.status)
   }
-  return listenerSnapshotSchema.parse(await response.json())
+  return response.json() as Promise<unknown>
+}
+
+export async function listenerRequest(
+  path: string,
+  credential: string,
+  method = 'GET',
+  body?: unknown,
+) {
+  return listenerSnapshotSchema.parse(
+    await playerRequest(path, credential, method, body),
+  )
+}
+
+export async function requestListenerMedia(
+  listener: SavedListener,
+  request: MediaRequest,
+  signal?: AbortSignal,
+) {
+  const result = await playerRequest(
+    `/api/player/sessions/${listener.sessionId}/media`,
+    listener.credential,
+    'POST',
+    request,
+    signal,
+  )
+  return request.operation === 'offer' ? mediaOfferSchema.parse(result) : null
 }

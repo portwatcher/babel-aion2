@@ -38,8 +38,21 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
   let disposed = false
   const connection = usePlayerConnection(receive, invalidSession)
   const playerList = usePlayerList(connection.state)
+  const audio = useListenerAudio((reference) => {
+    if (
+      !access ||
+      access.sessionId !== reference.sessionId ||
+      access.nicknameGeneration !== reference.nicknameGeneration
+    ) {
+      throw new Error('Listener has ended')
+    }
+    access = { ...access, mediaAttempt: Math.max(access.mediaAttempt, Date.now()) + 1 }
+    saveListener(access)
+    return access.mediaAttempt
+  })
 
   function clearAccess() {
+    audio.stop()
     access = null
     restoreFailed.value = false
     try {
@@ -61,6 +74,9 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
 
   function accept(next: ListenerSnapshot) {
     session.value = next
+    if (next.state === 'ACTIVE' && access) {
+      audio.connect(access)
+    }
     if (!['JOINING', 'ACTIVE'].includes(next.state)) {
       leavePending.value = false
       epoch += 1
@@ -137,6 +153,7 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
         nicknameGeneration: next.nicknameGeneration,
         credential: pending.credential,
         leaving: false,
+        mediaAttempt: 0,
       }
       saveListener(access)
       savePendingEntry(null)
@@ -207,6 +224,7 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
     const currentEpoch = ++epoch
     connection.stop()
     leavePending.value = true
+    audio.stop()
     submitting.value = true
     try {
       saveListener({ ...leaving, leaving: true })
@@ -286,6 +304,11 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
     active,
     leavePending,
     connectionState: connection.state,
+    audioState: audio.state,
+    audioBlocked: audio.blocked,
+    muted: audio.muted,
+    playAudio: audio.play,
+    toggleMute: audio.toggleMute,
     enter,
     restore,
     leave,

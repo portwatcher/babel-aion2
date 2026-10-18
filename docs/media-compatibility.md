@@ -2,10 +2,10 @@
 
 These checks use synthetic 440 Hz audio. They do not connect Discord, authorize a
 Babel listener, exercise nickname replacement, measure battle latency, or establish
-network capacity. The application still has no active media adapter and keeps
-listeners in JOINING. Candidate dependencies are isolated from the npm workspaces
-in `scripts/media-validation`; they are not installed by the application's `npm ci`
-or included in its builds.
+network capacity. The isolated fixtures live in `scripts/media-validation`.
+After these checks, Werift 0.25.1 was added to the worker for actual application
+[media admission](media-admission.md), tested separately on macOS and Linux arm64.
+Other candidate SDKs remain outside the application's dependencies and builds.
 
 ## Observations — 2026-10-18
 
@@ -29,12 +29,13 @@ the listener generation on every connection and handles in-flight joins before
 acknowledging removal. A short expiry or successful RemoveParticipant response is
 not sufficient.
 
-Werift is the next integration candidate, with an inspectable packet-oriented
+Werift is the selected admission transport, with an inspectable packet-oriented
 [WebRTC implementation](https://github.com/shinyoshiaki/werift-webrtc). Closing a
 local peer avoids the separate self-hosted-token problem, but the probes do **not**
-prove Babel credential revocation. The application must still fence admission,
-delayed negotiation and source generations, close every actual connection, and
-deny old credentials. A closed negotiation ID is not a listener credential.
+prove Babel credential revocation. Separate application tests now fence admission
+and delayed negotiation, close actual peers and deny obsolete credentials. Source
+generations and PCM publication remain unfinished. A closed negotiation ID is not
+a listener credential; the fixture's HTTP 404 is not the application proof.
 
 ## Reproduce the checks
 
@@ -92,9 +93,9 @@ room, releases native media objects, and lets the parent observe process exit.
   commander selection. REST authentication succeeds, but its guild list is empty.
 - Validate live Discord/DAVE receipt and separate selected commanders. No Discord
   library has been selected based on these media-only fixtures.
-- Connect media admission to real listener transactions and actual shutdown
-  acknowledgements. Prove old-credential denial and replacement while negotiation
-  is in flight, including across process/network failures.
+- Extend the implemented admission/close proof to confirmed hard-crash recovery
+  and production worker routing. Graceful restart and in-flight replacement pass;
+  unknown owner registrations remain fail-closed.
 - Integrate original audio independently from subtitle/provider work, then test
   foreground/background playback, multiple commanders, source changes, and PiP.
 - Validate the deployment platform, public ICE/TURN routes, actual player networks,

@@ -28,6 +28,7 @@
     "test:http": "node scripts/smoke.mjs",
     "test:http:db": "node --env-file=.env scripts/listener-smoke.mjs",
     "test:ws:db": "node --env-file=.env scripts/player-websocket-smoke.mjs",
+    "test:media:db": "node --env-file=.env scripts/media-smoke.mjs",
     "test:management:db": "node --env-file=.env scripts/management-smoke.mjs",
     "test:providers:db": "node --env-file=.env scripts/provider-smoke.mjs",
     "test:samples:db": "node --env-file=.env scripts/provider-sample-smoke.mjs",

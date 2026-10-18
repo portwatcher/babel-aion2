@@ -4,10 +4,18 @@ const props = defineProps<{
   session: ListenerSnapshot
   configuration: PublicRoomConfiguration
   connectionState: string
+  audioState: string
+  audioBlocked: boolean
+  muted: boolean
   busy: boolean
   changingLanguage: boolean
 }>()
-const emit = defineEmits<{ leave: []; language: [language: string | null] }>()
+const emit = defineEmits<{
+  leave: []
+  language: [language: string | null]
+  playAudio: []
+  toggleMute: []
+}>()
 const pip = useSubtitlePictureInPicture(
   () => `${props.session.sessionId}:${props.session.nicknameGeneration}`,
 )
@@ -38,6 +46,28 @@ const languageName = computed(
     <p v-if="session.state === 'JOINING'" role="status">正在等待收听通道就绪。</p>
     <p v-else role="status">会话已连接。</p>
     <p class="muted">指挥原声尚未接入。当前不会播放声音。</p>
+    <p v-if="session.state === 'ACTIVE'" role="status">
+      {{
+        audioState === 'connected'
+          ? '原声通道已连接，等待指挥音频。'
+          : audioState === 'unavailable'
+            ? '原声通道暂不可用。'
+            : '正在连接原声通道。'
+      }}
+    </p>
+    <Button
+      v-if="audioBlocked"
+      label="播放原声"
+      severity="secondary"
+      @click="emit('playAudio')"
+    />
+    <Button
+      v-if="audioState === 'connected'"
+      :label="muted ? '取消静音' : '静音'"
+      severity="secondary"
+      :aria-pressed="muted"
+      @click="emit('toggleMute')"
+    />
     <OutputLanguageSelect
       :model-value="session.outputLanguage"
       :languages="configuration.outputLanguages"

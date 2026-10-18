@@ -1,11 +1,11 @@
 # Listener lifecycle
 
-Implemented on 2026-10-18: persistent transactions, HTTP operations, player
-WebSockets, browser entry/restoration and the public list. With a migrated
-database, entry opens a JOINING waiting-room session. Discord and media are not
-connected, and the coordinator cannot authorize command delivery. Actual subtitle
-traffic is not implemented. This is progress toward design.md sections 6–9, not
-proof of end-to-end audio/subtitle replacement.
+Persistent transactions, HTTP operations, player WebSockets, browser restoration
+and the public list are implemented. The optional media worker now provides
+revocable receive-only WebRTC admission. With it configured, entry becomes ACTIVE
+only after older subtitle sockets and media peers confirm closure; otherwise it
+stays JOINING. The track has no Discord source and actual subtitles remain
+unimplemented. This is not proof of end-to-end audio/subtitle replacement.
 
 ## Entry and credentials
 
@@ -59,7 +59,8 @@ Every 30 seconds the web process retries pending shutdowns and considers session
 with no heartbeat for 120 seconds expired. It rechecks last-seen time under the
 nickname lock, preventing a stale sweep from expiring a just-renewed session.
 Sweeps do not overlap; shutdown clears the timer and waits for ongoing work.
-There is no actual-media participant comparison yet. Browser heartbeats respond
+The media worker compares actual peer registrations with current authorization
+every 500 ms and closes obsolete connections. Browser heartbeats respond
 to server messages instead of depending on foreground animation frames. Suspended
 devices may still expire; network recovery cannot resurrect an expired session.
 
@@ -87,8 +88,9 @@ session and close their sockets too. The physical close hook, not the close
 request, sets `closedAt`. A slow close is force-terminated after 1.5 seconds.
 Failed close persistence is retried; unconfirmed rows are never expired by TTL.
 An old credential can receive its terminal snapshot but cannot register a live
-connection. Media shutdown still returns false, so this socket proof alone never
-authorizes a replacement listener or removes its predecessor from the public list.
+connection. Media shutdown requires the independent worker's actual peer closure
+receipt. A socket receipt alone cannot authorize a replacement or remove its
+predecessor from the public list.
 
 The browser reconnects only its saved session, with a capped 1–15 second backoff.
 Connection-generation checks discard callbacks from obsolete sockets. Session ID
@@ -107,16 +109,17 @@ All responses are uncached. Player session operations require that session's
 credential. Administrators still require both a verified Access identity and a
 matching Better Auth session. There are no administrator WebSocket operations.
 
-| Method and route                          | Contract                                                                                     |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------- |
-| POST `/api/player/sessions`               | Body: `nickname`, `outputLanguage`, `requestId`; returns the session, 202 while JOINING      |
-| GET `/api/player/sessions/:id`            | Restores the same session; terminal sessions stay terminal                                   |
-| POST `/api/player/sessions/:id/heartbeat` | Updates only the current nonterminal generation; ended sessions return 410                   |
-| PATCH `/api/player/sessions/:id/language` | Body: `outputLanguage`; refuses disabled/unvalidated codes; keeps session and audio identity |
-| DELETE `/api/player/sessions/:id`         | Explicit leave; does not delete evidence before shutdown confirmation                        |
-| GET `/api/player/players`                 | Complete public list: session ID, nickname, entry time and connection state                  |
-| GET `/api/management/listeners`           | Protected list including generations for removal                                             |
-| DELETE `/api/management/listeners/:id`    | Protected removal; body includes exact `nicknameGeneration`                                  |
+| Method and route                          | Contract                                                                                                                  |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| POST `/api/player/sessions`               | Body: `nickname`, `outputLanguage`, `requestId`; returns the session, 202 while JOINING                                   |
+| GET `/api/player/sessions/:id`            | Restores the same session; terminal sessions stay terminal                                                                |
+| POST `/api/player/sessions/:id/heartbeat` | Updates only the current nonterminal generation; ended sessions return 410                                                |
+| PATCH `/api/player/sessions/:id/language` | Body: `outputLanguage`; refuses disabled/unvalidated codes; keeps session and audio identity                              |
+| POST `/api/player/sessions/:id/media`     | Same-origin authenticated offer/answer/close for the current ACTIVE generation; see [media admission](media-admission.md) |
+| DELETE `/api/player/sessions/:id`         | Explicit leave; does not delete evidence before shutdown confirmation                                                     |
+| GET `/api/player/players`                 | Complete public list: session ID, nickname, entry time and connection state                                               |
+| GET `/api/management/listeners`           | Protected list including generations for removal                                                                          |
+| DELETE `/api/management/listeners/:id`    | Protected removal; body includes exact `nicknameGeneration`                                                               |
 
 Language changes increment `subscriptionVersion` only when the selection changes.
 That metadata will fence delayed subtitle results when subscriptions are connected;
@@ -134,10 +137,14 @@ replacement, public response fields, restart restoration and terminal sessions.
 rejection, pong renewal, cross-process replacement and physical closure, old-token
 reconnect denial, forbidden publication and graceful restart recovery.
 `npm run ci:local` also checks unconfigured fail-closed behavior and Access boundaries.
+`npm run test:media:db` owns actual WebRTC admission, physical UDP closure,
+held-acknowledgement replacement, delayed attempts, concurrent recovery and old
+credential denial. Its production track is empty; it does not inject fake audio.
 
 Chrome checks on macOS cover waiting-room entry, refresh, literal nickname display,
 two-tab replacement, old-page reload without re-entry, process restart, interrupted
 leave followed by refresh, and a 320px layout without horizontal overflow. Database
 queries confirmed unchanged generations and the expected physical connection counts.
-Browser sound shutdown, actual subtitles, PiP, Discord DAVE and real-player-network
-tests remain NOT RUN. Waiting-room availability does not establish those results.
+Browser media negotiation, mute controls, refresh, replacement and PiP's unchanged
+connection count were also checked. Live sound shutdown, actual subtitles, native
+PiP pixels, Discord DAVE and real-player-network tests remain NOT RUN.

@@ -22,6 +22,11 @@ const {
   active,
   leavePending,
   connectionState,
+  audioState,
+  audioBlocked,
+  muted,
+  playAudio,
+  toggleMute,
   enter,
   restore,
   leave,
@@ -70,10 +75,15 @@ const {
           :session="session"
           :configuration="configuration"
           :connection-state="connectionState"
+          :audio-state="audioState"
+          :audio-blocked="audioBlocked"
+          :muted="muted"
           :busy="submitting"
           :changing-language="changingLanguage"
           @leave="leave"
           @language="changeLanguage"
+          @play-audio="playAudio"
+          @toggle-mute="toggleMute"
         />
         <RoomEntry
           v-else

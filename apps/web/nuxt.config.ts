@@ -36,6 +36,8 @@ export default defineNuxtConfig({
     accessTeamDomain: '',
     accessAudience: '',
     providerEncryptionKey: '',
+    mediaControlUrl: '',
+    mediaControlSecret: '',
   },
   primevue: {
     options: { theme: { preset: Aura, options: { darkModeSelector: '.babel-dark' } } },

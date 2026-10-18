@@ -13,7 +13,7 @@ listener reconciliation sweep and closes it on server shutdown.
 Without database configuration the public lobby stays available; readiness and
 administrator sessions fail closed. No worker starts audio automatically.
 
-Apply migrations through `0006_cooing_miss_america` before this web build. Readiness
+Apply migrations through `0007_dear_omega_red` before enabling media admission. Web readiness
 checks room configuration columns, listener lifecycle columns and player socket
 registrations, provider test/history columns, terminology tables, the initialized
 catalog revisions, output-language validation columns and administrator tables. Migration
@@ -26,6 +26,10 @@ language catalog; it normalizes existing ordering without enabling or adding
 languages. Back up language/catalog rows, room defaults, provider revisions and
 terminology versions consistently. A restored proof is current only when all
 referenced versions still match. See [output languages](output-languages.md).
+Migration 0007 adds media connection owners, listener generations, negotiation
+attempts and physical-close receipts. Worker readiness checks this schema.
+Preserve these records consistently with listener and nickname records; do not
+clear a registration until its owning transport is confirmed stopped.
 Migration 0003 adds room settings
 without enabling a source or adding credentials. Migration 0001 preserves old rows and marks their entry fingerprints as legacy, so
 they cannot be adopted by an unbound retry. Do not roll back or truncate nickname
@@ -39,8 +43,10 @@ Graceful shutdown closes sockets before the database pool; a physical close is
 required before the socket registration is acknowledged. Hard crashes or storage
 faults may leave open registrations: never clear these by age alone. Operational
 recovery must first establish that the owning transport cannot deliver anymore.
-This recovery tool and actual media revocation are not yet implemented. The media
-adapter never grants command access. See [listener operations](listener-sessions.md).
+This orphan-recovery tool is not yet implemented. The optional media worker now
+closes actual peers and confirms them before replacement; it still carries no
+Discord audio. Graceful restart is tested. See [media admission](media-admission.md)
+and [listener operations](listener-sessions.md).
 
 ## Backup and restore procedure
 
@@ -94,7 +100,8 @@ this is not a deployment rollback or proof of live media recovery.
 
 Log service state and safe error codes, never credentials, JWTs, cookies,
 connection strings, full provider responses, or complete battle recordings.
-The worker currently logs only its stopped state.
+The worker logs only controlled startup state, its listening port and safe
+configuration/startup errors. Discord audio is always reported STOPPED.
 Administrator audio-sample comparisons hold both provider test slots for at most
 the 35-second lease, with a 30-second processing deadline and the existing test
 cooldown. A crashed process releases its slots through lease expiry. Sample

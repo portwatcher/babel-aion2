@@ -1,6 +1,42 @@
 # Validation
 
-## Isolated media compatibility checks — 2026-10-18
+## Revocable media admission — 2026-10-19
+
+The application now uses Werift 0.25.1 for authenticated, receive-only WebRTC.
+The worker registers each negotiation under the global nickname lock, closes
+actual peers before acknowledging replacement and rejects obsolete credentials.
+The production audio track is empty: Discord reception and PCM publication remain
+unfinished. No synthetic source or fake transport acknowledgement was added to
+the application. See [media admission](media-admission.md) for configuration.
+
+| Check                                      | Status                    | Evidence                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                   | PASS                      | `npm run ci:local`; 166 first-party source files, maximum 494 lines, strict types, 14 tests, web/worker/migration builds and HTTP smoke                                                                                                                                                                    |
+| Migration 0007 and database regressions    | PASS                      | Applied media registration migration to disposable PostgreSQL 16; `test:db` passes seven tests; `test:http:db`, `test:ws:db` and `test:management:db` pass against built servers                                                                                                                           |
+| Real media admission                       | PASS                      | `test:media:db` uses two built web processes, the real worker and actual ICE/DTLS peers; receive-only negotiation connects, unauthorized private control returns 401, invalid listener credentials return 401 and foreign origins return 403                                                               |
+| Actual closure and replacement             | PASS                      | OS UDP binds independently prove candidate sockets occupied before close and released afterward. A held database close receipt keeps replacement JOINING even after socket release; both media and player socket closure are required                                                                      |
+| In-flight admission and old credentials    | PASS                      | Replacement queued before an old offer on the nickname lock makes that offer return 410 without inserting a media registration. The replacement obtains an actual connected peer; old credentials cannot reopen media                                                                                      |
+| Reconnect ordering                         | PASS                      | Same-ID open offer is idempotent; obsolete attempts/IDs return 409 without closing the newer peer. Three overlapping recoveries with delayed close persistence initially failed, then passed after closing only earlier attempts; one actual peer survives                                                 |
+| Scope, subscription and restart            | PASS                      | Delayed old-generation revocation leaves the current peer intact. Null-language update preserves identity and occupied sockets. Graceful worker restart closes old sockets/receipts and reconnects the same listener under a new worker owner                                                              |
+| Linux arm64                                | PASS                      | Same actual media suite, including overlapping recovery, passes on Node 24.18.0/Alpine as user `node` in the disposable PostgreSQL container network namespace                                                                                                                                             |
+| Worker runtime image                       | PASS                      | `voice-worker` target runs as UID 1000 with a read-only filesystem, all capabilities dropped and no-new-privileges. Actual web entry becomes ACTIVE, offer/close persist a real receipt, private readiness is authenticated and SIGTERM exits 0. This packaging check does not claim host-to-container ICE |
+| Browser media lifecycle                    | PASS                      | Chrome/macOS: connected peer, mute toggle, refresh retains the same listener/generation with one open media row; PiP open/close adds no media row; second entry replaces the first, old-page refresh stays at entry, and explicit leave leaves no open media rows                                          |
+| Browser layout and errors                  | PASS                      | New controls fit a 320 px document/viewport without horizontal overflow; default viewport restored; no captured warnings/errors in either test tab                                                                                                                                                         |
+| Discord credential and guild discovery     | WAITING FOR CONFIGURATION | Ignored mode-0600 `.env` credential returns the expected bot identity and HTTP 200. Guild lookup still returns an empty list; installation, voice channel and commander selection are pending                                                                                                              |
+| Hard crashes and production routing        | NOT RUN                   | Unknown transport owners remain fail-closed. Confirmed orphan recovery, multiple-worker routing, exclusive guild control, public ICE/TURN, Linux amd64 and actual player networks are unfinished                                                                                                           |
+| Original audio and full product acceptance | NOT RUN                   | No Discord/DAVE receipt, per-commander PCM publication, live provider quality, authorized player subtitles, native PiP pixel/closure proof, background audio, AION2 display modes or latency/capacity evidence                                                                                             |
+
+The new media suite owns real admission and transport lifecycle at the built HTTP
+boundary. Existing database tests continue to own transactional behavior with
+controlled transport ports; the candidate harness owns synthetic decoding and
+native runtime compatibility. `design.md` and `GOAL.md` remain byte-identical.
+No release or production deployment was made. Local evidence and credentials
+stay in ignored task files; source/history contain no real secrets.
+Owned browser previews, test processes, containers, volumes, networks and local
+image tags were removed. The unmerged worktree and its local credential remain
+preserved.
+
+## Isolated media compatibility checks — 2026-10-18 (historical)
 
 Candidate SDKs now have a separately installed validation harness. Application
 dependencies and behavior are unchanged: the worker remains stopped, listeners
@@ -24,7 +60,7 @@ added. The harness uses identified synthetic audio and isolated fixture credenti
 Temporary browser/encoder processes and both experimental Docker networks were
 removed; the unmerged implementation worktree and local credential remain preserved.
 
-## Player subtitle window and Discord credential check — 2026-10-18
+## Player subtitle window and Discord credential check — 2026-10-18 (historical)
 
 The player panel now owns a feature-detected Document PiP presentation with shared
 reactive status and text size. It is a status window until authorized live

@@ -15,6 +15,14 @@ import {
 import { snapshot, type ListenerRecord } from './model.ts'
 export { ListenerError } from './model.ts'
 export {
+  authorizeMediaSession,
+  openMediaConnection,
+  mediaConnectionAuthorized,
+  earlierMediaConnectionsStopped,
+  closeMediaConnection,
+  mediaConnectionsStopped,
+} from './media-connections.ts'
+export {
   openPlayerConnection,
   readPlayerConnection,
   renewPlayerConnection,

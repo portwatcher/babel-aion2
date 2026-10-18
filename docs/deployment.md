@@ -14,6 +14,10 @@ See [source and secret boundaries](source-and-secrets.md).
 `Dockerfile` builds the Nuxt Node server and a standalone PostgreSQL migration
 runner with Node 24.18.0. The runtime runs as UID 1000. It contains no production
 configuration or credentials and does not start the unfinished voice worker.
+The optional `voice-worker` build target packages private WebRTC admission with
+pruned runtime dependencies and UID 1000. It does not receive Discord audio.
+Keep its authenticated control service private; public ICE/TURN configuration,
+exclusive guild ownership and production routing remain separate infra work.
 
 The migration command is `node database/migrate.mjs` with `DATABASE_URL` supplied
 at runtime. The infra release applies migrations before starting the new web
@@ -39,12 +43,13 @@ No production image is published from a local checkout.
 
 ## Remaining product work
 
-The package includes the scaffold and persistent waiting-room sessions. Player
-WebSockets and browser replacement/recovery are implemented; Discord reception,
-media transport, actual subtitle delivery, provider management and PiP remain
-unfinished. A JOINING connection cannot receive battle commands. Keep the
-production output-language list empty until validated processing paths and
-configuration management exist. See [validation](test-report.md) for local evidence;
+Player WebSockets, persistent sessions, provider/language administration, a PiP
+status window and optional revocable media admission are implemented. Discord
+reception, decoded PCM publication, actual subtitle delivery and full PiP/audio
+acceptance remain unfinished. A JOINING connection cannot receive commands;
+ACTIVE media peers currently have an empty track. Keep the production language
+list empty until validated processing and authorized delivery exist.
+See [validation](test-report.md) for local evidence;
 these changes do not establish a successful production rollout.
 
 Verify Access, database readiness, routing, and actual rollout state separately.

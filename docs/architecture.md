@@ -14,8 +14,11 @@ shares the existing listener's reactive status and text size with that document;
 there is no extra network client, session or media element. Session replacement,
 leave, page navigation and listener-component disposal close the window. Actual
 subtitle content still needs the authorized delivery path described below.
-Unavailable media holds all new sessions in JOINING; entry returns 202 with a
-migrated database, or 503 without database configuration.
+Without the optional private media worker, new sessions remain JOINING and entry
+returns 202. A configured worker can authorize the current listener after older
+socket and media closures are confirmed. The browser opens one receive-only peer
+and owns its playback/mute control; PiP adds no audio element. Entry returns 503
+without database configuration. No live Discord source is connected.
 
 Administration uses separate `/api/management/*` HTTP routes. Server middleware
 protects those routes, `/admin` and its descendants, and `/api/auth/*`.
@@ -44,9 +47,12 @@ revisions; stale results cannot validate a replacement path. Last successful
 proofs and latest attempts are separate. Activation remains unavailable until
 the worker-to-player path exists. See [output languages](output-languages.md).
 
-`apps/voice-worker` is a buildable entry point that reports STOPPED and exits.
-It has no Discord connection, lease, media publisher, or provider job. It must
-not be deployed as a functioning audio worker.
+`apps/voice-worker` implements authenticated private media control and Werift
+0.25.1 receive-only admission. It rechecks persisted listener authorization,
+registers negotiations before creating peers, closes obsolete peers and persists
+the actual close acknowledgement. It has no Discord connection, exclusive guild
+lease, PCM publisher or provider job. Readiness reports audio STOPPED even when
+media admission is available. See [media admission](media-admission.md).
 
 ## Shared code
 
@@ -58,7 +64,7 @@ subtitle output language.
 `@babel/database` uses Drizzle and `pg`. The schema contains Better Auth's four
 tables, rooms, global nickname generations, listener sessions, provider
 configurations and their encrypted revisions, output languages, audit events and
-player socket registrations.
+player socket and media connection registrations.
 The terminology tables use a catalog row lock to serialize edits, prevent
 ambiguous aliases and make snapshots consistent. The catalog revision also supplies
 entry versions, preventing version reuse after deletion/recreation. Lists are
@@ -73,9 +79,12 @@ payload and credential. Nickname rows serialize generations globally, and a new
 session cannot become ACTIVE until all older deliveries have acknowledged shutdown.
 Player socket registration shares the nickname transaction lock. Only a physical
 socket close acknowledges that registration, including across web replicas.
-The media revocation adapter remains unavailable; database coordinator tests use
-explicitly simulated media acknowledgements. Real socket tests use two Node
-processes. See [listener lifecycle](listener-sessions.md).
+Media registrations share that same lock and use monotonically increasing
+negotiation attempts within a listener generation. Only the owning worker records
+closure after initialization, answer processing and actual peer close settle.
+Database coordinator tests use controlled transport receipts; the separate media
+suite proves actual WebRTC and OS UDP socket release across two web processes.
+See [listener lifecycle](listener-sessions.md).
 
 `@babel/auth` implements a Cloudflare Access Better Auth plugin. It derives a
 stable administrator ID from the signed issuer and subject, saves the identity,
@@ -99,18 +108,15 @@ See [provider configuration](providers-and-languages.md) for probe and sample li
 1. Select a DAVE-compatible Discord voice library with an actual audio-receive
    test. Add exclusive guild control using the established infra method. Use
    one decoder per selected commander and bounded audio queues.
-2. Select and prove a browser media transport, including old-token revocation,
-   active-connection removal, and reconnect authorization. Keep command delivery
-   disabled until revocation can be confirmed. No media SDK has been selected yet.
-   Local [candidate checks](media-compatibility.md) reject the native wrtc runtime
-   cleanup and self-hosted LiveKit removal as a complete revocation method. Werift
-   passes synthetic local transport/browser decoding; application admission,
-   source fencing and actual-network proof are still required.
-3. Connect the implemented idempotent entry and global nickname transactions to
-   real transport revocation. The coordinator already calls revocation outside
-   transactions and checks the current session/generation before authorization.
-   Its periodic sweep retries removals and expires silent sessions. Actual media
-   participant reconciliation and revocation proof are still required.
+2. Add decoded PCM publication independently from subtitle work, with source
+   fencing and actual-network proof. Werift passes local synthetic decoding and
+   application admission/closure checks on macOS and Linux arm64; these do not
+   establish commander audio, TURN, Linux amd64 or capacity. See the
+   [candidate evidence](media-compatibility.md).
+3. Implement confirmed recovery of orphan media registrations after hard crashes
+   and worker routing before scaling beyond one configured control endpoint.
+   Current revocation observes actual peers and old credentials are denied, but
+   unknown owners remain fail-closed. Graceful restart preserves listener identity.
 4. Extend the player WebSocket with authorized subtitles and generation/revision
    fencing. List, terminal-state delivery, browser restoration and socket closure
    are implemented; actual subtitle traffic is not. Orphaned socket registrations

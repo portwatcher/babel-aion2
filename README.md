@@ -11,8 +11,10 @@ nickname replacement, idempotent entry, browser restoration, language subscripti
 metadata, removal and reconciliation. The browser preserves its current session
 across refresh/reconnection and stops after replacement. A feature-detected
 Document PiP window shares the page's current subtitle/connection status and text
-size; it does not open another listener session or media connection. Live Discord
-audio, media revocation and the complete subtitle pipeline remain unfinished.
+size; it does not open another listener session or media connection. The optional
+media worker now authorizes receive-only WebRTC and confirms actual peer closure
+before replacement. Live Discord audio and the complete subtitle pipeline remain
+unfinished; a connected media track currently carries no audio.
 Administrators can save versioned room/Discord settings, protect the bot credential
 with server-side encryption, persist a stopped room, and remove a specific listener
 generation. Saving these settings does not connect Discord or enable audio.
@@ -31,7 +33,8 @@ These candidates remain disabled for production subtitles; no live provider
 quality or Discord audio has been validated.
 Isolated [media compatibility checks](docs/media-compatibility.md) record native
 cleanup, actual synthetic audio reception and the self-hosted LiveKit token-reuse
-failure. Their candidate SDKs are separate from application dependencies.
+failure. Werift 0.25.1 is now used by the worker after these checks and actual
+application admission tests. Other candidate SDKs remain isolated from the app.
 
 ## Start locally
 
@@ -48,10 +51,19 @@ npm run dev
 
 Open `http://localhost:3000`. The page starts with no enabled subtitle languages.
 With a migrated database, a player can enter the waiting room as `JOINING`
-(HTTP 202), view the current list and keep the session connected. This does not
-grant command delivery: the media adapter remains unavailable, and no session
-becomes ACTIVE. Without database configuration entry is disabled and the API
+(HTTP 202), view the current list and keep the session connected. With the optional
+private media worker configured, the current session can become ACTIVE after all
+older transports confirm closure. This authorizes a receive-only connection;
+Discord audio remains STOPPED. Without database configuration entry is disabled and the API
 returns 503. The player page does not require an account or Access login.
+
+To exercise local media admission, generate a separate random secret of at least
+32 characters and set both `MEDIA_CONTROL_SECRET` and `NUXT_MEDIA_CONTROL_SECRET`
+to that value in ignored `.env`. Set `NUXT_MEDIA_CONTROL_URL=http://127.0.0.1:3100`,
+then run `npm run build` and, in a separate terminal,
+`node --env-file=.env apps/voice-worker/dist/index.mjs`. Restart the web app after
+configuration changes. No capture permission is requested. See
+[media admission](docs/media-admission.md) for network and recovery limits.
 
 The `/admin` page fails closed until Access is configured. Set
 `NUXT_ACCESS_TEAM_DOMAIN`, `NUXT_ACCESS_AUDIENCE`, and a random
@@ -73,7 +85,7 @@ are for the local Compose service only.
 | Path                              | Responsibility                                                                  |
 | --------------------------------- | ------------------------------------------------------------------------------- |
 | `apps/web`                        | Nuxt player/administrator pages, Nitro HTTP APIs and player WebSockets          |
-| `apps/voice-worker`               | Explicitly stopped entry point for the future audio worker                      |
+| `apps/voice-worker`               | Private revocable WebRTC admission; Discord audio is still stopped              |
 | `packages/auth`                   | Cloudflare JWT verification and administrator Better Auth sessions              |
 | `packages/database`               | Drizzle schema, migrations, listener transactions and revocation coordinator    |
 | `packages/contracts`              | Browser-safe nickname, language, room, and subtitle contracts                   |
@@ -97,6 +109,7 @@ will run in a separate worker.
 | `npm run test:db`            | Real PostgreSQL administrator sessions and listener lifecycle tests                                                                                         |
 | `npm run test:http:db`       | Built server + local PostgreSQL: entry, replacement, isolation and restart; run after build/migrations                                                      |
 | `npm run test:ws:db`         | Two built servers + local PostgreSQL: real player WebSockets, replacement, shutdown and recovery                                                            |
+| `npm run test:media:db`      | Two built servers + real worker/PostgreSQL: actual WebRTC, closure, old-credential denial and concurrent recovery                                           |
 | `npm run test:management:db` | Built servers + local PostgreSQL: signed admin login, encrypted room settings, conflicts, stop and removal                                                  |
 | `npm run test:providers:db`  | Built servers + local PostgreSQL: provider history, encrypted credentials, replacement and test leases; local provider fixtures                             |
 | `npm run test:samples:db`    | Built servers + local PostgreSQL: authorized WAV sample processing, transcript revisions, upload limits and stale-result rejection; local provider fixtures |
@@ -123,6 +136,8 @@ See [AGENTS.md](AGENTS.md) for worktree, cleanup, security, and interface rules.
 - [Game terms and sample terminology context](docs/game-terms.md)
 - [Shared streaming subtitle processing](docs/streaming-subtitles.md)
 - [Player subtitle window and browser limits](docs/picture-in-picture.md)
+- [Media admission, configuration and recovery limits](docs/media-admission.md)
+- [Media dependency compatibility evidence](docs/media-compatibility.md)
 - [Production deployment](docs/deployment.md)
 - [Operations, backup, and rollback](docs/operations.md)
 - [Validation and unfinished live checks](docs/test-report.md)

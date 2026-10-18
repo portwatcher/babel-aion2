@@ -2,8 +2,20 @@ FROM node:24.18.0-alpine AS build
 WORKDIR /app
 COPY . .
 RUN npm ci
-RUN npm run build --workspace=@babel/web
-RUN npm run build:migrations
+RUN npm run build
+
+FROM build AS worker-dependencies
+RUN npm prune --omit=dev --workspace=@babel/voice-worker --include-workspace-root=false
+
+FROM node:24.18.0-alpine AS voice-worker
+ENV NODE_ENV=production
+ENV MEDIA_CONTROL_HOST=0.0.0.0
+WORKDIR /app
+COPY --from=worker-dependencies --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/apps/voice-worker/dist ./apps/voice-worker/dist
+USER node
+EXPOSE 3100
+CMD ["node", "apps/voice-worker/dist/index.mjs"]
 
 FROM node:24.18.0-alpine AS runtime
 ENV NODE_ENV=production

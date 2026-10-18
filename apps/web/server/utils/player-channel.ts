@@ -18,6 +18,7 @@ import {
 import type { Hooks, Peer } from 'crossws'
 import { useDatabase } from './database'
 import { publicRoomConfiguration } from './room-configuration'
+import { mediaReady, revokeMedia } from './media-control'
 
 interface Connection {
   peer: Peer
@@ -177,8 +178,8 @@ export async function stopPlayerChannels() {
 }
 
 export const playerListenerDelivery: ListenerDelivery = {
-  ready: async () => false, // Media revocation is still unavailable.
-  revokeMedia: async () => false,
+  ready: mediaReady,
+  revokeMedia,
   async revokeSubtitles(reference) {
     for (const connection of connections.values()) {
       if (
