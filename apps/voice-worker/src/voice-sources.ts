@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import { performance } from 'node:perf_hooks'
 import type { VoiceSourceStatus } from '@babel/contracts'
 import type { createDatabase } from '@babel/database'
@@ -28,7 +27,6 @@ interface Source {
 }
 
 export class VoiceSources {
-  private readonly ownerId = randomUUID()
   private readonly sources = new Map<string, Source>()
   private readonly failures = new Map<
     string,
@@ -48,6 +46,7 @@ export class VoiceSources {
     private readonly peers: MediaPeers,
     private readonly cipher: CredentialCipher | null,
     private readonly subtitles: SubtitleService,
+    private readonly ownerId: string,
   ) {
     this.timer = setInterval(() => this.check(), 500)
     this.timer.unref()

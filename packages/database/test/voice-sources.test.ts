@@ -9,6 +9,8 @@ import { startRoom, stopRoom, updateRoomSettings } from '../src/room-settings.ts
 import { auditEvent, room } from '../src/schema/rooms.ts'
 import { voiceSourceRun } from '../src/schema/voice-sources.ts'
 import { claimVoiceSource, readVoiceSources } from '../src/voice-sources.ts'
+import { registerRuntimeOwner } from '../src/runtime-owners.ts'
+import { runtimeOwner } from '../src/schema/runtime-owners.ts'
 
 async function fixture(t: TestContext) {
   assert.ok(process.env.DATABASE_URL, 'Use disposable PostgreSQL')
@@ -21,6 +23,7 @@ async function fixture(t: TestContext) {
   const cipher = createCredentialCipher(randomBytes(32).toString('base64'))
   await database.db.insert(room).values(ids.map((id) => ({ id, name: actor })))
   const leases: Awaited<ReturnType<typeof claimVoiceSource>>[] = []
+  const owners: string[] = []
   t.after(async () => {
     try {
       await Promise.all(leases.map((lease) => lease.abandon()))
@@ -29,6 +32,9 @@ async function fixture(t: TestContext) {
         .where(inArray(voiceSourceRun.roomId, ids))
       await database.db.delete(auditEvent).where(eq(auditEvent.actorSubject, actor))
       await database.db.delete(room).where(inArray(room.id, ids))
+      if (owners.length) {
+        await database.db.delete(runtimeOwner).where(inArray(runtimeOwner.id, owners))
+      }
     } finally {
       await database.close()
     }
@@ -58,7 +64,13 @@ async function fixture(t: TestContext) {
       cipher,
     )
   }
-  return { database, ids, cipher, actor, stored, configure, leases }
+  async function owner() {
+    const id = randomUUID()
+    await registerRuntimeOwner(database.db, id)
+    owners.push(id)
+    return id
+  }
+  return { database, ids, cipher, actor, stored, configure, leases, owner }
 }
 
 test('room start validates configuration and key, persists intent and fences stop or source changes', async (t) => {
@@ -151,7 +163,7 @@ test('PostgreSQL ownership excludes duplicate controllers and preserves an uncon
     f.database.pool,
     before,
     '10000000000000005',
-    randomUUID(),
+    await f.owner(),
     () => {
       lost = true
     },
@@ -165,7 +177,7 @@ test('PostgreSQL ownership excludes duplicate controllers and preserves an uncon
       f.database.pool,
       await f.stored(b),
       '10000000000000005',
-      randomUUID(),
+      await f.owner(),
       () => {},
     ),
     { name: 'Error' },
@@ -176,7 +188,7 @@ test('PostgreSQL ownership excludes duplicate controllers and preserves an uncon
       f.database.pool,
       await f.stored(a),
       '10000000000000006',
-      randomUUID(),
+      await f.owner(),
       () => {},
     ),
   )
@@ -200,7 +212,7 @@ test('PostgreSQL ownership excludes duplicate controllers and preserves an uncon
       f.database.pool,
       await f.stored(a),
       '10000000000000005',
-      randomUUID(),
+      await f.owner(),
       () => {},
     ),
   )
@@ -213,7 +225,7 @@ test('PostgreSQL ownership excludes duplicate controllers and preserves an uncon
     f.database.pool,
     await f.stored(a),
     '10000000000000005',
-    randomUUID(),
+    await f.owner(),
     () => {},
   )
   f.leases.push(next)
@@ -225,7 +237,7 @@ test('PostgreSQL ownership excludes duplicate controllers and preserves an uncon
       f.database.pool,
       await f.stored(a),
       '10000000000000005',
-      randomUUID(),
+      await f.owner(),
       () => {},
     ),
   )

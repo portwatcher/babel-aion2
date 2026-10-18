@@ -1,5 +1,39 @@
 # Validation
 
+## Confirmed runtime crash recovery — 2026-10-19
+
+A worker supervisor now observes its own child process exiting, persists scoped
+media/source closure and then starts a new incarnation. Owner-row locks fence
+late registration transactions. This covers child-runtime crashes while the
+supervisor survives; whole-supervisor/container/host recovery remains unfinished.
+See [worker recovery](worker-recovery.md).
+
+| Check                   | Result  | Evidence                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                | PASS    | Final `npm run ci:local`: 204 first-party source files, maximum 495 lines; formatting, strict types, 18 tests, web/worker/migration builds and built HTTP smoke                                                                                                                                                                               |
+| Database ownership      | PASS    | `npm run test:db`: ten tests against an isolated disposable database. Exit waits for in-flight registration; terminated IDs reject media/source claims and re-registration; new source generation survives repeated old-owner confirmation                                                                                                    |
+| Real process crash      | PASS    | `test:recovery:db`: actual ICE/DTLS peers, child SIGKILL, independently observed UDP release, automatic same-listener recovery, obsolete negotiation rejection and another runtime's surviving peer                                                                                                                                           |
+| Blocked receipt         | PASS    | A real PostgreSQL row lock prevents exit persistence. The bounded query times out and retries; readiness remains unavailable until the receipt can commit                                                                                                                                                                                     |
+| Linux ARM64 packaging   | PASS    | Built Docker worker runs as UID 1000 on a read-only filesystem with all capabilities dropped and no-new-privileges. Real child SIGKILL releases its UDP sockets, persists closure and restarts; same-listener negotiation resumes. Supervisor SIGTERM exits 0 and closes the fresh registration. This is not container-to-browser audio proof |
+| Media and subtitles     | PASS    | Existing `test:media:db` verifies native Opus publication, scoped retirement, revocation, concurrent recovery and graceful supervisor restart. `test:subtitles:db` passes actual registered player delivery with loopback providers                                                                                                           |
+| Media networking        | PASS    | Final `test:network:db`: all five Coturn/application checks pass, including UDP/TCP/TLS, fallback, real expiry, renewal, untrusted TLS, invalid startup, failed relay authentication and bounded UDP allocation                                                                                                                               |
+| Wider crash recovery    | NOT RUN | Unknown owners after supervisor/container/host loss remain fail-closed. Web-owned player WebSocket orphan recovery and multi-worker routing remain unfinished                                                                                                                                                                                 |
+| Fresh integrated speech | NOT RUN | Existing authorized Discord test is preserved; no new integrated speech frames were observed during this change. No live Discord crash/rejoin acceptance is claimed                                                                                                                                                                           |
+
+The new process regression failed before the repair: the OS released the killed
+worker's UDP sockets, but its persistent registration never closed. It passes
+with supervision and durable reconciliation. An initial network rerun also
+caught a changed generic startup diagnostic; the existing non-secret message was
+restored, the worker rebuilt, and all five checks passed. An initial strict test
+type error was corrected to use PostgreSQL's `PoolClient` type.
+
+Recovery production/tooling changes total +323/-64 lines; tests and test support
+total +473/-12 lines, excluding generated migrations and documentation.
+
+Test databases, relay containers and the temporary image-check container were
+removed. The active Discord preview remains separate. No production migration,
+release or deployment was performed in this change.
+
 ## Explicit media networking — 2026-10-19
 
 STUN/TURN configuration, independent temporary worker/browser credentials,

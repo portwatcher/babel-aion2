@@ -67,6 +67,9 @@ See [original audio](original-audio.md) and
 Explicit [STUN/TURN configuration](media-network.md) issues separate temporary
 worker/browser relay credentials. Expiry and renewal use existing media attempts;
 the worker acknowledges closure only after the actual peer stops.
+The worker supervisor also acknowledges a whole incarnation after observing its
+child's OS exit. Shared owner locks fence delayed registrations; storage failure
+blocks restart until the receipt commits. See [worker recovery](worker-recovery.md).
 
 ## Shared code
 
@@ -95,7 +98,8 @@ Player socket registration shares the nickname transaction lock. Only a physical
 socket close acknowledges that registration, including across web replicas.
 Media registrations share that same lock and use monotonically increasing
 negotiation attempts within a listener generation. Only the owning worker records
-closure after initialization, answer processing and actual peer close settle.
+closure after initialization, answer processing and actual peer close settle;
+its supervisor may also reconcile that incarnation after confirmed OS exit.
 Database coordinator tests use controlled transport receipts; the separate media
 suite proves actual WebRTC and OS UDP socket release across two web processes.
 See [listener lifecycle](listener-sessions.md).
@@ -129,10 +133,10 @@ See [provider configuration](providers-and-languages.md) for probe and sample li
    establish public TURN routing, native AMD64 performance, background/game behavior or capacity.
    Local Coturn UDP/TCP/TLS and credential expiry pass separate checks. See the
    [candidate evidence](media-compatibility.md).
-3. Implement confirmed recovery of orphan media registrations after hard crashes
-   and worker routing before scaling beyond one configured control endpoint.
-   Current revocation observes actual peers and old credentials are denied, but
-   unknown owners remain fail-closed. Graceful restart preserves listener identity.
+3. Complete recovery when the supervisor/container/host itself disappears, and
+   worker routing before scaling beyond one configured control endpoint.
+   Child-runtime crashes now recover after confirmed OS exit and durable scoped
+   cleanup, preserving listener identity. Unknown owners remain fail-closed.
 4. Recover orphaned player socket registrations after a confirmed hard process
    failure. Authorized subtitle delivery, generation/revision fencing and actual
    socket closure are implemented; unknown owners remain fail-closed.

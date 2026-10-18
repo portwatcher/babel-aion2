@@ -10,6 +10,7 @@
     "./credentials": "./src/credentials.ts",
     "./room-settings": "./src/room-settings.ts",
     "./voice-sources": "./src/voice-sources.ts",
+    "./runtime-owners": "./src/runtime-owners.ts",
     "./subtitles": "./src/subtitles.ts",
     "./providers": "./src/providers/index.ts",
     "./terms": "./src/terms.ts",

@@ -56,8 +56,11 @@ closure completes, and Discord is destroyed before the source close receipt is
 written. A delayed old negotiation receives a retryable conflict rather than
 terminating the listener. A new peer keeps that listener's nickname generation.
 Graceful shutdown follows the same sequence. Persisted stopped intent survives
-worker restarts. An unknown owner after a hard crash remains unavailable;
-automatic orphan recovery is not implemented.
+worker restarts. A surviving supervisor confirms its child's OS exit and closes
+only that incarnation's source/media registrations before restarting it. Claims
+share a database owner lock with this reconciliation, fencing delayed writes.
+Unknown owners after supervisor or host loss remain unavailable. See
+[worker recovery](worker-recovery.md) for the exact scope and outstanding cases.
 
 The current deployment contract is one configured worker control endpoint.
 PostgreSQL ownership prevents duplicate Discord control; it does not distribute

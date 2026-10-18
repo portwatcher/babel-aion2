@@ -4,6 +4,7 @@ import type { Pool, PoolClient, QueryResultRow } from 'pg'
 import type { Database } from './client.ts'
 import { room } from './schema/rooms.ts'
 import { voiceSourceRun } from './schema/voice-sources.ts'
+import { lockRuntimeOwner } from './runtime-owners.ts'
 
 export type VoiceSourceConfiguration = typeof room.$inferSelect
 export class VoiceSourceOwnershipError extends Error {
@@ -68,6 +69,7 @@ export async function claimVoiceSource(
       throw new VoiceSourceOwnershipError()
     }
     const claimed = await db.transaction(async (tx) => {
+      await lockRuntimeOwner(tx, ownerId)
       const [current] = await tx
         .select()
         .from(room)

@@ -1,15 +1,9 @@
-import { createDatabase } from '@babel/database'
-import { createCredentialCipher } from '@babel/database/credentials'
-import { MediaPeers } from './media-peers.ts'
-import { createControlServer } from './control-server.ts'
-import { VoiceSources } from './voice-sources.ts'
-import { SubtitleService } from './subtitle-service.ts'
 import { createMediaNetwork } from './media-network.ts'
+import { superviseWorker } from './supervisor.ts'
 
 const databaseUrl = process.env.DATABASE_URL
 const secret = process.env.MEDIA_CONTROL_SECRET
 const port = Number(process.env.MEDIA_CONTROL_PORT ?? '3100')
-const host = process.env.MEDIA_CONTROL_HOST ?? '127.0.0.1'
 
 if (!databaseUrl || !secret) {
   console.log(
@@ -20,58 +14,10 @@ if (!databaseUrl || !secret) {
   process.exitCode = 1
 } else {
   try {
-    start(databaseUrl, secret)
+    createMediaNetwork(process.env)
+    await superviseWorker(databaseUrl)
   } catch {
     console.error('Babel worker configuration is invalid.')
     process.exitCode = 1
   }
-}
-
-function start(databaseUrl: string, secret: string) {
-  const network = createMediaNetwork(process.env)
-  const database = createDatabase(databaseUrl)
-  const sourceDatabase = createDatabase(databaseUrl, { queryTimeoutMs: 2_000 })
-  const subtitleDatabase = createDatabase(databaseUrl, { queryTimeoutMs: 2_000 })
-  const peers = new MediaPeers(database.db, network)
-  let cipher = null
-  try {
-    cipher = createCredentialCipher(process.env.PROVIDER_ENCRYPTION_KEY ?? '')
-  } catch {
-    /* Media admission remains available without a source credential key. */
-  }
-  const subtitles = new SubtitleService(subtitleDatabase.db, cipher)
-  const sources = new VoiceSources(sourceDatabase, peers, cipher, subtitles)
-  const server = createControlServer(peers, secret, sources, subtitles)
-  server.listen(port, host, () => {
-    const address = server.address()
-    console.log(
-      JSON.stringify({
-        mediaControlListening: true,
-        port: typeof address === 'object' && address ? address.port : port,
-        voiceSourceControl: true,
-      }),
-    )
-  })
-  let stopping = false
-  async function stop() {
-    if (stopping) {
-      return
-    }
-    stopping = true
-    server.close()
-    await sources.stop()
-    await subtitles.stop()
-    await subtitleDatabase.close()
-    await sourceDatabase.close()
-    await peers.stop()
-    await database.close()
-  }
-  for (const signal of ['SIGINT', 'SIGTERM']) {
-    process.once(signal, () => void stop())
-  }
-  server.on('error', () => {
-    console.error('Babel media control could not start.')
-    process.exitCode = 1
-    void stop()
-  })
 }

@@ -6,6 +6,7 @@ import { once } from 'node:events'
 import pg from 'pg'
 import { WebSocket } from 'ws'
 import { createDatabase } from '@babel/database'
+import { registerRuntimeOwner } from '@babel/database/runtime-owners'
 import { createCredentialCipher } from '@babel/database/credentials'
 import { createManagementFixture } from '../management-fixture.mjs'
 import { createProviderFixture } from './provider-server.mjs'
@@ -78,7 +79,9 @@ export async function createLiveSubtitleFixture(mediaEnvironment = {}) {
       database.db,
       createCredentialCipher(identity.key.toString('base64')),
     )
-    peers = new MediaPeers(database.db, createMediaNetwork(mediaEnvironment))
+    const ownerId = randomUUID()
+    await registerRuntimeOwner(database.db, ownerId)
+    peers = new MediaPeers(database.db, createMediaNetwork(mediaEnvironment), ownerId)
     const secret = randomBytes(32).toString('base64url')
     // Decoded synthetic PCM enters the same production source port as Discord.
     // This fixture does not exercise or claim a Discord join/ownership receipt.

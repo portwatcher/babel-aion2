@@ -1,8 +1,9 @@
-import { randomInt, randomUUID } from 'node:crypto'
+import { randomInt } from 'node:crypto'
 import { performance } from 'node:perf_hooks'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { ListenerReference, MediaOffer } from '@babel/contracts'
 import type { Database } from '@babel/database'
+import { runtimeOwnerActive } from '@babel/database/runtime-owners'
 import {
   authorizeMediaSession,
   closeMediaConnection,
@@ -51,7 +52,6 @@ export class MediaPeerError extends Error {
 }
 
 export class MediaPeers {
-  private readonly ownerId = randomUUID()
   private readonly entries = new Map<string, Entry>()
   private readonly roomEpochs = new Map<string, number>()
   private stopping = false
@@ -61,6 +61,7 @@ export class MediaPeers {
   constructor(
     private readonly db: Database,
     private readonly network: MediaNetwork,
+    private readonly ownerId: string,
   ) {
     this.timer = setInterval(() => {
       if (!this.sweeping) {
@@ -83,7 +84,7 @@ export class MediaPeers {
       nicknameGeneration: 1,
     })
     await mediaConnectionAuthorized(this.db, this.ownerId, this.ownerId)
-    return true
+    return runtimeOwnerActive(this.db, this.ownerId)
   }
 
   async offer(

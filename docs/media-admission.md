@@ -90,8 +90,11 @@ production transport callback is mocked and no synthetic source is installed in
 the application. Results on Node 24.18.0/macOS arm64 and Linux arm64 are recorded
 in [the test report](test-report.md).
 
-Hard-killed owners or failed close persistence can leave open registrations.
-Unknown owners remain fail-closed; confirmed orphan recovery is unfinished.
+The supervisor recovers a hard-killed child runtime after observing OS exit and
+persisting scoped closure. `test:recovery:db` verifies actual socket release,
+blocked persistence and same-listener recovery. See [worker recovery](worker-recovery.md).
+Unknown owners after supervisor/container/host loss remain fail-closed;
+orchestrator-level confirmation and reconciliation are unfinished.
 Current control targets one worker URL. Owner routing,
 public ICE/TURN routing, native AMD64 performance, capacity and actual player networks
 remain unvalidated. Local Coturn UDP/TCP/TLS delivery and credential expiry have

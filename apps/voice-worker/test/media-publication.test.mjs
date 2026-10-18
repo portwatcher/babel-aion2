@@ -5,6 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import opus from '@discordjs/opus'
 import { RTCPeerConnection } from 'werift'
 import { createDatabase } from '@babel/database'
+import { registerRuntimeOwner } from '@babel/database/runtime-owners'
 import {
   createListenerService,
   subtitleConnectionsStopped,
@@ -26,7 +27,9 @@ test('published Opus reaches only its room; source retirement closes actual tran
     ),
   )
   const database = createDatabase(process.env.DATABASE_URL)
-  const peers = new MediaPeers(database.db, createMediaNetwork({}))
+  const ownerId = randomUUID()
+  await registerRuntimeOwner(database.db, ownerId)
+  const peers = new MediaPeers(database.db, createMediaNetwork({}), ownerId)
   const rooms = [randomUUID(), randomUUID()]
   const names = rooms.map((id) => `publication-${id.slice(0, 16)}`)
   const receivers = []
@@ -49,6 +52,7 @@ test('published Opus reaches only its room; source retirement closes actual tran
       )
       await database.pool.query('delete from nickname where key = any($1)', [names])
       await database.pool.query('delete from room where id = any($1)', [rooms])
+      await database.pool.query('delete from runtime_owner where id=$1', [ownerId])
     } finally {
       await database.close()
     }

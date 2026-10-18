@@ -77,6 +77,9 @@ then run `npm run build` and, in a separate terminal,
 configuration changes. No capture permission is requested. See
 [media admission](docs/media-admission.md) for recovery limits and
 [media networking](docs/media-network.md) for STUN/TURN, TLS and UDP port settings.
+The entry point supervises a child runtime and reconciles its confirmed exit
+before restarting it. Apply all migrations first; see
+[worker recovery](docs/worker-recovery.md) for storage fencing and host-crash limits.
 
 The `/admin` page fails closed until Access is configured. Set
 `NUXT_ACCESS_TEAM_DOMAIN`, `NUXT_ACCESS_AUDIENCE`, and a random
@@ -128,6 +131,7 @@ runs in a separate worker.
 | `npm run test:ws:db`         | Two built servers + local PostgreSQL: real player WebSockets, replacement, shutdown and recovery                                                                                      |
 | `npm run test:media:db`      | Real Opus publication and source fencing; two built servers + worker/PostgreSQL admission, revocation and recovery                                                                    |
 | `npm run test:network:db`    | Real Coturn UDP/TCP/TLS, UDP fallback, credential expiry and bounded ICE ports; requires Docker and OpenSSL, creates its own disposable database                                      |
+| `npm run test:recovery:db`   | Isolated PostgreSQL and built processes: SIGKILL, real UDP release, blocked exit receipts, scoped cleanup and automatic reconnection                                                  |
 | `npm run test:subtitles:db`  | Built web + real private worker HTTP/player WebSockets, isolated PostgreSQL and loopback provider protocols: shared PCM, language changes, source/provider replacement and revocation |
 | `npm run test:management:db` | Built servers + local PostgreSQL: signed admin login, encrypted room settings, conflicts, stop and removal                                                                            |
 | `npm run test:providers:db`  | Built servers + local PostgreSQL: provider history, encrypted credentials, replacement and test leases; local provider fixtures                                                       |

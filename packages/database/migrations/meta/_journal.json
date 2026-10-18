@@ -71,6 +71,13 @@
       "when": 1792340910186,
       "tag": "0009_mysterious_phantom_reporter",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792348950028,
+      "tag": "0010_cheerful_fenris",
+      "breakpoints": true
     }
   ]
 }

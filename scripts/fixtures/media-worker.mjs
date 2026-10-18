@@ -5,6 +5,7 @@ import { createServer } from 'node:net'
 import dgram from 'node:dgram'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { createInterface } from 'node:readline'
 
 export async function until(predicate, label, timeout = 10_000) {
   const deadline = Date.now() + timeout
@@ -39,7 +40,18 @@ export async function startMediaWorker(databaseUrl, secret, previousPort) {
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
-  child.stdout.resume()
+  let runtime = { pid: child.pid }
+  const lines = createInterface({ input: child.stdout })
+  lines.on('line', (line) => {
+    try {
+      const event = JSON.parse(line)
+      if (event.mediaControlListening && Number.isInteger(event.runtimePid)) {
+        runtime = { pid: event.runtimePid, ownerId: event.ownerId }
+      }
+    } catch {
+      /* Never expose raw process output, which can contain credentials. */
+    }
+  })
   child.stderr.resume()
   const exited = once(child, 'exit')
   const origin = `http://127.0.0.1:${port}`
@@ -48,7 +60,7 @@ export async function startMediaWorker(databaseUrl, secret, previousPort) {
       return
     }
     child.kill(signal)
-    await Promise.race([exited, delay(5_000, undefined, { ref: false })])
+    await Promise.race([exited, delay(10_000, undefined, { ref: false })])
     if (child.exitCode === null && child.signalCode === null) {
       child.kill('SIGKILL')
       await exited
@@ -74,7 +86,7 @@ export async function startMediaWorker(databaseUrl, secret, previousPort) {
         return false
       }
     }, 'media worker readiness')
-    return { origin, port, close, control }
+    return { origin, port, close, control, runtime: () => runtime }
   } catch (error) {
     await close()
     throw error

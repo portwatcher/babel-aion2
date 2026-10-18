@@ -4,6 +4,7 @@ import type { Database } from '../client.ts'
 import { mediaConnection } from '../schema/media-connections.ts'
 import { listenerSession, nickname } from '../schema/rooms.ts'
 import { ListenerError, snapshot, verifyCredential } from './model.ts'
+import { lockRuntimeOwner } from '../runtime-owners.ts'
 
 export async function authorizeMediaSession(
   db: Pick<Database, 'select'>,
@@ -40,6 +41,7 @@ export async function openMediaConnection(
   credential: string,
 ) {
   return db.transaction(async (tx) => {
+    await lockRuntimeOwner(tx, ownerId)
     const [original] = await tx
       .select()
       .from(listenerSession)
