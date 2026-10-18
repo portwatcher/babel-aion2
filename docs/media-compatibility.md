@@ -90,8 +90,11 @@ room, releases native media objects, and lets the parent observe process exit.
 ## Remaining integration gates
 
 - The dedicated bot is installed in the authorized test guild; the selected
-  private voice channel still needs a bot-specific view/connect grant. Capture
-  scope can now select specific members or all channel members without IDs.
+  private voice channel now has the approved bot-specific ViewChannel/Connect
+  grant. An isolated receiver reaches Ready with DAVE protocol 1 negotiated,
+  self-mute on and self-deafen off. The channel is empty, so no real speech or
+  completed DAVE group session has been observed. Capture scope can now select
+  specific members or all channel members without IDs.
 - Validate live Discord/DAVE receipt and independent member streams. An isolated
   candidate install of `@discordjs/voice` 0.19.2, `discord.js` 14.27.0 and
   `@discordjs/opus` 0.10.0 loads native DAVE/Opus on macOS arm64 and decodes an
