@@ -13,12 +13,13 @@ import { routeProviderNetwork } from './provider-network.mjs'
 import { syntheticWave } from './audio-sample.mjs'
 import { until } from './media-worker.mjs'
 import { MediaPeers } from '../../apps/voice-worker/src/media-peers.ts'
+import { createMediaNetwork } from '../../apps/voice-worker/src/media-network.ts'
 import { RoomAudio } from '../../apps/voice-worker/src/room-audio.ts'
 import { SubtitleService } from '../../apps/voice-worker/src/subtitle-service.ts'
 import { createControlServer } from '../../apps/voice-worker/src/control-server.ts'
 
 const exec = promisify(execFile)
-export async function createLiveSubtitleFixture() {
+export async function createLiveSubtitleFixture(mediaEnvironment = {}) {
   const url = new URL(process.env.DATABASE_URL)
   assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))
   const admin = new pg.Client({ connectionString: url.toString() })
@@ -45,8 +46,21 @@ export async function createLiveSubtitleFixture() {
     await database?.close()
     restore?.()
     await network?.close()
-    // This random database was created above solely for this fixture.
-    await admin.query(`drop database ${name} with (force)`)
+    // pg-pool can resolve end() before its clients finish closing their sockets.
+    // Observe server-side disconnection before dropping this fixture's database;
+    // FORCE can otherwise inject 57P01 into a client that is still shutting down.
+    await until(
+      async () => {
+        const { rows } = await admin.query(
+          'select count(*)::int as count from pg_stat_activity where datname=$1',
+          [name],
+        )
+        return rows[0].count === 0
+      },
+      'fixture PostgreSQL connections physically drained',
+      3_000,
+    )
+    await admin.query(`drop database ${name}`)
     await admin.end()
   }
   try {
@@ -64,7 +78,7 @@ export async function createLiveSubtitleFixture() {
       database.db,
       createCredentialCipher(identity.key.toString('base64')),
     )
-    peers = new MediaPeers(database.db, { iceServers: [], iceUseIpv6: false })
+    peers = new MediaPeers(database.db, createMediaNetwork(mediaEnvironment))
     const secret = randomBytes(32).toString('base64url')
     // Decoded synthetic PCM enters the same production source port as Discord.
     // This fixture does not exercise or claim a Discord join/ownership receipt.
@@ -172,7 +186,7 @@ export async function createLiveSubtitleFixture() {
         }),
       )
     }
-    async function enter(nickname, outputLanguage) {
+    async function enter(nickname, outputLanguage = null) {
       const credential = randomBytes(32).toString('base64url')
       async function request(path, method, body) {
         return fetch(`${web.origin}${path}`, {

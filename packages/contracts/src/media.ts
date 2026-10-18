@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { listenerCredentialSchema, listenerReferenceSchema } from './listeners.ts'
+import { mediaIceConfigurationSchema } from './media-network.ts'
 
 export const mediaDescriptionSchema = z
   .object({
@@ -36,6 +37,11 @@ export const mediaControlRequestSchema = z
   .strict()
 export const mediaOfferSchema = z.object({
   connectionId: z.uuid(),
+  ice: mediaIceConfigurationSchema.default({
+    servers: [],
+    policy: 'all',
+    renewAfterMs: null,
+  }),
   description: z.object({
     type: z.literal('offer'),
     sdp: z

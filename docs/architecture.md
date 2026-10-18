@@ -64,6 +64,9 @@ member timelines feed shared provider jobs only while language demand exists.
 Version-checked private HTTP streams feed actual registered player sockets.
 See [original audio](original-audio.md) and
 [media admission](media-admission.md).
+Explicit [STUN/TURN configuration](media-network.md) issues separate temporary
+worker/browser relay credentials. Expiry and renewal use existing media attempts;
+the worker acknowledges closure only after the actual peer stops.
 
 ## Shared code
 
@@ -123,7 +126,8 @@ See [provider configuration](providers-and-languages.md) for probe and sample li
    and exclusive source control are implemented.
 2. Complete actual-network publication proof. Source fencing and local real
    Opus publication pass on Linux ARM64 and emulated AMD64; these do not
-   establish TURN, native AMD64 performance, background/game behavior or capacity. See the
+   establish public TURN routing, native AMD64 performance, background/game behavior or capacity.
+   Local Coturn UDP/TCP/TLS and credential expiry pass separate checks. See the
    [candidate evidence](media-compatibility.md).
 3. Implement confirmed recovery of orphan media registrations after hard crashes
    and worker routing before scaling beyond one configured control endpoint.

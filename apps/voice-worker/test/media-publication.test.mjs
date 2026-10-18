@@ -10,6 +10,7 @@ import {
   subtitleConnectionsStopped,
 } from '@babel/database/listeners'
 import { MediaPeers } from '../src/media-peers.ts'
+import { createMediaNetwork } from '../src/media-network.ts'
 import { RoomAudio } from '../src/room-audio.ts'
 import {
   candidateSockets,
@@ -25,7 +26,7 @@ test('published Opus reaches only its room; source retirement closes actual tran
     ),
   )
   const database = createDatabase(process.env.DATABASE_URL)
-  const peers = new MediaPeers(database.db, { iceServers: [], iceUseIpv6: false })
+  const peers = new MediaPeers(database.db, createMediaNetwork({}))
   const rooms = [randomUUID(), randomUUID()]
   const names = rooms.map((id) => `publication-${id.slice(0, 16)}`)
   const receivers = []

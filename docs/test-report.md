@@ -1,5 +1,51 @@
 # Validation
 
+## Explicit media networking — 2026-10-19
+
+STUN/TURN configuration, independent temporary worker/browser credentials,
+credential expiry and browser renewal are implemented. See
+[media networking](media-network.md). This is local transport evidence; production
+worker routing and real player-network acceptance remain unfinished.
+
+| Check                                | Status  | Evidence                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                             | PASS    | `npm run ci:local`: 197 source files, maximum 495 lines, formatting, strict types, 18 tests, builds and built HTTP smoke                                                                                                                                                                                  |
+| Real relay transport                 | PASS    | Pinned Coturn 4.18.0-r0, real player HTTP authorization/private control and native Opus decoding. UDP, TCP, TLS and UDP-to-TCP fallback select relay candidates at both ends and decode nonzero audio                                                                                                     |
+| Credential lifetime                  | PASS    | With a 60-second lifetime, publication stops, the actual peer closes and its close receipt persists. A subsequent attempt retains the listener generation and obtains different credentials. Coturn rejects expired credentials with actual 401; fresh credentials allocate through the same request path |
+| TLS and invalid settings             | PASS    | TLS succeeds with the fixture CA trusted only in the test child; a separate process with no trust rejects it. Incomplete credentials, invalid URLs, unsafe lifetime and incomplete port configuration fail actual worker startup with a generic message                                                   |
+| Relay authentication failure         | PASS    | A reachable Coturn with a mismatched secret returns no usable offer: Babel responds 503, reveals no relay credential and persists actual negotiation closure                                                                                                                                              |
+| Direct/STUN port configuration       | PASS    | Two simultaneous authorized peers gather actual STUN candidates, use distinct ports in the configured local UDP range, decode audio and release their OS sockets after closure                                                                                                                            |
+| Chrome UDP/TCP and renewal           | PASS    | Real Chrome stats show relay at both ends, UDP/TCP relay protocols and nonzero audio energy. TCP completes multiple renewals with one open peer and one audio element; database evidence retains one session and one nickname generation                                                                  |
+| Existing media and subtitle delivery | PASS    | Real publication/admission/replacement/recovery suite passes. Subtitle suite passes independently and in a nested disposable database. Teardown initially triggered PostgreSQL `57P01`; the fixture now waits for server-side disconnection and drops its database without FORCE                          |
+| Public network and deployment        | NOT RUN | Public NAT/TURN routes, China mainland players, production TLS/browser trust, native AMD64 relay performance and end-to-end Discord speech latency                                                                                                                                                        |
+
+The first isolated relay probe advertised host loopback from Docker. Allocation
+succeeded, but Coturn rejected relay permissions. The corrected fixture relays
+both endpoints within its Docker network, without exposing relay ports or enabling
+loopback-peer exceptions. An initial expiry assertion observed only a Werift
+timeout: its integrity guard drops unsigned post-authentication errors. The final
+check reads the real TURN error response and requires a fresh-credential positive
+control, so network failure cannot count as authentication denial.
+
+Two runs exposed a test teardown race: `pg-pool.end()` removes clients from its
+inventory before their socket-close callbacks finish. Immediate `DROP DATABASE
+... WITH (FORCE)` could therefore terminate a still-closing client with `57P01`.
+The shared fixture now observes zero connections in `pg_stat_activity` before a
+normal database drop. No production database lifecycle behavior was changed.
+
+Default host-only networking now uses ICE-lite. Inspection of the exact Werift
+dependency showed that an empty `iceServers` list alone still selected its built-in
+Google STUN fallback; the earlier “no implicit external STUN” statement was not
+true for that previous configuration. The current configuration suppresses that
+fallback. Existing direct admission and subtitle transport checks pass with it.
+
+The test-authoring gate assigns the new suite ownership of actual relay, lifetime,
+TLS and port-binding contracts; existing tests retain application replacement and
+subtitle ordering ownership. No production test endpoint or TLS bypass was added.
+Temporary relay containers, generated secrets/certificates, browser previews and
+their databases are removed after use. The separate live Discord/browser test
+remains available for a new authorized speech sample. No deployment is claimed.
+
 ## Authorized shared subtitle delivery — 2026-10-19
 
 Per-member decoded PCM now feeds shared recognition and output-language

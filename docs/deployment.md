@@ -13,11 +13,12 @@ See [source and secret boundaries](source-and-secrets.md).
 
 `Dockerfile` builds the Nuxt Node server and a standalone PostgreSQL migration
 runner with Node 24.18.0. The runtime runs as UID 1000. It contains no production
-configuration or credentials and does not start the unfinished voice worker.
-The optional `voice-worker` build target packages private WebRTC admission with
-pruned runtime dependencies and UID 1000. It does not receive Discord audio.
-Keep its authenticated control service private; public ICE/TURN configuration,
-exclusive guild ownership and production routing remain separate infra work.
+configuration or credentials and does not start the optional voice worker.
+The `voice-worker` build target packages Discord/DAVE reception, shared subtitle
+processing and private WebRTC admission with pruned dependencies and UID 1000.
+Keep its authenticated control service private. Source ownership and explicit
+[STUN/TURN settings](media-network.md) are implemented; production worker images,
+public relay routing and firewall rules remain separate private infra work.
 
 The migration command is `node database/migrate.mjs` with `DATABASE_URL` supplied
 at runtime. The infra release applies migrations before starting the new web

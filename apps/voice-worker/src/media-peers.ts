@@ -18,8 +18,8 @@ import {
   RTCRtpCodecParameters,
   RtpHeader,
   RtpPacket,
-  type PeerConfig,
 } from 'werift'
+import type { MediaNetwork } from './media-network.ts'
 
 interface Entry {
   id: string
@@ -41,6 +41,7 @@ interface Entry {
   answer: Promise<void> | null
   closingTask: Promise<void> | null
   expiresAt: number
+  credentialExpiresAt: number
 }
 
 export class MediaPeerError extends Error {
@@ -59,7 +60,7 @@ export class MediaPeers {
 
   constructor(
     private readonly db: Database,
-    private readonly rtc: Partial<PeerConfig>,
+    private readonly network: MediaNetwork,
   ) {
     this.timer = setInterval(() => {
       if (!this.sweeping) {
@@ -133,7 +134,8 @@ export class MediaPeers {
       offer: null,
       answer: null,
       closingTask: null,
-      expiresAt: Date.now() + 30_000,
+      expiresAt: Date.now() + 45_000,
+      credentialExpiresAt: Infinity,
     }
     this.entries.set(id, entry)
     entry.offer = this.create(entry, credential)
@@ -151,7 +153,11 @@ export class MediaPeers {
 
   private async authorized(entry: Entry) {
     const authorized = await mediaConnectionAuthorized(this.db, entry.id, this.ownerId)
-    if (entry.closing || entry.roomEpoch !== (this.roomEpochs.get(entry.roomId) ?? 0)) {
+    if (
+      entry.closing ||
+      Date.now() >= entry.expiresAt ||
+      entry.roomEpoch !== (this.roomEpochs.get(entry.roomId) ?? 0)
+    ) {
       // Retiring a source/peer does not revoke the listener. Let the browser
       // negotiate again; a terminal 410 would permanently stop its recovery.
       throw new MediaPeerError('BUSY')
@@ -199,8 +205,10 @@ export class MediaPeers {
         await delay(50)
       }
       await this.authorized(entry)
+      const network = this.network.create()
+      entry.credentialExpiresAt = network.expiresAt
       const peer = new RTCPeerConnection({
-        ...this.rtc,
+        ...network.worker,
         codecs: {
           audio: [
             new RTCRtpCodecParameters({
@@ -217,7 +225,7 @@ export class MediaPeers {
       peer.addTransceiver(entry.track, { direction: 'sendonly' })
       peer.connectionStateChange.subscribe((state) => {
         if (state === 'connected') {
-          entry.expiresAt = Number.POSITIVE_INFINITY
+          entry.expiresAt = entry.credentialExpiresAt
         }
         if (state === 'failed' || state === 'closed') {
           void this.close(entry).catch(() => {})
@@ -229,8 +237,25 @@ export class MediaPeers {
       if (!description || description.type !== 'offer') {
         throw new MediaPeerError('UNAVAILABLE')
       }
+      const candidates = description.sdp
+        .split(/\r?\n/)
+        .filter((line) => line.startsWith('a=candidate:'))
+      if (
+        !candidates.length ||
+        (network.worker.iceTransportPolicy === 'relay' &&
+          !candidates.some((line) => / typ relay(?: |$)/.test(line)))
+      ) {
+        throw new MediaPeerError('UNAVAILABLE')
+      }
       result = {
         connectionId: entry.id,
+        ice: {
+          ...network.browser,
+          renewAfterMs:
+            network.browser.renewAfterMs === null
+              ? null
+              : Math.max(1_000, network.expiresAt - Date.now() - 30_000),
+        },
         description: { type: 'offer', sdp: description.sdp },
       }
     } catch (error) {
@@ -327,6 +352,7 @@ export class MediaPeers {
         entry.roomId !== roomId ||
         entry.closing ||
         entry.closed ||
+        Date.now() >= entry.credentialExpiresAt ||
         entry.roomEpoch !== (this.roomEpochs.get(roomId) ?? 0) ||
         entry.peer?.connectionState !== 'connected' ||
         !entry.track

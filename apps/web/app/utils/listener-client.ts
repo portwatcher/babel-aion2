@@ -105,6 +105,7 @@ async function playerRequest(
   method = 'GET',
   body?: unknown,
   signal?: AbortSignal,
+  timeout = 10_000,
 ) {
   const response = await fetch(path, {
     method,
@@ -114,8 +115,8 @@ async function playerRequest(
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
     signal: signal
-      ? AbortSignal.any([signal, AbortSignal.timeout(10_000)])
-      : AbortSignal.timeout(10_000),
+      ? AbortSignal.any([signal, AbortSignal.timeout(timeout)])
+      : AbortSignal.timeout(timeout),
   })
   if (!response.ok) {
     throw new PlayerApiError(response.status)
@@ -145,6 +146,7 @@ export async function requestListenerMedia(
     'POST',
     request,
     signal,
+    request.operation === 'offer' ? 25_000 : 10_000,
   )
   return request.operation === 'offer' ? mediaOfferSchema.parse(result) : null
 }

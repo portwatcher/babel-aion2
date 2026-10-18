@@ -34,8 +34,10 @@ Werift is the selected admission transport, with an inspectable packet-oriented
 local peer avoids the separate self-hosted-token problem, but the probes do **not**
 prove Babel credential revocation. Separate application tests now fence admission
 and delayed negotiation, close actual peers and deny obsolete credentials. Source
-generations and PCM publication remain unfinished. A closed negotiation ID is not
+generations and PCM publication are now covered by application tests. A closed negotiation ID is not
 a listener credential; the fixture's HTTP 404 is not the application proof.
+Real Coturn UDP/TCP/TLS and temporary credentials have separate
+[application network checks](media-network.md); this does not validate public routing.
 
 ## Reproduce the checks
 

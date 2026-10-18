@@ -18,6 +18,8 @@ independently and publishes mixed original audio to that room. Each member's PCM
 also feeds shared recognition and language-specific translation, delivered through
 the existing authenticated player socket to the page and PiP. Live provider quality
 and production-network acceptance remain unfinished.
+Explicit STUN/TURN settings support temporary relay credentials and browser renewal
+within the same listener. Local relay proof does not establish public reachability.
 Administrators can save versioned room/Discord settings, protect the bot credential
 with server-side encryption, persist a stopped room, and remove a specific listener
 generation. Saving a changed source stops it; the separate start action requests
@@ -73,7 +75,8 @@ to that value in ignored `.env`. Set `NUXT_MEDIA_CONTROL_URL=http://127.0.0.1:31
 then run `npm run build` and, in a separate terminal,
 `node --env-file=.env apps/voice-worker/dist/index.mjs`. Restart the web app after
 configuration changes. No capture permission is requested. See
-[media admission](docs/media-admission.md) for network and recovery limits.
+[media admission](docs/media-admission.md) for recovery limits and
+[media networking](docs/media-network.md) for STUN/TURN, TLS and UDP port settings.
 
 The `/admin` page fails closed until Access is configured. Set
 `NUXT_ACCESS_TEAM_DOMAIN`, `NUXT_ACCESS_AUDIENCE`, and a random
@@ -124,6 +127,7 @@ runs in a separate worker.
 | `npm run test:http:db`       | Built server + local PostgreSQL: entry, replacement, isolation and restart; run after build/migrations                                                                                |
 | `npm run test:ws:db`         | Two built servers + local PostgreSQL: real player WebSockets, replacement, shutdown and recovery                                                                                      |
 | `npm run test:media:db`      | Real Opus publication and source fencing; two built servers + worker/PostgreSQL admission, revocation and recovery                                                                    |
+| `npm run test:network:db`    | Real Coturn UDP/TCP/TLS, UDP fallback, credential expiry and bounded ICE ports; requires Docker and OpenSSL, creates its own disposable database                                      |
 | `npm run test:subtitles:db`  | Built web + real private worker HTTP/player WebSockets, isolated PostgreSQL and loopback provider protocols: shared PCM, language changes, source/provider replacement and revocation |
 | `npm run test:management:db` | Built servers + local PostgreSQL: signed admin login, encrypted room settings, conflicts, stop and removal                                                                            |
 | `npm run test:providers:db`  | Built servers + local PostgreSQL: provider history, encrypted credentials, replacement and test leases; local provider fixtures                                                       |
@@ -152,6 +156,7 @@ See [AGENTS.md](AGENTS.md) for worktree, cleanup, security, and interface rules.
 - [Shared streaming subtitle processing](docs/streaming-subtitles.md)
 - [Player subtitle window and browser limits](docs/picture-in-picture.md)
 - [Media admission, configuration and recovery limits](docs/media-admission.md)
+- [STUN/TURN configuration, temporary credentials and network verification](docs/media-network.md)
 - [Discord original audio and source lifecycle](docs/original-audio.md)
 - [Media dependency compatibility evidence](docs/media-compatibility.md)
 - [Production deployment](docs/deployment.md)

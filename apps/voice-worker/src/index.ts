@@ -4,6 +4,7 @@ import { MediaPeers } from './media-peers.ts'
 import { createControlServer } from './control-server.ts'
 import { VoiceSources } from './voice-sources.ts'
 import { SubtitleService } from './subtitle-service.ts'
+import { createMediaNetwork } from './media-network.ts'
 
 const databaseUrl = process.env.DATABASE_URL
 const secret = process.env.MEDIA_CONTROL_SECRET
@@ -18,12 +19,20 @@ if (!databaseUrl || !secret) {
   console.error('Babel worker configuration is invalid.')
   process.exitCode = 1
 } else {
+  try {
+    start(databaseUrl, secret)
+  } catch {
+    console.error('Babel worker configuration is invalid.')
+    process.exitCode = 1
+  }
+}
+
+function start(databaseUrl: string, secret: string) {
+  const network = createMediaNetwork(process.env)
   const database = createDatabase(databaseUrl)
   const sourceDatabase = createDatabase(databaseUrl, { queryTimeoutMs: 2_000 })
   const subtitleDatabase = createDatabase(databaseUrl, { queryTimeoutMs: 2_000 })
-  // Public ICE/TURN configuration remains a deployment gate. No external STUN
-  // service is contacted implicitly, and no production connectivity is claimed.
-  const peers = new MediaPeers(database.db, { iceServers: [], iceUseIpv6: false })
+  const peers = new MediaPeers(database.db, network)
   let cipher = null
   try {
     cipher = createCredentialCipher(process.env.PROVIDER_ENCRYPTION_KEY ?? '')

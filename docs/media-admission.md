@@ -70,9 +70,10 @@ inferred from time, a request being sent, or a token expiring. The coordinator
 also requires physical player-socket closure before it authorizes replacement.
 
 Every 500 ms, the worker rechecks registrations and closes unauthorized peers.
-An unconnected negotiation expires after 30 seconds. A connected peer remains
+An unconnected negotiation expires after 45 seconds. A connected peer remains
 subject to session authorization; local browser disconnects retry the same
-listener. Terminal 401/410 responses stop media recovery. Explicit leave,
+listener. Configured TURN credentials expire and renew through this same admission
+path; see [media networking](media-network.md). Terminal 401/410 responses stop media recovery. Explicit leave,
 replacement, page exit and component disposal close local playback. PiP shares
 the existing session and adds no media connection or audio element. Mute affects
 playback only; rejected autoplay displays the existing playback button.
@@ -92,11 +93,13 @@ in [the test report](test-report.md).
 Hard-killed owners or failed close persistence can leave open registrations.
 Unknown owners remain fail-closed; confirmed orphan recovery is unfinished.
 Current control targets one worker URL. Owner routing,
-public ICE/TURN, native AMD64 performance, capacity and actual player networks
-remain unvalidated. Source-boundary tests pass on Linux ARM64 and emulated AMD64. Local direct ICE uses no external STUN by default.
+public ICE/TURN routing, native AMD64 performance, capacity and actual player networks
+remain unvalidated. Local Coturn UDP/TCP/TLS delivery and credential expiry have
+separate protocol tests. Source-boundary tests pass on Linux ARM64 and emulated AMD64.
+Local direct ICE uses ICE-lite with no external STUN by default.
 
 The worker now decodes speakers independently, bounds PCM queues, mixes playback
 and closes old peers on source changes. Exclusive PostgreSQL ownership and
-automatic all-channel discovery are implemented. The separate recognition branch,
-real-network reception and original-audio latency still need evidence; candidate
+automatic all-channel discovery and shared recognition are implemented. Live
+provider quality, real-network reception and original-audio latency still need evidence; candidate
 synthetic decoding alone does not satisfy those gates.

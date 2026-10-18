@@ -72,7 +72,11 @@ export async function mediaOperation(
   credential: string,
   request: MediaRequest,
 ) {
-  const result = await control('/media', { reference, credential, request })
+  const result = await control(
+    '/media',
+    { reference, credential, request },
+    request.operation === 'offer' ? 20_000 : 8_000,
+  )
   if (!result || result.status !== 200) {
     const status =
       result && [400, 404, 409, 410].includes(result.status) ? result.status : 503

@@ -10,6 +10,7 @@ interface AudioConnection {
   listener: SavedListener
   peer: RTCPeerConnection
   abort: AbortController
+  renewal: ReturnType<typeof setTimeout> | undefined
 }
 
 export function useListenerAudio(
@@ -30,6 +31,7 @@ export function useListenerAudio(
     const previous = connection
     connection = null
     if (previous) {
+      clearTimeout(previous.renewal)
       previous.abort.abort()
       previous.peer.close()
       void requestListenerMedia(previous.listener, {
@@ -89,7 +91,7 @@ export function useListenerAudio(
     await new Promise<void>((resolve, reject) => {
       const deadline = setTimeout(
         () => finish(new Error('Media gathering timeout')),
-        5_000,
+        10_000,
       )
       const abort = () => finish(new Error('Media connection cancelled'))
       const changed = () => {
@@ -128,6 +130,7 @@ export function useListenerAudio(
       listener,
       peer: new RTCPeerConnection({ iceServers: [] }),
       abort: new AbortController(),
+      renewal: undefined,
     }
     connection = active
     state.value = 'connecting'
@@ -171,6 +174,17 @@ export function useListenerAudio(
       }
       if (!offer || offer.connectionId !== active.id) {
         throw new Error('Invalid media offer')
+      }
+      active.peer.setConfiguration({
+        iceServers: offer.ice.servers,
+        iceTransportPolicy: offer.ice.policy,
+      })
+      if (offer.ice.renewAfterMs !== null) {
+        active.renewal = setTimeout(() => {
+          if (connection === active) {
+            schedule()
+          }
+        }, offer.ice.renewAfterMs)
       }
       await active.peer.setRemoteDescription(offer.description)
       await active.peer.setLocalDescription(await active.peer.createAnswer())
