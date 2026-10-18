@@ -1,0 +1,12 @@
+.git
+node_modules
+**/node_modules
+**/.nuxt
+**/.output
+**/dist
+.env
+.env.*
+!.env.example
+.agents
+.local
+coverage

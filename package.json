@@ -1,0 +1,45 @@
+{
+  "name": "babel-aion2",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace=@babel/web",
+    "build": "npm run build --workspace=@babel/web && npm run build --workspace=@babel/voice-worker",
+    "start": "npm run start --workspace=@babel/web",
+    "dev:worker": "npm run dev --workspace=@babel/voice-worker",
+    "prepare": "npm run prepare --workspace=@babel/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "tsx --test packages/contracts/test/*.test.ts packages/auth/test/*.test.ts",
+    "test:db": "tsx --env-file=.env --test packages/database/test/*.test.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check:lines": "node scripts/check-lines.mjs",
+    "check": "npm run check:lines && npm run format:check && npm run typecheck && npm test",
+    "ci:local": "npm run check && npm run build && npm run test:http",
+    "test:http": "node scripts/smoke.mjs",
+    "db:up": "docker compose up -d --wait postgres",
+    "db:down": "docker compose down",
+    "db:generate": "drizzle-kit generate --config packages/database/drizzle.config.ts",
+    "db:migrate": "tsx --env-file=.env packages/database/src/migrate.ts",
+    "db:studio": "drizzle-kit studio --config packages/database/drizzle.config.ts",
+    "worktree:audit": "node scripts/worktree-audit.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "drizzle-kit": "0.31.11",
+    "prettier": "3.9.10",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vue-tsc": "3.3.13",
+    "vue-router": "5.4.0"
+  }
+}

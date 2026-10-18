@@ -1,0 +1,9 @@
+package-lock.json
+node_modules
+.nuxt
+.output
+dist
+.agents/skills
+packages/database/migrations
+design.md
+GOAL.md

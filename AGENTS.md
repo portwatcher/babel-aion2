@@ -1,0 +1,111 @@
+# Babel project guidance
+
+## Scope and references
+
+- Read `design.md` before changing behavior. It contains the original product
+  specification. `GOAL.md` is the identical delivery reference. Keep both in sync.
+- This repository is an application scaffold. See `docs/architecture.md` and
+  `docs/test-report.md` for implemented behavior and unfinished integration gates.
+- Follow the workspace patterns in the related repository
+  `../perohub-monorepo`: npm workspaces, `apps/*`, `packages/*`, shared contracts,
+  domain modules, conventional commits, and deterministic local checks.
+- Use the related `../infra` repository for production resources and established
+  deployment methods. Never copy credentials or private runtime configuration.
+- Respond in clear, direct language. State actual test results and limitations.
+
+## Worktree management
+
+- For code-changing tasks, use a dedicated Codex-managed worktree unless the user
+  explicitly requests the local checkout. Inspect attached worktrees first and
+  reuse a suitable active one. Create worktrees through the Codex app tools.
+- Keep new managed worktrees on detached HEAD until intentionally creating a
+  task branch. Never check out `main`, `master`, or `develop` in a task worktree.
+- Never create a task worktree in an operating-system temporary directory.
+- Before integration, fetch the remote and incorporate the latest integration
+  branch. Run `npm run ci:local`. Never force-push an integration branch.
+- Before removal, verify task commits are contained in the latest remote
+  integration branch, the worktree has no uncommitted or valuable untracked
+  files, and no unfinished task is using it. If no remote exists, preserve the
+  worktree and report that integration cannot be verified remotely.
+- Prefer Codex-managed archival or cleanup. Run cleanup outside the target
+  worktree. Identify exact PIDs, commands, and ownership. Move idle sessions to
+  a stable directory or gracefully stop helpers owned only by the finished task.
+  A cwd reference alone does not make a task active. Never kill another task's
+  processes or the shared Codex host. Force-stop only confirmed leftover helpers.
+- After these checks, forced removal is allowed when disposable generated files
+  or stale references are the only blocker. Delete only merged task branches,
+  prune metadata, and verify directories, registrations, and task branches are gone.
+- Do not create another task or worktree just for cleanup. Preserve and report
+  actual unmerged work, unknown valuable files, and another active task.
+- At session start, completion, and after removal, check all accessible Codex
+  tasks across projects for `Current working directory missing` or a confirmed
+  nonexistent cwd on the owning host. Archive every match with
+  `set_thread_archived`, `archived: true`, exact task ID, and owning host.
+  The user authorizes this without completion checks, recovery, or confirmation.
+  Verify success. Preserve chat history, surviving files, and branches. Do not
+  recreate directories or replacement tasks. Host/permission errors are lookup
+  failures, not proof of a missing directory; report them accurately.
+
+## Source size and boundaries
+
+- Prefer source files below 600 lines. **800 lines is the maximum.** Split by
+  domain responsibility before exceeding the limit. Do not compress code to
+  evade it. `npm run check:lines` warns at 600 and fails above 800.
+- Configuration, generated migrations, lockfiles, and vendored skill resources
+  are exempt. The line checker still examines all first-party application,
+  shared-package, test, and script source, including untracked files.
+- Use TypeScript strict mode. Avoid `as any`, double casts, and `@ts-ignore`.
+  Use braces around conditionals. Prefer domain names to anonymous utility bags.
+- Browser code may import `@babel/contracts`. Never import `@babel/database`,
+  `@babel/auth`, provider clients, encryption keys, or credentials into the browser.
+- Keep `packages/*` reusable and server dependencies explicit. Share contracts
+  instead of re-declaring payloads in the web app and voice worker.
+
+## Product and security boundaries
+
+- Players use nickname listener sessions, without accounts or Cloudflare login.
+  Better Auth is for administrators authenticated by Cloudflare Access.
+- Protect `/admin`, nested admin pages, every `/api/management` operation, and
+  administrator auth endpoints. Verify JWT signature, issuer, application
+  audience, required identity claims, and time validity at the server boundary.
+  Never authorize an email header or a Better Auth cookie by itself.
+- Use HTTP polling for administration. Never add `/admin/ws` or an admin WebSocket.
+- Use same-origin checks for management mutations. Do not add a development
+  bypass or accept an arbitrary forwarded origin as a trusted configuration.
+- Keep languages empty and providers unavailable until implemented paths pass
+  validation. Never seed production languages or fabricate subtitles or players.
+- Authorize a new nickname generation only after confirming old subtitle and
+  media delivery have stopped. Fail closed while transport revocation is absent.
+- Keep original audio independent from transcription and translation. Select
+  Discord/DAVE and media dependencies only after live compatibility checks.
+- Encrypt dynamic provider secrets with a protected server key. Never return
+  saved secrets, log them, commit them, or include them in exports.
+
+## Interface and assets
+
+- Reuse established components and tokens. This scaffold follows Perohub's
+  PrimeVue/Aura conventions. Extend or extract shared controls across Babel
+  applications instead of making parallel button, input, select, or theme systems.
+- Reuse official brand logos and icons. Never invent, redraw, or approximate a
+  logo with text, CSS, custom artwork, or generated images. No official Babel
+  logo has been supplied; the page title is ordinary text.
+- The requested `better-interface` skill is installed at
+  `.agents/skills/better-interface/SKILL.md`. Use it for combined interface
+  reviews; use installed `better-*` domain skills for focused work.
+- Read `.impeccable.md` for the provisional design context. Keep interface copy
+  in Simplified Chinese and separate from selectable subtitle languages.
+
+## Validation and release
+
+- Run `npm run ci:local` for source changes. Run `npm run test:db` when changing
+  database behavior, using the disposable local PostgreSQL service.
+- Use the installed `test-audit` authoring gate for tests. Test observable
+  contracts and credible failure modes; do not mirror source or add test-only seams.
+- Update the README and relevant docs when behavior, commands, or limits change.
+  Record PASS, FAIL, NOT RUN, or WAITING FOR CONFIGURATION with evidence.
+- Use conventional commits and a coding-agent coauthor trailer. Do not create
+  a remote repository, publish a release, or deploy as part of scaffolding.
+- If GitHub Actions are added, follow Perohub's runner policy:
+  `[self-hosted, Linux, X64, ser7-homelab]`. Keep local/CI checks equivalent.
+- Production manifests belong in `../infra`; reuse public-edge, Access policy,
+  secrets, databases, and GitOps conventions. No new LoadBalancer without cause.

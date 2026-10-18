@@ -1,0 +1,26 @@
+{
+  "name": "@babel/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev --dotenv ../../.env --host 127.0.0.1",
+    "build": "nuxt build",
+    "prepare": "nuxt prepare",
+    "start": "node .output/server/index.mjs",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@babel/auth": "*",
+    "@babel/contracts": "*",
+    "@babel/database": "*",
+    "@primeuix/themes": "2.0.3",
+    "@primevue/nuxt-module": "4.5.4",
+    "better-auth": "1.7.10",
+    "drizzle-orm": "0.45.4",
+    "nuxt": "4.6.2",
+    "primevue": "4.5.4",
+    "vue": "3.5.44",
+    "zod": "4.6.7"
+  }
+}
