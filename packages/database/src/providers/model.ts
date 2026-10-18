@@ -15,6 +15,7 @@ export class ProviderConfigurationError extends Error {
       | 'INVALID_CONFIGURATION'
       | 'INVALID_AUDIO'
       | 'REQUEST_TOO_LARGE'
+      | 'TERMINOLOGY_CHANGED'
       | 'TYPE_IMMUTABLE'
       | 'TEST_IN_PROGRESS'
       | 'TEST_COOLDOWN'

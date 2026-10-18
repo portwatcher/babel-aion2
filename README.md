@@ -18,6 +18,8 @@ The administrator can also save encrypted Soniox/DeepL candidate configurations,
 run connection probes, replace credentials, and test/restore historical versions.
 An authorized PCM WAV sample can be recognized through Soniox and translated
 through DeepL for an administrator-only comparison of source and translated text.
+Administrators can edit versioned game terms and compare samples with or without
+their source and output-language terminology context.
 These candidates remain disabled for production subtitles; no live provider
 quality or Discord audio has been validated.
 
@@ -88,6 +90,7 @@ will run in a separate worker.
 | `npm run test:management:db` | Built servers + local PostgreSQL: signed admin login, encrypted room settings, conflicts, stop and removal                                                  |
 | `npm run test:providers:db`  | Built servers + local PostgreSQL: provider history, encrypted credentials, replacement and test leases; local provider fixtures                             |
 | `npm run test:samples:db`    | Built servers + local PostgreSQL: authorized WAV sample processing, transcript revisions, upload limits and stale-result rejection; local provider fixtures |
+| `npm run test:terms:db`      | Built servers + local PostgreSQL: terminology CRUD, aliases, concurrent edits, restart, pagination and redacted audit                                       |
 | `npm run db:generate`        | Generate a migration after schema changes                                                                                                                   |
 | `npm run db:migrate`         | Apply committed migrations using `.env`                                                                                                                     |
 | `npm run db:studio`          | Open the local schema browser using `.env`                                                                                                                  |
@@ -105,6 +108,7 @@ See [AGENTS.md](AGENTS.md) for worktree, cleanup, security, and interface rules.
 - [Room settings and protected Discord credentials](docs/room-configuration.md)
 - [Listener lifecycle and API](docs/listener-sessions.md)
 - [Providers and output languages](docs/providers-and-languages.md)
+- [Game terms and sample terminology context](docs/game-terms.md)
 - [Production deployment](docs/deployment.md)
 - [Operations, backup, and rollback](docs/operations.md)
 - [Validation and unfinished live checks](docs/test-report.md)

@@ -2,6 +2,7 @@
 definePageMeta({ middleware: 'administrator' })
 useHead({ title: '管理 · Babel' })
 const { status, loading, error, connect } = useAdministratorStatus()
+const terminologyVersion = ref<number | null>(null)
 </script>
 
 <template>
@@ -19,7 +20,8 @@ const { status, loading, error, connect } = useAdministratorStatus()
     <template v-else-if="status">
       <AdminRoomSettings />
       <AdminListeners />
-      <AdminProviders />
+      <AdminProviders :terminology-version="terminologyVersion" />
+      <AdminTerms @version="terminologyVersion = $event" />
       <section
         class="room-detail"
         :aria-busy="loading"

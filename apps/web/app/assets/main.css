@@ -305,6 +305,45 @@ small {
 .sample-segments {
   padding-inline-start: 1.5rem;
 }
+.check-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.term-expressions,
+.term-expression {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.term-expressions h4 {
+  margin: 0;
+}
+.term-expression {
+  padding-block-end: 16px;
+  border-bottom: 1px solid var(--babel-border);
+}
+.term-expression > button,
+.term-expressions > button {
+  justify-self: start;
+}
+.term-translations {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.term-translations > div {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.term-translations dd {
+  margin: 0;
+}
+.term-content,
+.term-translations dd {
+  overflow-wrap: anywhere;
+}
 .sample-segments li {
   margin-block: 1.5rem;
   overflow-wrap: anywhere;

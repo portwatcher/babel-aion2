@@ -63,6 +63,7 @@ export const providerTestCodeSchema = z.enum([
   'TIMEOUT',
   'UNAVAILABLE',
   'INVALID_RESPONSE',
+  'CONTEXT_TOO_LARGE',
 ])
 export const providerTestResultSchema = z.object({
   code: providerTestCodeSchema,

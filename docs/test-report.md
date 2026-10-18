@@ -1,6 +1,42 @@
 # Validation
 
-## Recognition adapter and audio-sample comparison — 2026-10-18
+## Editable terminology and sample context — 2026-10-18
+
+Administrators can now create, edit, disable, delete and search versioned game
+terms. Authorized sample comparisons can send enabled terms through Soniox and
+DeepL's documented context fields, preserving the source and translated text as
+returned. Context hints are not evidence that a provider used the intended term.
+The catalog starts empty and no production provider or language is enabled.
+
+| Check                                                  | Status                    | Evidence                                                                                                                                                                                                   |
+| ------------------------------------------------------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                               | PASS                      | `npm run ci:local`; 128 first-party source files, largest 494 lines, strict types, eight tests, web/migration/worker builds and unconfigured HTTP boundaries                                               |
+| Migration 0005                                         | PASS                      | Applied to disposable PostgreSQL 16; adds term tables and the empty catalog revision without seeded vocabulary                                                                                             |
+| Authenticated terminology HTTP                         | PASS                      | `npm run test:terms:db`; verified Access plus persisted session and same origin; invalid fields, control characters and oversized/chunked bodies rejected                                                  |
+| Persistent terms and concurrent edits                  | PASS                      | Two built processes share one catalog; source/alias collisions, concurrent creation and stale updates reject; restart preserves entries; delete/recreate cannot reuse an obsolete version                  |
+| Search and pagination                                  | PASS                      | 52 synthetic entries exercise 50-entry pages, literal percent-sign search and stale catalog-page rejection                                                                                                 |
+| Provider context and output-language separation        | PASS                      | `npm run test:samples:db`; loopback Soniox receives source terms without target expressions; DeepL receives only the selected target expression; disabled terms and comparisons without terms are excluded |
+| Sample revision and context limits                     | PASS                      | A catalog edit while translation is in flight rejects the old result with 409; excessive context rejects before provider requests; audits contain revisions without term, audio or transcript text         |
+| Unknown-language validation regressions                | PASS                      | Tests first reproduced acceptance of `und` as a term/output language; shared validation now rejects it, including sample requests before provider work                                                     |
+| Existing application regressions                       | PASS                      | `test:db` (seven tests), `test:http:db`, `test:ws:db`, `test:management:db` and `test:providers:db` on disposable PostgreSQL 16                                                                            |
+| Browser terminology workflow                           | PASS                      | Chrome with local signed identity: create three output expressions, reload in another tab, edit and disable; an older tab's save is refused and explicit reload shows the accepted revision                |
+| Literal text and narrow layout                         | PASS                      | Angle brackets render as text; populated term editor and all language fields fit a 320 px viewport with document width 320 px; captured console has no warning/error entries                               |
+| Live recognition, translation and terminology accuracy | NOT RUN                   | No real provider credentials or authorized battle samples; synthetic responses do not establish quality, latency or provider suitability                                                                   |
+| Discord reception and original audio                   | WAITING FOR CONFIGURATION | Dedicated bot exists; saved token location and guild/channel/commander IDs remain pending                                                                                                                  |
+| Shared live subtitles, PiP and full acceptance         | NOT RUN                   | No deployment by this task; media and live subtitle integration remain incomplete                                                                                                                          |
+
+Browser screenshots are retained under ignored local task artifacts. Vocabulary
+and provider responses are explicitly synthetic test fixtures. These checks do
+not constitute a complete accessibility audit or game compatibility assessment.
+The source specification files remain byte-identical. See [game terminology](game-terms.md)
+for the exact context-matching rules and processing bounds.
+
+Readiness regression: **PASS** on a built server and disposable PostgreSQL.
+Temporarily removing access to the terminology table, then to the initialized
+catalog row, each returned 503; restoring each returned 200. Local CI and the
+existing database-backed HTTP suite passed again after extending the probe.
+
+## Recognition adapter and audio-sample comparison — 2026-10-18 (historical)
 
 This stage adds Soniox recognition with token revisions and utterance endpoints,
 plus an administrator-only authorized WAV comparison using saved Soniox and

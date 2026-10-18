@@ -7,6 +7,8 @@ import {
 } from '@babel/contracts'
 import { providerFailure, providerTestLabel } from '~/utils/provider-feedback'
 
+defineProps<{ terminologyVersion: number | null }>()
+
 const providers = shallowRef<ProviderSummary[]>([])
 const protectionReady = ref(false)
 const busy = ref(false)
@@ -269,6 +271,7 @@ onBeforeUnmount(() => {
       />
     </div>
     <ProviderSample
+      :terminology-version="terminologyVersion"
       :providers="providers"
       :disabled="busy || !loaded || !protectionReady"
       @busy="busy = $event"

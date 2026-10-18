@@ -1,25 +1,16 @@
 import { z } from 'zod'
 import { providerTestCodeSchema } from './providers.ts'
+import { languageCodeSchema as language } from './languages.ts'
 
 const reference = z
   .object({ id: z.uuid(), version: z.number().int().positive() })
   .strict()
-const language = z
-  .string()
-  .min(2)
-  .max(35)
-  .refine((value) => {
-    try {
-      return new Intl.Locale(value).baseName === value
-    } catch {
-      return false
-    }
-  }, 'Use a canonical BCP 47 language code')
 export const providerSampleRequestSchema = z
   .object({
     recognition: reference,
     translation: reference,
     outputLanguage: language,
+    includeTerms: z.boolean().default(true),
     audioBase64: z
       .string()
       .min(1)
@@ -41,6 +32,7 @@ export const transcriptSchema = z.object({
 export const sampleSegmentSchema = transcriptSchema.extend({
   translatedText: z.string().max(16_384),
   translationRevision: z.number().int().nonnegative(),
+  translationTermCount: z.number().int().nonnegative(),
   failure: providerTestCodeSchema.exclude(['PASS']).nullable(),
 })
 export const providerSampleResultSchema = z.object({
@@ -51,6 +43,12 @@ export const providerSampleResultSchema = z.object({
   audioDurationMs: z.number().positive().max(10_000),
   elapsedMs: z.number().nonnegative(),
   segments: z.array(sampleSegmentSchema).max(32),
+  terminology: z
+    .object({
+      version: z.number().int().nonnegative(),
+      recognitionTermCount: z.number().int().nonnegative(),
+    })
+    .nullable(),
 })
 export type ProviderSampleRequest = z.infer<typeof providerSampleRequestSchema>
 export type ProviderSampleResult = z.infer<typeof providerSampleResultSchema>

@@ -3,22 +3,26 @@ import type {
   SampleSegment,
   SonioxSettings,
   DeepLSettings,
+  TerminologySnapshot,
 } from '@babel/contracts'
 import { translateDeepL } from './deepl.ts'
 import { ProviderFailure } from './errors.ts'
 import { transcribePcm, type PcmAudio } from './pcm.ts'
+import { recognitionTerminology, translationTerminology } from './terminology.ts'
 
 export async function previewSubtitleSample(input: {
   recognition: { settings: SonioxSettings; credential: string; version: number }
   translation: { settings: DeepLSettings; credential: string; version: number }
   outputLanguage: string
   audio: PcmAudio
+  terminology: TerminologySnapshot | null
 }): Promise<ProviderSampleResult> {
   const started = performance.now()
   const deadline = AbortSignal.timeout(30_000)
   const segments = new Map<string, SampleSegment>()
   let code: ProviderSampleResult['code'] = 'PASS'
   try {
+    const context = recognitionTerminology(input.terminology?.terms ?? [])
     await transcribePcm(
       input.recognition.settings,
       input.recognition.credential,
@@ -31,10 +35,12 @@ export async function previewSubtitleSample(input: {
           ...transcript,
           translatedText: '',
           translationRevision: 0,
+          translationTermCount: 0,
           failure: null,
         })
       },
       deadline,
+      context,
     )
     const finalized = [...segments.values()].filter(
       (segment) => segment.isFinal && segment.text.trim(),
@@ -46,6 +52,12 @@ export async function previewSubtitleSample(input: {
     // confirmed utterances once; do not treat provisional hypotheses as evidence.
     for (const segment of finalized) {
       try {
+        const terms = translationTerminology(
+          input.terminology?.terms ?? [],
+          segment.language,
+          input.outputLanguage,
+        )
+        segment.translationTermCount = terms.count
         segment.translatedText = await translateDeepL(
           input.translation.settings,
           input.translation.credential,
@@ -53,6 +65,7 @@ export async function previewSubtitleSample(input: {
             text: segment.text,
             sourceLanguage: segment.language,
             outputLanguage: input.outputLanguage,
+            context: terms.context,
           },
           deadline,
         )
@@ -73,5 +86,11 @@ export async function previewSubtitleSample(input: {
     audioDurationMs: input.audio.durationMs,
     elapsedMs: Math.round(performance.now() - started),
     segments: [...segments.values()],
+    terminology: input.terminology
+      ? {
+          version: input.terminology.version,
+          recognitionTermCount: input.terminology.terms.length,
+        }
+      : null,
   }
 }

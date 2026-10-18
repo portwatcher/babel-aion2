@@ -23,6 +23,7 @@ import {
   type StoredProvider,
   type ProtectedProvider,
 } from './model.ts'
+import { termCatalog } from '../schema/terms.ts'
 
 export { ProviderConfigurationError } from './model.ts'
 
@@ -398,12 +399,23 @@ export function createProviderService(
             throw new ProviderConfigurationError('VERSION_CONFLICT')
           }
         }
+        if (result.terminology) {
+          const [catalog] = await tx
+            .select()
+            .from(termCatalog)
+            .where(eq(termCatalog.id, 'global'))
+            .for('share')
+          if (!catalog || catalog.version !== result.terminology.version) {
+            throw new ProviderConfigurationError('TERMINOLOGY_CHANGED')
+          }
+        }
         await tx.insert(auditEvent).values({
           actorSubject: actor,
           action: 'provider.sample',
           metadata: {
             configurations: leased.map(({ id, version }) => ({ id, version })),
             code: result.code,
+            terminologyVersion: result.terminology?.version ?? null,
           },
         })
       })

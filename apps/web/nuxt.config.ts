@@ -39,7 +39,9 @@ export default defineNuxtConfig({
   },
   primevue: {
     options: { theme: { preset: Aura, options: { darkModeSelector: '.babel-dark' } } },
-    components: { include: ['Button', 'InputText', 'Select', 'Tag', 'Textarea'] },
+    components: {
+      include: ['Button', 'Checkbox', 'InputText', 'Select', 'Tag', 'Textarea'],
+    },
     directives: { include: [] },
     composables: { include: [] },
   },

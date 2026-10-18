@@ -6,11 +6,16 @@ import {
 } from '@babel/contracts'
 import { providerFailure, providerTestLabel } from '~/utils/provider-feedback'
 
-const props = defineProps<{ providers: ProviderSummary[]; disabled: boolean }>()
+const props = defineProps<{
+  providers: ProviderSummary[]
+  disabled: boolean
+  terminologyVersion: number | null
+}>()
 const emit = defineEmits<{ busy: [value: boolean] }>()
 const recognitionId = ref<string | null>(null)
 const translationId = ref<string | null>(null)
 const outputLanguage = ref('')
+const includeTerms = ref(true)
 const audio = shallowRef<File | null>(null)
 const previewUrl = ref('')
 const running = ref(false)
@@ -37,10 +42,20 @@ function selectAudio(event: Event) {
   result.value = null
   error.value = ''
 }
-watch([recognitionId, translationId, outputLanguage, () => props.providers], () => {
-  result.value = null
-  error.value = ''
-})
+watch(
+  [
+    recognitionId,
+    translationId,
+    outputLanguage,
+    includeTerms,
+    () => props.providers,
+    () => props.terminologyVersion,
+  ],
+  () => {
+    result.value = null
+    error.value = ''
+  },
+)
 async function preview() {
   if (running.value || props.disabled) {
     return
@@ -75,6 +90,7 @@ async function preview() {
           recognition: { id: recognition.id, version: recognition.version },
           translation: { id: translation.id, version: translation.version },
           outputLanguage: code,
+          includeTerms: includeTerms.value,
           audioBase64: btoa(binary),
         },
       }),
@@ -167,6 +183,21 @@ onBeforeUnmount(() => {
         aria-label="播放所选音频样本"
       />
     </div>
+    <div class="check-field">
+      <Checkbox
+        input-id="sample-terms"
+        v-model="includeTerms"
+        binary
+        :disabled="disabled || running"
+      />
+      <label for="sample-terms">使用已启用的游戏术语提示</label>
+    </div>
+    <small class="muted"
+      >启用后，词表内容也会发送给识别和翻译服务。可关闭此项对比效果。<a
+        href="#terms-title"
+        >管理术语表</a
+      ></small
+    >
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <div class="management-actions">
       <Button
@@ -191,6 +222,11 @@ onBeforeUnmount(() => {
         翻译版本 {{ result.translationVersion }} · 请求耗时
         {{ result.elapsedMs }} ms（不代表实战字幕延迟）</small
       >
+      <p v-if="result.terminology" class="muted">
+        词表版本 {{ result.terminology.version }} · 识别术语提示
+        {{ result.terminology.recognitionTermCount }} 项
+      </p>
+      <p v-else class="muted">本次未使用术语提示。</p>
       <ol class="sample-segments">
         <li v-for="segment in result.segments" :key="segment.utteranceId">
           <p class="muted">
@@ -207,7 +243,8 @@ onBeforeUnmount(() => {
             }}
           </p>
           <small class="muted"
-            >服务报告的样本时间：{{ segment.audioStartMs ?? '未知' }}–{{
+            >译文术语上下文 {{ segment.translationTermCount }} 项 ·
+            服务报告的样本时间：{{ segment.audioStartMs ?? '未知' }}–{{
               segment.audioEndMs ?? '未知'
             }}
             ms</small

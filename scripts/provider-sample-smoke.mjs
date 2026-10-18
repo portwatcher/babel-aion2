@@ -14,6 +14,9 @@ const pool = new Pool({ connectionString: databaseUrl })
 const servers = []
 const recognitionId = randomUUID()
 const translationId = randomUUID()
+const termId = randomUUID()
+const disabledTermId = randomUUID()
+const largeTermId = randomUUID()
 const recognitionKey = network.credential('speech')
 const translationKey = network.credential()
 const wave = syntheticWave()
@@ -68,6 +71,31 @@ async function result(response, expectedStatus = 200) {
 try {
   const server = await start()
   const auth = await identity.signIn(server)
+  const termInput = {
+    expectedVersion: 0,
+    sourceTerm: 'attack',
+    sourceLanguage: 'en',
+    alternatives: ['engage'],
+    category: 'Fixture-only action',
+    context: 'Local fixture, not confirmed game vocabulary.',
+    enabled: true,
+    expressions: [
+      { language: 'zh-Hant', text: '測試攻擊' },
+      { language: 'zh-Hans', text: '测试攻击' },
+      { language: 'ja', text: '試験攻撃' },
+    ],
+  }
+  const term = await result(
+    await request(server, auth, `/api/management/terms/${termId}`, 'PUT', termInput),
+  )
+  const disabledTerm = await result(
+    await request(server, auth, `/api/management/terms/${disabledTermId}`, 'PUT', {
+      ...termInput,
+      sourceTerm: 'disabled fixture term',
+      alternatives: [],
+      enabled: false,
+    }),
+  )
   const recognition = {
     name: '样本识别',
     expectedVersion: 0,
@@ -181,10 +209,21 @@ try {
     0,
     'Invalid input must not send audio or spend a provider request',
   )
+  assert.equal(
+    (await request(server, auth, path, 'POST', { ...input, outputLanguage: 'und' }))
+      .status,
+    400,
+    'An unknown output language must be rejected before provider work',
+  )
+  assert.equal(network.observations.length, 0)
   await pastCooldown()
   const preview = await result(await request(server, auth, path))
   assert.equal(preview.code, 'PASS')
   assert.equal(preview.audioDurationMs, 1000)
+  assert.deepEqual(preview.terminology, {
+    version: disabledTerm.version,
+    recognitionTermCount: 1,
+  })
   assert.deepEqual(
     preview.segments.map((segment) => segment.text),
     ['Do not attack', 'Wait 3 seconds.'],
@@ -209,6 +248,12 @@ try {
     ['fixture:ZH-HANT', 'fixture:ZH-HANT'],
   )
   const audioRequest = network.observations.find((value) => value.protocol === 'soniox')
+  assert.deepEqual(audioRequest.configuration.context.terms, ['attack', 'engage'])
+  assert.equal(
+    'translation_terms' in audioRequest.configuration.context,
+    false,
+    'Recognition uses source terms independently of the output language',
+  )
   assert.equal(
     audioRequest.audioDigest,
     createHash('sha256').update(wave.subarray(44)).digest('hex'),
@@ -234,6 +279,19 @@ try {
         value.body.source_lang === 'EN' && value.body.target_lang === 'ZH-HANT',
     ),
   )
+  for (const translated of translations) {
+    const context = JSON.parse(translated.body.context)
+    assert.deepEqual(context.terminology, [
+      {
+        source: 'attack',
+        alternatives: ['engage'],
+        output: '測試攻擊',
+        category: 'Fixture-only action',
+        context: 'Local fixture, not confirmed game vocabulary.',
+      },
+    ])
+  }
+  assert.ok(preview.segments.every((segment) => segment.translationTermCount === 1))
   const saved = (
     await pool.query(
       'select enabled, last_test from provider_configuration where id = any($1::uuid[])',
@@ -243,6 +301,24 @@ try {
   assert.ok(
     saved.every((value) => value.enabled === false && value.last_test === null),
     'Sample comparison neither enables a candidate nor overwrites connection-test evidence',
+  )
+
+  await pastCooldown()
+  const beforeOptOut = network.observations.length
+  const optOut = await result(
+    await request(server, auth, path, 'POST', { ...input, includeTerms: false }),
+  )
+  assert.equal(optOut.code, 'PASS')
+  assert.equal(optOut.terminology, null)
+  assert.ok(optOut.segments.every((segment) => segment.translationTermCount === 0))
+  assert.ok(
+    network.observations
+      .slice(beforeOptOut)
+      .every((observation) =>
+        observation.protocol === 'soniox'
+          ? observation.configuration.context === undefined
+          : observation.body.context === undefined,
+      ),
   )
 
   await pastCooldown()
@@ -266,6 +342,62 @@ try {
     failed.segments.every(
       (value) => value.failure === 'QUOTA_EXHAUSTED' && value.translatedText === '',
     ),
+  )
+
+  await pastCooldown()
+  network.setMode(translationKey, 'pass')
+  const termHold = network.hold(translationKey)
+  const pendingTerms = request(server, auth, path)
+  await Promise.race([
+    termHold.started,
+    setTimeout(5_000).then(() => {
+      throw new Error('Term snapshot sample did not reach translation')
+    }),
+  ])
+  await result(
+    await request(server, auth, `/api/management/terms/${termId}`, 'PUT', {
+      ...termInput,
+      expectedVersion: term.version,
+      context: 'Newer terminology snapshot',
+    }),
+  )
+  termHold.release()
+  const staleTerms = await result(await pendingTerms, 409)
+  assert.equal(staleTerms.data.code, 'TERMINOLOGY_CHANGED')
+
+  const largeInput = {
+    ...termInput,
+    sourceTerm: '界'.repeat(118) + 'zz',
+    alternatives: Array.from(
+      { length: 12 },
+      (_, index) => '界'.repeat(118) + String(index).padStart(2, '0'),
+    ),
+    context: '测'.repeat(400),
+  }
+  const largeTerm = await result(
+    await request(
+      server,
+      auth,
+      `/api/management/terms/${largeTermId}`,
+      'PUT',
+      largeInput,
+    ),
+  )
+  await pastCooldown()
+  const beforeLargeContext = network.observations.length
+  const largeContext = await result(await request(server, auth, path))
+  assert.equal(largeContext.code, 'CONTEXT_TOO_LARGE')
+  assert.equal(
+    network.observations.length,
+    beforeLargeContext,
+    'Reject oversized terminology before sending audio or text',
+  )
+  await result(
+    await request(server, auth, `/api/management/terms/${largeTermId}`, 'PUT', {
+      ...largeInput,
+      expectedVersion: largeTerm.version,
+      enabled: false,
+    }),
   )
 
   // The sample owns two configuration test slots. Validate the whole snapshot
@@ -322,10 +454,12 @@ try {
       [identity.actor],
     )
   ).rows
-  assert.equal(audits.length, 3)
+  assert.equal(audits.length, 5)
   assert.ok(
     audits.every(
-      (row) => Object.keys(row.metadata).sort().join(',') === 'code,configurations',
+      (row) =>
+        Object.keys(row.metadata).sort().join(',') ===
+        'code,configurations,terminologyVersion',
     ),
   )
   const auditText = JSON.stringify(audits)
@@ -333,6 +467,8 @@ try {
     recognitionKey,
     translationKey,
     'Do not attack',
+    '測試攻擊',
+    'Newer terminology snapshot',
     input.audioBase64,
   ]) {
     assert.equal(auditText.includes(privateValue), false)
@@ -340,7 +476,7 @@ try {
   const configuration = await (await fetch(`${second.origin}/api/player/config`)).json()
   assert.deepEqual(configuration.outputLanguages, [])
   console.log(
-    'PASS authenticated audio sample HTTP + PostgreSQL: bounded WAV input, paced PCM with preserved pauses, corrected/final utterances, honest timestamps, separate text translation, no-speech/quota outcomes, two-config leases, stale-result rejection and redacted audit. Speech responses and translations are local fixtures; live quality remains untested.',
+    'PASS authenticated audio sample HTTP + PostgreSQL: bounded WAV input, paced PCM and revisions, separate translation, versioned terminology context and opt-out, context limits, no-speech/quota outcomes, provider/term stale-result rejection and redacted audit. Speech responses, terms and translations are local fixtures; live quality remains untested.',
   )
 } finally {
   await network.close()
@@ -348,6 +484,10 @@ try {
   await pool.query('delete from provider_configuration where id = any($1::uuid[])', [
     [recognitionId, translationId],
   ])
+  await pool.query('delete from game_term where id = any($1::uuid[])', [
+    [termId, disabledTermId, largeTermId],
+  ])
+  await pool.query("update term_catalog set version = version + 1 where id = 'global'")
   await pool.query('delete from audit_event where actor_subject = $1', [identity.actor])
   await pool.query('delete from auth_user where id = $1', [identity.actor])
   await pool.end()

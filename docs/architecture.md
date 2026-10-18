@@ -29,6 +29,10 @@ duplicate tests across replicas and version checks reject late results.
 The audio-sample form holds two candidate test leases while Soniox recognizes
 a bounded authorized PCM WAV and DeepL translates stable original utterances.
 The result is restricted to the administrator and does not enable player delivery.
+The term editor persists a versioned catalog with source alternatives and separate
+output expressions. Sample processing reads one catalog snapshot, passes enabled
+entries as provider context, and checks the catalog revision before accepting a
+result. The original and translated text remain provider output.
 
 `apps/voice-worker` is a buildable entry point that reports STOPPED and exits.
 It has no Discord connection, lease, media publisher, or provider job. It must
@@ -45,6 +49,10 @@ subtitle output language.
 tables, rooms, global nickname generations, listener sessions, provider
 configurations and their encrypted revisions, output languages, audit events and
 player socket registrations.
+The terminology tables use a catalog row lock to serialize edits, prevent
+ambiguous aliases and make snapshots consistent. The catalog revision also supplies
+entry versions, preventing version reuse after deletion/recreation. Lists are
+paginated and reject obsolete page revisions. See [game terms](game-terms.md).
 Room settings use a row lock and optimistic version check. Credentials use
 AES-256-GCM with the room/provider ID and credential purpose as authenticated context;
 read APIs expose only credential presence. See [room settings](room-configuration.md).

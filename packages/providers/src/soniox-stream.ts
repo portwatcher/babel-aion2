@@ -6,6 +6,7 @@ import {
 } from '@babel/contracts'
 import { ProviderFailure, sonioxFailure } from './errors.ts'
 import { createSonioxTranscript, sonioxResponseSchema } from './soniox-transcript.ts'
+import type { RecognitionContext } from './terminology.ts'
 
 export function openSonioxStream(
   settings: SonioxSettings,
@@ -14,6 +15,7 @@ export function openSonioxStream(
     sampleRate: 16_000 | 48_000
     onTranscript: (value: Transcript) => void
     signal?: AbortSignal
+    context?: RecognitionContext
   },
 ) {
   if (
@@ -112,6 +114,7 @@ export function openSonioxStream(
           num_channels: 1,
           enable_endpoint_detection: true,
           enable_language_identification: true,
+          ...(options.context ? { context: options.context } : {}),
         }),
       )
       clearTimeout(deadline)

@@ -12,6 +12,7 @@ const labels: Record<ProviderTestCode, string> = {
   TIMEOUT: '连接测试超时',
   UNAVAILABLE: '服务暂时不可用',
   INVALID_RESPONSE: '服务响应不完整',
+  CONTEXT_TOO_LARGE: '术语上下文过大，请停用部分术语或关闭本次样本的术语提示',
 }
 export const providerTestLabel = (code: ProviderTestCode) => labels[code]
 
@@ -26,6 +27,9 @@ export function providerFailure(error: unknown) {
     }
     if (data.code === 'REQUEST_TOO_LARGE') {
       return '样本文件过大，请选择不超过 1 MB 的 WAV。'
+    }
+    if (data.code === 'TERMINOLOGY_CHANGED') {
+      return '术语表在处理期间已变化，请重新测试当前版本。'
     }
     if (data.code === 'CONNECTION_TEST_FAILED' && 'testCode' in data) {
       const code = providerTestCodeSchema.safeParse(data.testCode)

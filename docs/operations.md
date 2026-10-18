@@ -13,10 +13,14 @@ listener reconciliation sweep and closes it on server shutdown.
 Without database configuration the public lobby stays available; readiness and
 administrator sessions fail closed. No worker starts audio automatically.
 
-Apply migrations through `0004_bumpy_ma_gnuci` before this web build. Readiness
+Apply migrations through `0005_breezy_punisher` before this web build. Readiness
 checks room configuration columns, listener lifecycle columns and player socket
-registrations, provider test/history columns and administrator tables. Migration
+registrations, provider test/history columns, terminology tables, the initialized
+catalog revision and administrator tables. Migration
 0004 adds provider history and test leases without enabling a provider or language.
+Migration 0005 adds the empty terminology catalog and game-term table. Include both
+tables in the same database backup; catalog and entry versions must be restored
+together. No production term vocabulary is initialized.
 Migration 0003 adds room settings
 without enabling a source or adding credentials. Migration 0001 preserves old rows and marks their entry fingerprints as legacy, so
 they cannot be adopted by an unbound retry. Do not roll back or truncate nickname

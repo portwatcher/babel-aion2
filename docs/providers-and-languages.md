@@ -47,6 +47,8 @@ The server rejects invalid RIFF/chunk sizes, duplicate format/data chunks,
 compressed or stereo audio, unsupported sample rates and excessive duration.
 It bounds the JSON request to 1,400,000 bytes while reading, including chunked input.
 The sample operation has a total 30-second provider deadline.
+Sample language codes must identify an actual language; `und` is not an output
+choice. Recognition can still report `und` when source language is unknown.
 
 Audio is sent to Soniox in paced 20 ms frames; silence is retained. Text and
 sample-relative audio timestamps come from the provider. Final tokens accumulate
@@ -69,8 +71,14 @@ modify connection-test evidence, create a language or send anything to players.
 Audio reaches Soniox and recognized text reaches DeepL, so use authorized samples
 and expect provider charges. Babel keeps sample content only in request memory
 and the current page; it does not persist audio, transcript or translated text.
-The audit records only configuration IDs/versions and the safe result code.
+The audit records only configuration IDs/versions, the catalog revision when used,
+and the safe result code.
 Provider retention policies are separate from Babel's storage behavior.
+Samples use the enabled [game terminology catalog](game-terms.md) by default.
+The optional `includeTerms: false` request field disables its context for a
+comparison. Results identify the catalog revision and context entry counts;
+catalog changes during processing reject obsolete results. The context is sent
+to the relevant provider and remains separate from the actual text to translate.
 The browser can play the selected local file without uploading it until the
 administrator starts the test.
 

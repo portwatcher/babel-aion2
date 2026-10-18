@@ -2,6 +2,7 @@ import { setTimeout } from 'node:timers/promises'
 import type { SonioxSettings, Transcript } from '@babel/contracts'
 import { openSonioxStream } from './soniox-stream.ts'
 import { ProviderFailure } from './errors.ts'
+import type { RecognitionContext } from './terminology.ts'
 
 export interface PcmAudio {
   data: Uint8Array
@@ -77,6 +78,7 @@ export async function transcribePcm(
   audio: PcmAudio,
   onTranscript: (value: Transcript) => void,
   signal: AbortSignal,
+  context?: RecognitionContext,
 ) {
   const cancellation = new AbortController()
   const combined = AbortSignal.any([signal, cancellation.signal])
@@ -84,6 +86,7 @@ export async function transcribePcm(
     sampleRate: audio.sampleRate,
     onTranscript,
     signal: combined,
+    context,
   })
   try {
     await stream.ready
