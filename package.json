@@ -33,6 +33,7 @@
     "test:recovery:db": "node --env-file=.env scripts/worker-recovery-smoke.mjs && node --env-file=.env scripts/web-recovery-smoke.mjs",
     "test:pools:db": "node --env-file=.env scripts/database-pool-smoke.mjs",
     "test:restore:db": "node --env-file=.env scripts/backup-restore-smoke.mjs",
+    "test:rollback:images": "node scripts/release-rollback-smoke.mjs",
     "test:subtitles:db": "tsx --env-file=.env --test apps/voice-worker/test/subtitle-delivery.test.mjs",
     "test:management:db": "node --env-file=.env scripts/management-smoke.mjs",
     "test:providers:db": "node --env-file=.env scripts/provider-smoke.mjs",

@@ -1,5 +1,38 @@
 # Validation
 
+## Published-image rollback compatibility — 2026-10-19
+
+The new `test:rollback:images` command exercises the actual published Linux AMD64
+images for source `09bbb8bf88600df29edea0f0e63792aaa746129e` and
+`bbe9fc204d61b37a46284581416504bc172cb46e`. Their immutable digests match the
+two production release records. The check ran locally with CPU emulation and a
+disposable PostgreSQL 13.23 container; no production version or data was changed.
+
+| Check                                         | Result  | Evidence                                                                                                                                                                                                                                                    |
+| --------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Published runtime and migration compatibility | PASS    | Each image's own migration runner and default web entry run under UID 1000, read-only, with capabilities dropped. Database ownership belongs to a role without superuser, database-creation or role-creation privileges                                     |
+| Upgrade, rollback and forward recovery        | PASS    | Migration count advances from 1 to 12. Running the older migration runner on the upgraded database preserves all 12 records; returning to the current runner applies no duplicate migrations. All four web starts reach readiness and shut down with exit 0 |
+| Stored configuration                          | PASS    | Independent digests for 18 business/migration tables match across rollback. Process-owner rows are excluded because each process legitimately creates its own incarnation; all current owners close on normal exit                                          |
+| Restored application settings                 | PASS    | Current-image HTTP reads retain the configured room, terminology, empty provider/language lists and stopped state. A normal save retains the encrypted bot credential after forward recovery                                                                |
+| Administrator access                          | PASS    | The original test administrator cookie remains valid with the verified test Access identity across both images. Missing cookie, missing assertion and forged assertion remain denied                                                                        |
+| Live deployment rollback                      | NOT RUN | No production GitOps image change, active listener/media rollback or provider request was performed. The previous scaffold omits current features; operators must stop command delivery before considering that downgrade                                   |
+
+The first run stopped with HTTP 415 because the older sign-in endpoint requires
+JSON. The shared fixture now sends an explicit empty JSON object, preserving the
+normal authentication route. Database digests are shared with the existing
+backup/restore test instead of duplicating its storage comparison. No production
+endpoint, authentication flag or image modification was introduced. See
+[the rollback procedure](operations.md#release-rollback) for command inputs and
+the remaining production checks.
+
+Final `npm run ci:local` is PASS: 217 first-party source files, maximum 495 lines,
+formatting, strict types, 18 tests, builds and built HTTP smoke. The management
+and PostgreSQL backup/restore regressions also pass after the shared fixture
+changes. Test/support changes total +404/-22 lines; tooling adds one command.
+All rollback containers, temporary databases, registry credential directories and
+images downloaded for this exercise were removed. The authorized Discord preview
+remains active for its separate live speech check.
+
 ## Production web release — 2026-10-19
 
 PR #1 merged as `bbe9fc204d61b37a46284581416504bc172cb46e`. The existing

@@ -166,10 +166,38 @@ GitOps release method. Confirm schema compatibility first. Do not reverse a
 destructive migration without an explicit data recovery plan. Verify probes,
 Access boundaries, sessions, and live media after the rollback.
 
-Use only previously published, verified image references. An initial deployment
-has no earlier deployed Babel version to restore.
+Use only previously published, verified image references. The earlier scaffold
+does not implement the current listener and configuration features. A downgrade
+to that version requires stopped command delivery and an explicit plan to return
+to the current version; database compatibility alone does not preserve features.
 
-These implementation checks do not establish a production rollback. Local process
+Before a rollout, pull the previous and candidate published images using the
+approved registry access method. Keep registry credentials outside this repository.
+Set `BABEL_ROLLBACK_PREVIOUS_IMAGE` and `BABEL_ROLLBACK_CURRENT_IMAGE` to their
+immutable `@sha256:` references and run `npm run test:rollback:images`. Images
+must already be local and contain the release source-revision label. Docker is
+required. `BABEL_TEST_POSTGRES_IMAGE` selects the disposable database image and
+defaults to `postgres:13-alpine`; match the production server major.
+
+This command generates its own database credentials and does not load `.env`.
+It creates a disposable database owned by a non-superuser role, uses each image's
+own migration runner and starts the unmodified web entry points as UID 1000 with
+a read-only filesystem and dropped capabilities. It exercises the previous
+release, upgrade, rollback and forward recovery. Signed test Access assertions
+are supplied by the existing test-process JWKS preload; there is no production
+authentication bypass. The original administrator cookie must work across the
+sequence, while assertion-only, cookie-only and forged-assertion requests fail.
+
+The check compares all business/migration table digests across rollback, excluding
+process-owner rows that legitimately change at startup and shutdown. It also reads
+saved room and terminology settings through the application after forward recovery
+and retains the encrypted room credential through a normal save. It starts no
+Discord connection, seeds no production data and removes its containers and
+temporary database storage. Exact-image functional checks on an emulated CPU are
+not a native capacity measurement.
+
+These implementation checks do not establish a production GitOps rollback or
+live media recovery. Local process
 restart preserves the room's stopped state, configuration version, encrypted bot
 credential, administrator session and listener generations. Separate built-server
 checks also preserve provider versions and encrypted history across processes.
