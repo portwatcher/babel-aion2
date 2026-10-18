@@ -7,6 +7,9 @@ configurations. Soniox is a recognition candidate; DeepL is a separate text
 translation candidate. Every saved configuration stays `enabled: false` and the
 public language list stays empty. The UI distinguishes a connection test from
 speech/subtitle quality. There is no enable operation or player-defined endpoint.
+The separate [output-language editor](output-languages.md) references these
+candidates and persists version-bound sample validation, ordering and defaults.
+It cannot activate a language while player delivery remains unavailable.
 
 `@babel/providers` makes real protocol requests when used with real credentials.
 Local validation substitutes loopback HTTP/WebSocket servers only in test processes.

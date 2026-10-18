@@ -1,5 +1,9 @@
 import { sql } from 'drizzle-orm'
-import type { ProviderTestResult, TerminalReason } from '@babel/contracts'
+import type {
+  ProviderTestResult,
+  TerminalReason,
+  LanguageValidation,
+} from '@babel/contracts'
 import {
   bigint,
   boolean,
@@ -130,6 +134,16 @@ export const outputLanguage = pgTable('output_language', {
     () => providerConfiguration.id,
   ),
   pathValidatedAt: timestamp('path_validated_at', { withTimezone: true }),
+  version: integer('version').notNull().default(1),
+  pathVersion: integer('path_version').notNull().default(1),
+  includeTerms: boolean('include_terms').notNull().default(true),
+  validation: jsonb('validation').$type<LanguageValidation>(),
+  lastAttempt: jsonb('last_attempt').$type<LanguageValidation>(),
+})
+
+export const languageCatalog = pgTable('language_catalog', {
+  id: text('id').primaryKey(),
+  version: integer('version').notNull().default(0),
 })
 
 export const auditEvent = pgTable('audit_event', {

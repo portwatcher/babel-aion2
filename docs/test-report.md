@@ -1,6 +1,37 @@
 # Validation
 
-## Shared streaming subtitle processing — 2026-10-18
+## Output-language configuration and validation — 2026-10-18
+
+Administrators can prepare language paths, select service configurations and term
+policy, order languages, choose a default, and persist sample validation against
+the exact revisions used. The player language list remains empty and activation
+fails closed; live worker and player subtitle delivery are still unfinished.
+
+| Check                                 | Status                    | Evidence                                                                                                                                                                                                                      |
+| ------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                              | PASS                      | `npm run ci:local`; 147 first-party source files, maximum 494 lines, strict types, 14 tests, production builds and unconfigured HTTP boundaries                                                                               |
+| Migration 0006                        | PASS                      | Applied to fresh disposable PostgreSQL 16, adds language/catalog versions and validation metadata without seeded languages                                                                                                    |
+| Language administration HTTP          | PASS                      | `npm run test:languages:db`; verified Access plus matching session and same origin; canonical codes, input bounds, immutable provider roles and references                                                                    |
+| Validation persistence                | PASS                      | Built HTTP requests through actual loopback WebSocket/HTTP fixtures; stable source and translated text produce a revision-bound proof that survives restart; quota failure records the attempt and preserves the last success |
+| Stale evidence and concurrent editing | PASS                      | Two built processes race edits; provider and term revisions make old proof stale; replacing a path while its translation is held rejects the late sample with 409 and leaves the new path unvalidated                         |
+| Ordering, default and pagination      | PASS                      | Atomic adjacent move, stale default rejection, persisted default and deletion cleanup; 53 languages exercise 50-entry pages and reject an obsolete page version; delete/recreate cannot reuse an old entry version            |
+| Activation remains closed             | PASS                      | An unvalidated language returns PATH_UNVALIDATED; a successfully validated language returns DELIVERY_UNAVAILABLE; public languages remain empty                                                                               |
+| Privacy and provider deletion         | PASS                      | Language responses and audit omit credentials, audio and transcript text; a referenced provider cannot be deleted, and deletion succeeds after references are removed                                                         |
+| Database and related regressions      | PASS                      | `test:db` (seven tests), `test:http:db`, `test:ws:db`, `test:management:db`, `test:providers:db`, `test:samples:db`, `test:terms:db` on disposable PostgreSQL                                                                 |
+| Readiness dependency check            | PASS                      | Removing the initialized language catalog row, then hiding the output-language validation column, each returns 503; restoring each dependency returns 200                                                                     |
+| Browser language workflow             | PASS                      | Chrome with local signed identity: create canonicalized code and two paths, reorder, choose default, reload in another tab; stale save is refused and explicit reload shows the accepted name                                 |
+| Responsive layout and shared form     | PASS                      | Language editor and saved-path sample form fit a 320 px viewport/document width; both sample forms have distinct IDs; literal angle brackets remain text; no captured browser errors/warnings                                 |
+| Complete browser WAV upload/results   | NOT RUN                   | The existing Chrome file-URL permission limitation remains unresolved; sample form and HTTP upload/persistence were checked separately, without claiming a complete browser result                                            |
+| Real provider access and quality      | NOT RUN                   | All provider responses/audio in these checks are synthetic fixtures; no real provider credentials or authorized battle speech supplied                                                                                        |
+| Discord/audio/full acceptance         | WAITING FOR CONFIGURATION | Dedicated bot page verified; existing token cannot be viewed again. Saved token location and guild/channel/commander IDs remain pending. Media revocation, worker integration, player subtitles and PiP remain incomplete     |
+
+The new suite owns persisted language behavior at the built HTTP boundary; existing
+provider/sample suites own wire format and upload semantics. It introduces no
+production test switch or fake activation path. No deployment was made.
+`design.md` and `GOAL.md` remain byte-identical. Browser evidence is stored in
+ignored local task artifacts. See [output languages](output-languages.md).
+
+## Shared streaming subtitle processing — 2026-10-18 (historical)
 
 The administrator sample now runs recognition and translation concurrently through
 the shared source/language engine. This is executable processing used by the

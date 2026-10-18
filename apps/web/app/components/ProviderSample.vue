@@ -1,21 +1,35 @@
 <script setup lang="ts">
 import {
   providerSampleResultSchema,
+  languageSampleResultSchema,
+  type ManagedLanguage,
   type ProviderSampleResult,
   type ProviderSummary,
 } from '@babel/contracts'
 import { providerFailure, providerTestLabel } from '~/utils/provider-feedback'
+import { languageFailure } from '~/utils/language-feedback'
 
 const props = defineProps<{
   providers: ProviderSummary[]
   disabled: boolean
   terminologyVersion: number | null
+  path?: ManagedLanguage | null
 }>()
-const emit = defineEmits<{ busy: [value: boolean] }>()
+const emit = defineEmits<{
+  busy: [value: boolean]
+  validated: [value: ManagedLanguage]
+}>()
+const formId = useId()
 const recognitionId = ref<string | null>(null)
 const translationId = ref<string | null>(null)
 const outputLanguage = ref('')
 const includeTerms = ref(true)
+const effectiveRecognition = computed(
+  () => props.path?.recognitionConfigurationId ?? recognitionId.value,
+)
+const effectiveTranslation = computed(
+  () => props.path?.translationConfigurationId ?? translationId.value,
+)
 const audio = shallowRef<File | null>(null)
 const previewUrl = ref('')
 const running = ref(false)
@@ -50,6 +64,8 @@ watch(
     includeTerms,
     () => props.providers,
     () => props.terminologyVersion,
+    () => props.path?.code,
+    () => props.path?.pathVersion,
   ],
   () => {
     result.value = null
@@ -60,15 +76,19 @@ async function preview() {
   if (running.value || props.disabled) {
     return
   }
-  const recognition = props.providers.find((value) => value.id === recognitionId.value)
-  const translation = props.providers.find((value) => value.id === translationId.value)
+  const recognition = props.providers.find(
+    (value) => value.id === effectiveRecognition.value,
+  )
+  const translation = props.providers.find(
+    (value) => value.id === effectiveTranslation.value,
+  )
   if (!recognition || !translation || !audio.value || audio.value.size > 1_000_000) {
     error.value = '请选择识别、翻译配置和不超过 1 MB 的音频样本。'
     return
   }
   let code: string
   try {
-    code = new Intl.Locale(outputLanguage.value.trim()).baseName
+    code = props.path?.code ?? new Intl.Locale(outputLanguage.value.trim()).baseName
   } catch {
     error.value = '请输入有效的输出语言代码，例如 zh-Hans、ja 或 ko。'
     return
@@ -83,24 +103,41 @@ async function preview() {
     for (let offset = 0; offset < bytes.length; offset += 8192) {
       binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192))
     }
-    const response = providerSampleResultSchema.parse(
-      await $fetch<unknown, string>('/api/management/providers/sample', {
-        method: 'POST',
-        body: {
-          recognition: { id: recognition.id, version: recognition.version },
-          translation: { id: translation.id, version: translation.version },
-          outputLanguage: code,
-          includeTerms: includeTerms.value,
-          audioBase64: btoa(binary),
-        },
-      }),
-    )
+    let response: ProviderSampleResult
+    if (props.path) {
+      const validation = languageSampleResultSchema.parse(
+        await $fetch<unknown, string>(
+          `/api/management/languages/${props.path.code}/validate`,
+          {
+            method: 'POST',
+            body: { expectedVersion: props.path.version, audioBase64: btoa(binary) },
+          },
+        ),
+      )
+      response = validation.sample
+      if (!disposed) {
+        emit('validated', validation.language)
+      }
+    } else {
+      response = providerSampleResultSchema.parse(
+        await $fetch<unknown, string>('/api/management/providers/sample', {
+          method: 'POST',
+          body: {
+            recognition: { id: recognition.id, version: recognition.version },
+            translation: { id: translation.id, version: translation.version },
+            outputLanguage: code,
+            includeTerms: includeTerms.value,
+            audioBase64: btoa(binary),
+          },
+        }),
+      )
+    }
     if (!disposed) {
       result.value = response
     }
   } catch (failure) {
     if (!disposed) {
-      error.value = providerFailure(failure)
+      error.value = props.path ? languageFailure(failure) : providerFailure(failure)
     }
   } finally {
     running.value = false
@@ -117,19 +154,25 @@ onBeforeUnmount(() => {
 
 <template>
   <form class="entry-form provider-editor" @submit.prevent="preview">
-    <h3>音频样本测试</h3>
+    <h3>{{ path ? `验证样本路径：${path.name}` : '音频样本测试' }}</h3>
     <p class="muted">
-      使用已保存的识别与翻译配置处理一段授权样本，核对原文与译文。结果仅在此页展示，不会启用语言或发送给玩家。
+      使用已保存的识别与翻译配置处理一段授权样本，核对原文与译文。测试文字仅在此页展示，不会启用语言或发送给玩家。
+    </p>
+    <p v-if="path" class="muted">
+      输出 {{ path.code }} ·
+      {{
+        path.includeTerms ? '使用游戏术语提示' : '不使用游戏术语提示'
+      }}。验证状态会保存到此语言配置。
     </p>
     <p class="muted">
       音频会发送至 Soniox，识别文字会发送至
       DeepL，识别修订可能触发多次翻译并产生服务费用。请选择获授权的样本；服务器不保存音频或测试文字。
       处理期间会持续识别和翻译，结果在结束后显示。
     </p>
-    <div class="field">
-      <label for="sample-recognition">语音识别配置</label>
+    <div v-if="!path" class="field">
+      <label :for="`${formId}-recognition`">语音识别配置</label>
       <Select
-        input-id="sample-recognition"
+        :input-id="`${formId}-recognition`"
         v-model="recognitionId"
         :options="recognitionOptions"
         option-label="name"
@@ -138,10 +181,10 @@ onBeforeUnmount(() => {
         placeholder="选择 Soniox 候选"
       />
     </div>
-    <div class="field">
-      <label for="sample-translation">文本翻译配置</label>
+    <div v-if="!path" class="field">
+      <label :for="`${formId}-translation`">文本翻译配置</label>
       <Select
-        input-id="sample-translation"
+        :input-id="`${formId}-translation`"
         v-model="translationId"
         :options="translationOptions"
         option-label="name"
@@ -150,10 +193,10 @@ onBeforeUnmount(() => {
         placeholder="选择 DeepL 候选"
       />
     </div>
-    <div class="field">
-      <label for="sample-language">样本输出语言代码</label>
+    <div v-if="!path" class="field">
+      <label :for="`${formId}-language`">样本输出语言代码</label>
       <InputText
-        id="sample-language"
+        :id="`${formId}-language`"
         v-model="outputLanguage"
         :disabled="disabled || running"
         maxlength="35"
@@ -162,17 +205,17 @@ onBeforeUnmount(() => {
       />
     </div>
     <div class="field">
-      <label for="sample-audio">授权音频样本</label>
+      <label :for="`${formId}-audio`">授权音频样本</label>
       <input
-        id="sample-audio"
+        :id="`${formId}-audio`"
         type="file"
         accept=".wav,audio/wav"
         :disabled="disabled || running"
-        aria-describedby="sample-format"
+        :aria-describedby="`${formId}-format`"
         required
         @change="selectAudio"
       />
-      <small id="sample-format" class="muted"
+      <small :id="`${formId}-format`" class="muted"
         >0.2–10 秒，单声道 16 位 PCM WAV，16 或 48 kHz，最大 1 MB。测试最多等待 30
         秒。</small
       >
@@ -184,16 +227,16 @@ onBeforeUnmount(() => {
         aria-label="播放所选音频样本"
       />
     </div>
-    <div class="check-field">
+    <div v-if="!path" class="check-field">
       <Checkbox
-        input-id="sample-terms"
+        :input-id="`${formId}-terms`"
         v-model="includeTerms"
         binary
         :disabled="disabled || running"
       />
-      <label for="sample-terms">使用已启用的游戏术语提示</label>
+      <label :for="`${formId}-terms`">使用已启用的游戏术语提示</label>
     </div>
-    <small class="muted"
+    <small v-if="!path" class="muted"
       >启用后，词表内容也会发送给识别和翻译服务。可关闭此项对比效果。<a
         href="#terms-title"
         >管理术语表</a
@@ -205,7 +248,7 @@ onBeforeUnmount(() => {
         type="submit"
         label="识别并翻译样本"
         :loading="running"
-        :disabled="disabled || !recognitionId || !translationId || !audio"
+        :disabled="disabled || !effectiveRecognition || !effectiveTranslation || !audio"
       />
     </div>
     <div v-if="result" class="sample-result" aria-live="polite">

@@ -11,6 +11,14 @@ import { requireAdministratorSession } from './auth'
 import { useDatabase } from './database'
 import { roomCredentialCipher } from './management-configuration'
 
+export function useProviderService(event: H3Event) {
+  return createProviderService(
+    useDatabase(event),
+    roomCredentialCipher(event),
+    testProviderConnection,
+  )
+}
+
 export async function providerOperation<T>(
   event: H3Event,
   operation: (
@@ -20,50 +28,47 @@ export async function providerOperation<T>(
 ) {
   const { identity } = await requireAdministratorSession(event)
   try {
-    return await operation(
-      createProviderService(
-        useDatabase(event),
-        roomCredentialCipher(event),
-        testProviderConnection,
-      ),
-      administratorUserId(identity),
-    )
+    return await operation(useProviderService(event), administratorUserId(identity))
   } catch (error) {
-    if (error instanceof ProviderConfigurationError) {
-      const statuses = {
-        NOT_FOUND: 404,
-        VERSION_CONFLICT: 409,
-        INVALID_CONFIGURATION: 400,
-        INVALID_AUDIO: 400,
-        REQUEST_TOO_LARGE: 413,
-        TERMINOLOGY_CHANGED: 409,
-        TYPE_IMMUTABLE: 409,
-        TEST_IN_PROGRESS: 409,
-        TEST_COOLDOWN: 429,
-        PROVIDER_IN_USE: 409,
-        CONNECTION_TEST_FAILED: 422,
-      }
-      throw createError({
-        statusCode: statuses[error.code],
-        statusMessage: error.code,
-        data: {
-          code: error.code,
-          ...(error.testCode ? { testCode: error.testCode } : {}),
-        },
-      })
+    return providerConfigurationFailure(error)
+  }
+}
+
+export function providerConfigurationFailure(error: unknown): never {
+  if (error instanceof ProviderConfigurationError) {
+    const statuses = {
+      NOT_FOUND: 404,
+      VERSION_CONFLICT: 409,
+      INVALID_CONFIGURATION: 400,
+      INVALID_AUDIO: 400,
+      REQUEST_TOO_LARGE: 413,
+      TERMINOLOGY_CHANGED: 409,
+      TYPE_IMMUTABLE: 409,
+      TEST_IN_PROGRESS: 409,
+      TEST_COOLDOWN: 429,
+      PROVIDER_IN_USE: 409,
+      CONNECTION_TEST_FAILED: 422,
     }
-    if (error instanceof CredentialProtectionError) {
-      throw createError({
-        statusCode: 503,
-        statusMessage: 'Credential protection unavailable',
-      })
-    }
-    // Do not forward driver/transport error causes or credential-bearing parameters.
     throw createError({
-      statusCode: 503,
-      statusMessage: 'Provider configuration unavailable',
+      statusCode: statuses[error.code],
+      statusMessage: error.code,
+      data: {
+        code: error.code,
+        ...(error.testCode ? { testCode: error.testCode } : {}),
+      },
     })
   }
+  if (error instanceof CredentialProtectionError) {
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'Credential protection unavailable',
+    })
+  }
+  // Do not forward driver/transport error causes or credential-bearing parameters.
+  throw createError({
+    statusCode: 503,
+    statusMessage: 'Provider configuration unavailable',
+  })
 }
 
 export function providerId(event: H3Event) {

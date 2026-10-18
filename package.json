@@ -32,6 +32,7 @@
     "test:providers:db": "node --env-file=.env scripts/provider-smoke.mjs",
     "test:samples:db": "node --env-file=.env scripts/provider-sample-smoke.mjs",
     "test:terms:db": "node --env-file=.env scripts/term-catalog-smoke.mjs",
+    "test:languages:db": "node --env-file=.env scripts/output-language-smoke.mjs",
     "db:up": "docker compose up -d --wait postgres",
     "db:down": "docker compose down",
     "db:generate": "drizzle-kit generate --config packages/database/drizzle.config.ts",

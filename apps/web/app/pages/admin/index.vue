@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import type { ProviderSummary } from '@babel/contracts'
+
 definePageMeta({ middleware: 'administrator' })
 useHead({ title: '管理 · Babel' })
 const { status, loading, error, connect } = useAdministratorStatus()
 const terminologyVersion = ref<number | null>(null)
+const providers = shallowRef<ProviderSummary[]>([])
 </script>
 
 <template>
@@ -20,7 +23,14 @@ const terminologyVersion = ref<number | null>(null)
     <template v-else-if="status">
       <AdminRoomSettings />
       <AdminListeners />
-      <AdminProviders :terminology-version="terminologyVersion" />
+      <AdminProviders
+        :terminology-version="terminologyVersion"
+        @change="providers = $event"
+      />
+      <AdminLanguages
+        :providers="providers"
+        :terminology-version="terminologyVersion"
+      />
       <AdminTerms @version="terminologyVersion = $event" />
       <section
         class="room-detail"
@@ -44,7 +54,7 @@ const terminologyVersion = ref<number | null>(null)
           </div>
           <div>
             <dt>字幕语言</dt>
-            <dd>尚未配置</dd>
+            <dd>尚未开放</dd>
           </div>
         </dl>
       </section>

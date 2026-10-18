@@ -10,7 +10,8 @@
     "./credentials": "./src/credentials.ts",
     "./room-settings": "./src/room-settings.ts",
     "./providers": "./src/providers/index.ts",
-    "./terms": "./src/terms.ts"
+    "./terms": "./src/terms.ts",
+    "./languages": "./src/languages/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"

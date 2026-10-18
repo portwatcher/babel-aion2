@@ -33,6 +33,11 @@ The term editor persists a versioned catalog with source alternatives and separa
 output expressions. Sample processing reads one catalog snapshot, passes enabled
 entries as provider context, and checks the catalog revision before accepting a
 result. The original and translated text remain provider output.
+The output-language editor stores provider references, terminology policy, order
+and a room default. Sample validation binds to the path and provider/catalog
+revisions; stale results cannot validate a replacement path. Last successful
+proofs and latest attempts are separate. Activation remains unavailable until
+the worker-to-player path exists. See [output languages](output-languages.md).
 
 `apps/voice-worker` is a buildable entry point that reports STOPPED and exits.
 It has no Discord connection, lease, media publisher, or provider job. It must
@@ -106,7 +111,8 @@ See [provider configuration](providers-and-languages.md) for probe and sample li
    destination restrictions, connection probes, encrypted versions and audits
    and the administrator sample comparison are implemented; connection success
    alone does not validate a subtitle path or speech quality.
-   Add language-path configuration and validation before enabling any language.
+   Language-path configuration and persisted sample validation are implemented;
+   live provider evidence and authorized delivery are still required for activation.
 6. Connect the shared processing engine to the Discord worker and actual
    language demand, with source-generation fencing and independent reconnects.
    Runtime revision fencing, bounded translation queues and unused-stream release

@@ -24,6 +24,15 @@ export default defineEventHandler(async (event) => {
     if (catalog.rows.length !== 1) {
       throw new Error('Term catalog is missing')
     }
+    await useDatabase(event).execute(
+      sql`select version, path_version, validation, last_attempt, include_terms from output_language limit 1`,
+    )
+    const languages = await useDatabase(event).execute(
+      sql`select version from language_catalog where id = 'global'`,
+    )
+    if (languages.rows.length !== 1) {
+      throw new Error('Language catalog is missing')
+    }
     return { status: 'ok' }
   } catch {
     throw createError({

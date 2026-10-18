@@ -8,6 +8,7 @@ import {
 import { providerFailure, providerTestLabel } from '~/utils/provider-feedback'
 
 defineProps<{ terminologyVersion: number | null }>()
+const emit = defineEmits<{ change: [providers: ProviderSummary[]] }>()
 
 const providers = shallowRef<ProviderSummary[]>([])
 const protectionReady = ref(false)
@@ -29,6 +30,7 @@ async function load() {
     const response = providerListSchema.parse(await $fetch('/api/management/providers'))
     if (!disposed) {
       providers.value = response.configurations
+      emit('change', providers.value)
       protectionReady.value = response.credentialProtectionReady
       loaded.value = true
       editing.value = false
@@ -56,6 +58,7 @@ function accept(provider: ProviderSummary) {
     ...providers.value.filter((row) => row.id !== provider.id),
     provider,
   ]
+  emit('change', providers.value)
   if (editing.value && candidateId.value === provider.id) {
     selected.value = provider
   }
@@ -133,6 +136,7 @@ async function remove() {
     })
     if (!disposed) {
       providers.value = providers.value.filter((row) => row.id !== provider.id)
+      emit('change', providers.value)
       removing.value = null
       if (selected.value?.id === provider.id) {
         editing.value = false

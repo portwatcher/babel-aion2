@@ -22,6 +22,9 @@ Administrators can edit versioned game terms and compare samples with or without
 their source and output-language terminology context.
 Samples use the shared streaming processor: recognition and translation overlap,
 and obsolete revisions are cancelled before they can replace current text.
+Administrators can prepare output-language paths, order them, choose a default,
+and save sample validation tied to the exact provider and terminology revisions.
+Player-language activation stays unavailable until authorized delivery is implemented.
 These candidates remain disabled for production subtitles; no live provider
 quality or Discord audio has been validated.
 
@@ -93,6 +96,7 @@ will run in a separate worker.
 | `npm run test:providers:db`  | Built servers + local PostgreSQL: provider history, encrypted credentials, replacement and test leases; local provider fixtures                             |
 | `npm run test:samples:db`    | Built servers + local PostgreSQL: authorized WAV sample processing, transcript revisions, upload limits and stale-result rejection; local provider fixtures |
 | `npm run test:terms:db`      | Built servers + local PostgreSQL: terminology CRUD, aliases, concurrent edits, restart, pagination and redacted audit                                       |
+| `npm run test:languages:db`  | Built servers + local PostgreSQL: language paths, persisted validation, ordering/default, conflicts and fail-closed activation                              |
 | `npm run db:generate`        | Generate a migration after schema changes                                                                                                                   |
 | `npm run db:migrate`         | Apply committed migrations using `.env`                                                                                                                     |
 | `npm run db:studio`          | Open the local schema browser using `.env`                                                                                                                  |
@@ -110,6 +114,7 @@ See [AGENTS.md](AGENTS.md) for worktree, cleanup, security, and interface rules.
 - [Room settings and protected Discord credentials](docs/room-configuration.md)
 - [Listener lifecycle and API](docs/listener-sessions.md)
 - [Providers and output languages](docs/providers-and-languages.md)
+- [Output-language configuration and validation](docs/output-languages.md)
 - [Game terms and sample terminology context](docs/game-terms.md)
 - [Shared streaming subtitle processing](docs/streaming-subtitles.md)
 - [Production deployment](docs/deployment.md)
