@@ -5,7 +5,7 @@ import { promisify } from 'node:util'
 import pg from 'pg'
 import { until } from './media-worker.mjs'
 
-export async function isolatedDatabase() {
+export async function isolatedDatabase({ migrate = true } = {}) {
   const url = new URL(process.env.DATABASE_URL)
   assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))
   const admin = new pg.Client({ connectionString: url.toString() })
@@ -31,16 +31,18 @@ export async function isolatedDatabase() {
     await admin.end()
   }
   try {
-    await promisify(execFile)(
-      process.execPath,
-      ['packages/database/dist/migrate.mjs'],
-      {
-        env: { ...process.env, DATABASE_URL: url.toString() },
-        maxBuffer: 1_000_000,
-      },
-    ).catch(() => {
-      throw new Error('Disposable recovery database migration failed')
-    })
+    if (migrate) {
+      await promisify(execFile)(
+        process.execPath,
+        ['packages/database/dist/migrate.mjs'],
+        {
+          env: { ...process.env, DATABASE_URL: url.toString() },
+          maxBuffer: 1_000_000,
+        },
+      ).catch(() => {
+        throw new Error('Disposable recovery database migration failed')
+      })
+    }
     return { url: url.toString(), pool, close }
   } catch (error) {
     await close()

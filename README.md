@@ -138,6 +138,7 @@ runs in a separate worker.
 | `npm run test:network:db`    | Real Coturn UDP/TCP/TLS, UDP fallback, credential expiry and bounded ICE ports; requires Docker and OpenSSL, creates its own disposable database                                      |
 | `npm run test:recovery:db`   | Isolated PostgreSQL and built web/voice processes: SIGKILL, real socket release, blocked receipts, scoped recovery, old credentials and normal shutdown                               |
 | `npm run test:pools:db`      | Actual PostgreSQL connection budgets under concurrent web/worker requests, queue recovery and invalid startup settings                                                                |
+| `npm run test:restore:db`    | Real PostgreSQL custom-format backup/restore, configuration and credential recovery, and preserved uncertain transport receipts                                                       |
 | `npm run test:subtitles:db`  | Built web + real private worker HTTP/player WebSockets, isolated PostgreSQL and loopback provider protocols: shared PCM, language changes, source/provider replacement and revocation |
 | `npm run test:management:db` | Built servers + local PostgreSQL: signed admin login, encrypted room settings, conflicts, stop and removal                                                                            |
 | `npm run test:providers:db`  | Built servers + local PostgreSQL: provider history, encrypted credentials, replacement and test leases; local provider fixtures                                                       |

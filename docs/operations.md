@@ -101,6 +101,7 @@ To prove restoration in an isolated environment:
 1. Create a consistent PostgreSQL custom-format dump with `pg_dump` using the
    approved credential source. Do not put a production connection string in shell history.
 2. Restore with `pg_restore` into a separate database; do not overwrite a running room.
+   Keep it outside public routing and leave voice workers stopped during inspection.
 3. Run readiness and the relevant database-backed tests against that database.
 4. Verify configuration versions, stopped state and administrator session behavior.
    With the original protected key, confirm that saving a retained test credential
@@ -108,7 +109,44 @@ To prove restoration in an isolated environment:
 5. Record the release, migration version, duration, and evidence before using
    the procedure for disaster recovery.
 
-No production backup or restore was performed during scaffolding.
+Restoration does not provide transport-close evidence. A backup taken before a
+socket closes still contains its unconfirmed owner/receipt after restoration,
+even if the original database later recorded the close. Those rows must remain
+fail-closed until independent physical shutdown evidence is available. Do not
+clear them by age or mark them closed merely because a dump was restored.
+Also account for revocations written after the snapshot: a point-in-time backup
+does not contain that later history. Production recovery must fence the old
+services and outstanding credentials before exposing the restored application.
+Supervisor/host recovery and production disaster-recovery coordination remain
+unfinished; the local checks below do not establish those paths.
+
+`npm run test:restore:db` rehearses real custom-format dumps and restores using
+only generated local fixture data. It creates its own source and destination
+databases. Host `pg_dump`/`pg_restore` must match the server major version. For the
+local Compose service, use its matching tools instead:
+
+```sh
+BABEL_TEST_POSTGRES_CONTAINER=babel-local-postgres-1 npm run test:restore:db
+```
+
+The named container must be the disposable PostgreSQL service referenced by
+`DATABASE_URL`. Credentials pass through process environment, not command-line
+arguments. Custom-format dumps are mode 0600 in an ignored private temporary
+directory and are removed afterward. This test is not a production backup tool
+or encrypted backup-storage implementation.
+The fixture restores with ownership/ACL changes omitted into a database owned by
+its local test user. Production roles, grants and backup retention remain the
+private infra procedure's responsibility and need separate verification.
+
+The fixture exports one PostgreSQL snapshot for both the dump and independent
+table digests. It verifies all application/migration tables after restore, repeats
+migration safely, then starts the actual application. Checks include saved
+administrator sessions with mandatory Access, stopped rooms, encrypted room and
+provider settings/history, terminology and language validation revisions, and
+denial of a previously ended listener. A separate running-state snapshot retains
+an unconfirmed player receipt: nickname replacement stays JOINING while an
+unrelated nickname becomes ACTIVE. See [validation](test-report.md) for tested
+PostgreSQL versions. No production backup or restore has been rehearsed.
 
 `NUXT_PROVIDER_ENCRYPTION_KEY` protects saved Discord bot credentials and current
 and historical provider credentials. Generate

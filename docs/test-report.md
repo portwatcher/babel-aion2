@@ -1,5 +1,40 @@
 # Validation
 
+## Actual PostgreSQL backup restoration — 2026-10-19
+
+The restore rehearsal uses real `pg_dump -Fc` and `pg_restore` with matching
+server/tool major versions. Every source and destination is a disposable local
+database. Provider responses, audio and credentials are synthetic fixtures; no
+production data or live provider service is involved.
+
+| Check                                 | Result  | Evidence                                                                                                                                                                                                                                                           |
+| ------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| PostgreSQL 13 and 16                  | PASS    | `test:restore:db` passes on both server majors. Each run dumps a live state and a normally stopped state, then restores each into a separate empty database                                                                                                        |
+| Consistent full storage copy          | PASS    | A shared exported PostgreSQL snapshot supplies the dump and independent per-table digests. All 19 public/migration tables match exactly after restore; rerunning migrations preserves those digests                                                                |
+| Restored application                  | PASS    | Actual web/worker processes reach readiness and reproduce room/provider/history/terminology/language-validation reads. The previous administrator cookie remains usable with verified Access, and cookie-only access is denied                                     |
+| Credential recovery and stopped state | PASS    | A stopped room stays STOPPED. Retaining room/provider credentials succeeds with the original protected key; a wrong key cannot save the retained room credential or alter its version                                                                              |
+| Ended listener                        | PASS    | A listener that left before the stopped-state dump remains denied with HTTP 410 after restoration. A fresh entry reuses the nickname with a higher generation                                                                                                      |
+| Running-state snapshot                | PASS    | An actually open socket is captured in the live dump. After restoration, its receipt remains unconfirmed and duplicate-nickname entry remains JOINING. An unrelated nickname becomes ACTIVE, proving the block is scoped rather than general worker unavailability |
+| Production disaster recovery          | NOT RUN | Production backup storage/encryption, later revocation history, old-service fencing, orchestration receipts and release rollback remain separate gates                                                                                                             |
+
+Local CI is PASS: `npm run ci:local` checked 214 first-party sources, maximum
+495 lines, formatting, strict types, 18 tests, builds and built HTTP smoke.
+The separate PostgreSQL 13 regression is PASS: ten database cases and both actual
+worker/web process crash-recovery cases. This rehearsal uses the disposable
+database owner; production ownership and role grants were not restored or tested.
+
+The first fixture run used a nonexistent provider-detail GET route and stopped
+with 404. The fixture now reads the supported provider-list API; no production
+route was added. Terminal-state inspection uses the application's REMOVED state
+and the actual socket close event before making the stopped-state backup.
+The test owns dump/restore integrity and application behavior after restoration;
+existing suites retain provider protocol, cryptographic corruption and transport
+revocation ownership. No production test endpoint or fake close receipt was added.
+Temporary databases, mode-0600 dumps, the PostgreSQL 13 container and its newly
+pulled image were removed. The separate live Discord fixture remains active.
+Production/tooling adds one command line; tests and test support total +508/-11
+lines. Application runtime behavior is unchanged by this rehearsal.
+
 ## Database connection budgeting — 2026-10-19
 
 Web and voice runtimes now honor explicit per-pool limits. Each supervisor uses
