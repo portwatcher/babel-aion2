@@ -9,6 +9,11 @@ session, list, configuration and heartbeat events. Session credentials stay in
 per-tab storage and travel in the first WebSocket frame, never in a URL. Refresh
 and reconnect restore the original generation; replaced sessions never re-enter
 automatically. No sample players, language choices or subtitles are generated.
+A player action can open a feature-detected Document PiP window. Vue Teleport
+shares the existing listener's reactive status and text size with that document;
+there is no extra network client, session or media element. Session replacement,
+leave, page navigation and listener-component disposal close the window. Actual
+subtitle content still needs the authorized delivery path described below.
 Unavailable media holds all new sessions in JOINING; entry returns 202 with a
 migrated database, or 503 without database configuration.
 
@@ -117,8 +122,9 @@ See [provider configuration](providers-and-languages.md) for probe and sample li
    language demand, with source-generation fencing and independent reconnects.
    Runtime revision fencing, bounded translation queues and unused-stream release
    are implemented and exercised by the sample path and local protocol tests.
-7. Add feature-detected Document PiP from a player action, sharing the same
-   listener session and audio output. Test actual game display modes.
+7. Connect real subtitle content to the implemented Document PiP status window.
+   Verify its native rendering, background updates, single audio output and actual
+   game display modes. See [PiP scope and evidence](picture-in-picture.md).
 8. Complete deployment, transport, restore, rollback, and real-network evidence
    from `design.md`. Optional character lookup remains outside core delivery.
 

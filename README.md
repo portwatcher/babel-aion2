@@ -9,8 +9,10 @@ requirements are preserved verbatim in [design.md](design.md) and [GOAL.md](GOAL
 Listener storage, HTTP operations and player WebSockets implement atomic global
 nickname replacement, idempotent entry, browser restoration, language subscription
 metadata, removal and reconciliation. The browser preserves its current session
-across refresh/reconnection and stops after replacement. Live Discord audio, media
-revocation, the complete subtitle pipeline and PiP remain unfinished.
+across refresh/reconnection and stops after replacement. A feature-detected
+Document PiP window shares the page's current subtitle/connection status and text
+size; it does not open another listener session or media connection. Live Discord
+audio, media revocation and the complete subtitle pipeline remain unfinished.
 Administrators can save versioned room/Discord settings, protect the bot credential
 with server-side encryption, persist a stopped room, and remove a specific listener
 generation. Saving these settings does not connect Discord or enable audio.
@@ -117,6 +119,7 @@ See [AGENTS.md](AGENTS.md) for worktree, cleanup, security, and interface rules.
 - [Output-language configuration and validation](docs/output-languages.md)
 - [Game terms and sample terminology context](docs/game-terms.md)
 - [Shared streaming subtitle processing](docs/streaming-subtitles.md)
+- [Player subtitle window and browser limits](docs/picture-in-picture.md)
 - [Production deployment](docs/deployment.md)
 - [Operations, backup, and rollback](docs/operations.md)
 - [Validation and unfinished live checks](docs/test-report.md)

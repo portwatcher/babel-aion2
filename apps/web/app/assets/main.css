@@ -146,11 +146,28 @@ small {
   margin-bottom: 0;
   overflow-wrap: anywhere;
 }
-.subtitle-empty {
+.listener-subtitles {
   display: grid;
   gap: 8px;
   padding-block: 20px;
   border-block: 1px solid var(--babel-border);
+}
+.subtitle-message {
+  font-size: var(--subtitle-text-size, 1.25rem);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.subtitle-context {
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.subtitle-pip-page {
+  min-width: 0;
+  padding: 16px;
+}
+.listener-subtitles-compact {
+  padding: 0;
+  border: 0;
 }
 .session-notice,
 .session-feedback {

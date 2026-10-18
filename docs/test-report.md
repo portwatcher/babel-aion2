@@ -1,6 +1,27 @@
 # Validation
 
-## Output-language configuration and validation — 2026-10-18
+## Player subtitle window and Discord credential check — 2026-10-18
+
+The player panel now owns a feature-detected Document PiP presentation with shared
+reactive status and text size. It is a status window until authorized live
+subtitles are connected; this does not establish the full PiP/audio acceptance gate.
+
+| Check                                      | Status                    | Evidence                                                                                                                                                                      |
+| ------------------------------------------ | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                   | PASS                      | `npm run ci:local`; 149 source files, maximum 494 lines, strict types, 14 existing tests, production builds and HTTP smoke                                                    |
+| Browser open/close and keyboard activation | PASS                      | Built app in Chrome on macOS: click and Enter complete `requestWindow`, owner control changes to close, and closing returns to the open control without ending the listener   |
+| Shared listener identity                   | PASS                      | Real PostgreSQL retains one current listener generation and one open socket after opening/closing PiP; no separate listener entry is created                                  |
+| Text size and narrow layout                | PASS                      | Main-page extra-large status computes to 32 px; complete controls fit 320 px; no captured browser warnings/errors                                                             |
+| Replacement and explicit exit UI           | PASS                      | Another actual browser entry replaces the old generation, displays the required terminal message and removes its listener panel; explicit leave also removes the panel        |
+| Native PiP rendering and physical close    | NOT RUN                   | Native-app capture failed; browser read-only DOM inspection cannot access the separate PiP document. Main-page lifecycle state alone is not proof of native pixels or closure |
+| Live subtitles, background audio and AION2 | NOT RUN                   | No live source/media adapter or authorized player subtitle delivery; no actual game/display-mode or player-network test                                                       |
+| Discord credential                         | PASS                      | User-generated bot token saved only in ignored local `.env` with mode 0600; Discord `GET /users/@me` returns 200 and confirms the dedicated bot identity                      |
+| Discord guild/voice receive                | WAITING FOR CONFIGURATION | `GET /users/@me/guilds` returns 200 with an empty list; bot installation, target voice channel and commander selection are pending                                            |
+
+No credentials are included in source, this report or browser screenshots. No
+production deployment was made. See [PiP implementation and limits](picture-in-picture.md).
+
+## Output-language configuration and validation — 2026-10-18 (historical)
 
 Administrators can prepare language paths, select service configurations and term
 policy, order languages, choose a default, and persist sample validation against
