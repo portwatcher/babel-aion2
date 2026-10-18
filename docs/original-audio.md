@@ -17,7 +17,8 @@ version had security advisories. The codec and Discord versions stay pinned.
 
 ## Configuration and control
 
-Apply migrations through `0009_mysterious_phantom_reporter`. Web and worker share
+Apply migrations through `0011_tough_psylocke`, including runtime ownership and
+player-connection ownership. Web and worker share
 PostgreSQL and the private media-control secret described in
 [media admission](media-admission.md). Give the worker `PROVIDER_ENCRYPTION_KEY`
 with exactly the same protected value as web's `NUXT_PROVIDER_ENCRYPTION_KEY`.
@@ -69,7 +70,7 @@ public ICE/TURN and actual player networks remain separate integration gates.
 
 ## Audio processing
 
-Each selected Discord user has a separate Opus decoder and receive stream.
+Each captured Discord user has a separate Opus decoder and receive stream.
 Leaving the channel removes the stream and its queued sound; re-entry can create
 a fresh stream. Member IDs identify sources even when display names match.
 Audio already mixed inside one member's client remains a single source.
@@ -82,9 +83,12 @@ averaged for playback, and explicit silence retains pauses. Each packet contains
 960 samples per channel and is encoded as Opus for receive-only WebRTC.
 RTP timestamps use the 48 kHz timeline and preserve an interruption's time gap.
 
-The recognition branch is not connected yet. When integrated, it must consume
-each member's PCM separately, before playback mixing, and cannot block this path.
-No speech recording or persistent audio file is created by the receiver.
+The recognition branch consumes each member's PCM separately, before playback
+mixing. It creates shared recognition and language-specific translation work only
+for configured, validated paths with listener demand. Provider failure does not
+stop original audio. Source retirement closes both branches and clears their
+queues. See [shared subtitle processing](streaming-subtitles.md). No speech
+recording or persistent audio file is created by the receiver.
 
 ## Reproducible checks
 
@@ -99,7 +103,9 @@ It verifies room isolation, decoder output, source retirement, OS UDP socket
 release, and a real database-lock race against a pending negotiation. No test-only
 publication endpoint or simulated close receipt is installed in production.
 
-Real Discord-to-browser receipt, simultaneous members, member re-entry and DAVE
-changes, Linux live reception, background/game use and latency/capacity need their
-own recorded evidence. Synthetic PCM and a connected browser alone do not prove
-those requirements.
+Isolated single-member Discord receipt and re-entry have passed. The integrated
+application still needs real Discord-to-browser receipt, simultaneous members,
+member re-entry and DAVE changes, Linux live reception, background/game use and
+latency/capacity evidence. Synthetic PCM and a connected browser alone do not
+prove those requirements. See the [current acceptance status](test-report.md#current-acceptance-status--2026-10-19)
+for the distinction between implementation, isolated checks and production use.

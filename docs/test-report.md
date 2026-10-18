@@ -1,5 +1,50 @@
 # Validation
 
+## Current acceptance status — 2026-10-19
+
+The complete `design.md` delivery is unfinished. Production runs web source
+`bbe9fc204d61b37a46284581416504bc172cb46e`; the later documentation and
+rollback-rehearsal changes through `91f1374` do not change that runtime.
+The dated reports below retain the conditions of each run. A local or isolated
+PASS applies only to that named check, not automatically to production.
+
+| Acceptance area                              | Result                    | Evidence and remaining dependency                                                                                                                                                                                           |
+| -------------------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web release and access boundaries            | PASS                      | Two production web replicas, 12 migrations, public browser/assets and direct-origin rejection checks passed; see the production release report below                                                                        |
+| Local listener, media and subtitle contracts | PASS                      | Built application suites cover nickname replacement, actual peer closure, per-member PCM, shared subtitle transport and child-process recovery; live provider responses are not part of these proofs                        |
+| Production voice delivery                    | WAITING FOR CONFIGURATION | Private infra still needs the long-running voice worker, authenticated control routing, public TURN/firewall configuration and database pool budgets                                                                        |
+| Integrated real speech                       | NOT RUN                   | Isolated single-member DAVE receipt/re-entry passed. The integrated preview is connected but its current run has zero received frames and zero browser audio energy; fresh speech and simultaneous members are still needed |
+| Live subtitle quality                        | WAITING FOR CONFIGURATION | Soniox/DeepL settings and validation are implemented. Authorized credentials and representative commands are needed to validate each chosen output language                                                                 |
+| Native window and game use                   | NOT RUN                   | Browser controls and shared subtitle state passed; the Mac is locked for native inspection. Background audio and the actual AION2 display mode need an accessible test device                                               |
+| Deployed latency and capacity                | NOT RUN                   | Requires production voice transport, actual source/playback devices and player networks, including the intended mainland-China connection; synthetic loopback timing is not end-to-end evidence                             |
+| Production disaster recovery                 | NOT RUN                   | Child-process recovery, isolated database restore and published-image rollback passed. Supervisor/container/host-loss fencing and actual production restore/rollback remain outstanding                                     |
+
+Empty production provider and language lists are intentional and do not block
+the web release or original-audio deployment. Optional character enrichment is
+disabled under the source policy recorded below; nickname entry remains available.
+
+This status reconciliation changes documentation only. `npm run ci:local` is
+PASS: 217 first-party sources, maximum 495 lines, formatting, strict types,
+18 tests, builds and built HTTP smoke. Documentation targets resolve and the
+changed text contains no configured local secrets. `design.md` and `GOAL.md`
+remain identical.
+
+## Optional character source probe — 2026-10-19
+
+The public [homepage](https://aion2index.com/) returned HTTP 200 and
+`text/html; charset=utf-8` to an identified Babel compatibility request. Its
+actual HTML contains a GET search form with action `/search`, field `q`, and a
+`region` field. Public profile links use paths such as `/c/as/israphel/kbbb`,
+and the homepage and [about page](https://aion2index.com/about) identify the
+dataset as AION 2 Global with Asia among its regions.
+
+The source's [robots.txt](https://aion2index.com/robots.txt) returned HTTP 200
+and disallows `/search` and `/api/` for all crawlers. Automated nickname lookup
+was therefore stopped before sending a search request. Its result is **NOT RUN
+(source access policy)**, not a successful query with no matches or an HTTP 403.
+No character ID or server match is asserted. Enrichment needs a permitted data
+path before implementation can be enabled; it must not affect nickname admission.
+
 ## Published-image rollback compatibility — 2026-10-19
 
 The new `test:rollback:images` command exercises the actual published Linux AMD64
@@ -721,30 +766,34 @@ was applied. This is not a claim that the entire dependency graph is vulnerabili
 
 ## External inputs for later live checks
 
-- Discord bot/guild/channel/commander configuration and permission to run a live audio test.
-- A selected, revocation-tested media service and its approved server credentials.
-- Selected provider credentials and authorized battle-command samples for subtitle quality tests.
-- Real supported browser, AION2 display mode, and player network access for end-to-end checks.
+- Private infra configuration for the production voice worker, existing TURN
+  service, network rules, database budgets and orchestration recovery evidence.
+- Fresh speech in the already configured Discord test channel, including a
+  second speaking member for source separation. The existing all-channel mode
+  does not require a commander-ID list; the local bot credential is already saved.
+- Selected provider credentials and authorized battle-command samples for
+  language-specific quality checks after configuration.
+- An unlocked supported browser/device, the actual AION2 display mode, and player
+  network access for native-window, background, end-to-end and capacity checks.
 
-These inputs are not blockers for the requested scaffold. Production language
-selection remains reserved until validated processing paths exist.
+Werift has already been selected and local revocation/relay checks passed. These
+inputs concern the remaining production and live acceptance work; the shipped
+web application can keep its language list empty until paths are validated.
 
 ## Git and task cleanup
 
-The project started as an empty directory and was initialized as a Git repository.
-Application files were authored and validated in the Codex-managed
-`babel-scaffold` worktree and published to the private `portwatcher/babel-aion2`
-repository. After task commits are verified on the latest `origin/main`, the
-task worktree can be archived through Codex. Other active task worktrees must
-be preserved. Infrastructure changes use the existing infra checkout explicitly
-selected by the owner; no separate infra repository was created.
+The implementation, web-release evidence and published-image rollback rehearsal
+are merged in application PRs #1–#3. The existing private release workflow made
+the production web/migration image update. Voice infrastructure changes remain
+pending; the infra primary checkout has not been edited by this implementation.
 
-The active `babel-implementation` worktree contains the subsequent listener and
-room-administration work. Its branch incorporates the release documentation from
-`origin/main` at `528ac38`; these task commits remain unmerged and the worktree is
-preserved. This implementation task has not changed production infrastructure.
+The Codex-managed `babel-implementation` worktree remains in use by the unfinished
+live-audio preview. Its local credential and test evidence are ignored by Git.
+Rehearsal containers, databases, temporary registry credentials and downloaded
+images were removed. Final preview/worktree cleanup follows completion of the
+remaining live work and remote integration verification; other tasks are preserved.
 
-Temporary preview and container processes are stopped at completion. Local task
-records and the accessible chat list were checked for missing working directories;
-no confirmed missing local directory was found. Remote-host path existence was
-not independently verified by a remote filesystem probe.
+The current local directory check covered 75 unarchived task records and found
+no missing paths or lookup errors. The accessible app task list reported no
+unavailable host or source. Remote-host path existence was not independently
+verified by a remote filesystem probe.

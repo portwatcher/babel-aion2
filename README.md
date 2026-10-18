@@ -6,6 +6,11 @@ private today and prepared for eventual open source.
 The player interface is a dark, low-distraction battle panel. The original
 requirements are kept in sync in [design.md](design.md) and [GOAL.md](GOAL.md).
 
+The website is deployed at [babel.juryquinn.com](https://babel.juryquinn.com/).
+Production voice delivery remains unfinished. The
+[current acceptance status](docs/test-report.md#current-acceptance-status--2026-10-19)
+separates shipped web behavior, local proofs and outstanding live checks.
+
 Listener storage, HTTP operations and player WebSockets implement atomic global
 nickname replacement, idempotent entry, browser restoration, language subscription
 metadata, removal and reconciliation. The browser preserves its current session
