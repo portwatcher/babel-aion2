@@ -102,6 +102,10 @@ See [provider configuration](providers-and-languages.md) for probe and sample li
 2. Select and prove a browser media transport, including old-token revocation,
    active-connection removal, and reconnect authorization. Keep command delivery
    disabled until revocation can be confirmed. No media SDK has been selected yet.
+   Local [candidate checks](media-compatibility.md) reject the native wrtc runtime
+   cleanup and self-hosted LiveKit removal as a complete revocation method. Werift
+   passes synthetic local transport/browser decoding; application admission,
+   source fencing and actual-network proof are still required.
 3. Connect the implemented idempotent entry and global nickname transactions to
    real transport revocation. The coordinator already calls revocation outside
    transactions and checks the current session/generation before authorization.

@@ -1,0 +1,20 @@
+{
+  "name": "babel-media-validation",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "scripts": {
+    "test": "node run.mjs werift",
+    "browser": "node browser-server.mjs",
+    "check:wrtc": "node run.mjs wrtc",
+    "check:livekit": "node run.mjs livekit"
+  },
+  "dependencies": {
+    "@livekit/rtc-node": "1.1.0",
+    "@roamhq/wrtc": "0.10.0",
+    "livekit-server-sdk": "2.19.1",
+    "werift": "0.25.1"
+  }
+}

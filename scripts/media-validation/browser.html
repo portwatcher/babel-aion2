@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Babel · 本地媒体验证</title>
+  <style>
+    body {
+      font: 18px/1.5 system-ui;
+      max-width: 50rem;
+      margin: 2rem auto;
+      padding: 1rem;
+    }
+    button {
+      font: inherit;
+      margin: 0.5rem 0.5rem 0.5rem 0;
+    }
+    pre {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+  </style>
+  <h1>本地媒体兼容性验证</h1>
+  <p>
+    合成 440 Hz 音频，静音解码。不连接 Discord，不测试真实指挥、会话凭据或网络覆盖。
+  </p>
+  <button id="start">开始接收（静音）</button>
+  <button id="stop" disabled>关闭服务端连接</button>
+  <audio id="audio" controls muted></audio>
+  <pre id="state" aria-live="polite">尚未连接</pre>
+  <script type="module">
+    const status = document.querySelector('#state')
+    const audio = document.querySelector('#audio')
+    const start = document.querySelector('#start')
+    const stop = document.querySelector('#stop')
+    let peer, id, answer, timer, context, analyser
+    let decodedRmsPeak = 0
+    let serverClosed = null
+    let replayStatus = null
+    let closedAt = null
+    let lastPackets = 0
+    let stableSince = 0
+    let reading = false
+
+    async function post(path, body) {
+      return fetch(path, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body || {}),
+      })
+    }
+    async function show() {
+      if (reading) {
+        return
+      }
+      reading = true
+      try {
+        const reports = await peer.getStats()
+        const inbound = [...reports.values()].find(
+          (report) => report.type === 'inbound-rtp' && report.kind === 'audio',
+        )
+        let decodedRms = 0
+        if (analyser) {
+          const values = new Float32Array(analyser.fftSize)
+          analyser.getFloatTimeDomainData(values)
+          decodedRms = Math.sqrt(
+            values.reduce((sum, value) => sum + value * value, 0) / values.length,
+          )
+          decodedRmsPeak = Math.max(decodedRmsPeak, decodedRms)
+        }
+        const packets = inbound?.packetsReceived || 0
+        if (lastPackets !== packets) {
+          stableSince = performance.now()
+        }
+        lastPackets = packets
+        const packetsStopped =
+          closedAt !== null &&
+          performance.now() - Math.max(closedAt, stableSince) > 2000
+        status.textContent = JSON.stringify(
+          {
+            result:
+              packetsStopped &&
+              packets > 50 &&
+              decodedRmsPeak > 0.001 &&
+              decodedRms < 0.0001 &&
+              replayStatus === 404 &&
+              serverClosed?.state === 'closed'
+                ? 'PASS'
+                : 'RUNNING',
+            connection: peer.connectionState,
+            receiveDirection: peer.getTransceivers()[0]?.currentDirection,
+            packetsReceived: packets,
+            bytesReceived: inbound?.bytesReceived,
+            decodedRms,
+            decodedRmsPeak,
+            packetsStopped,
+            audioElements: document.querySelectorAll('audio').length,
+            muted: audio.muted,
+            serverClosed,
+            oldAnswerReplayStatus: replayStatus,
+          },
+          null,
+          2,
+        )
+      } finally {
+        reading = false
+      }
+    }
+    start.onclick = async () => {
+      start.disabled = true
+      try {
+        context = new AudioContext()
+        await context.resume()
+        peer = new RTCPeerConnection({ iceServers: [] })
+        peer.ontrack = (event) => {
+          audio.srcObject = new MediaStream([event.track])
+          analyser = context.createAnalyser()
+          context.createMediaStreamSource(audio.srcObject).connect(analyser)
+          const silence = context.createGain()
+          silence.gain.value = 0
+          analyser.connect(silence)
+          silence.connect(context.destination)
+          void audio.play()
+        }
+        const response = await post('/offer')
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`)
+        }
+        const offer = await response.json()
+        id = offer.id
+        await peer.setRemoteDescription(offer.description)
+        await peer.setLocalDescription(await peer.createAnswer())
+        if (peer.iceGatheringState !== 'complete') {
+          await new Promise((resolve) => {
+            peer.onicegatheringstatechange = () => {
+              if (peer.iceGatheringState === 'complete') {
+                resolve()
+              }
+            }
+          })
+        }
+        answer = { id, description: peer.localDescription }
+        const accepted = await post('/answer', answer)
+        if (!accepted.ok) {
+          throw new Error(`HTTP ${accepted.status}`)
+        }
+        stop.disabled = false
+        timer = setInterval(() => void show(), 250)
+        await show()
+      } catch (error) {
+        status.textContent = error.message
+      }
+    }
+    stop.onclick = async () => {
+      stop.disabled = true
+      const response = await post('/close', { id })
+      if (!response.ok) {
+        status.textContent = `HTTP ${response.status}`
+        return
+      }
+      serverClosed = await response.json()
+      closedAt = performance.now()
+      replayStatus = (await post('/answer', answer)).status
+      await show()
+    }
+    window.addEventListener('pagehide', () => {
+      clearInterval(timer)
+      peer?.close()
+      void context?.close()
+    })
+  </script>
+</html>

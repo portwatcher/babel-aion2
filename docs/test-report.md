@@ -1,5 +1,29 @@
 # Validation
 
+## Isolated media compatibility checks — 2026-10-18
+
+Candidate SDKs now have a separately installed validation harness. Application
+dependencies and behavior are unchanged: the worker remains stopped, listeners
+remain JOINING, and live Discord original audio is not available.
+
+| Check                                                                               | Status                    | Evidence                                                                                                                                                                                                                                          |
+| ----------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                                                            | PASS                      | `npm run ci:local`; 155 first-party source files, maximum 494 lines, strict types, 14 tests, production builds and HTTP smoke                                                                                                                     |
+| Werift synthetic RTP and sender shutdown                                            | PASS                      | Node 24.18.0 / macOS arm64; at least 50 Opus packets and 9,533 payload bytes received over actual peers. Closing only the sender stops further reception; source and receiver remain active during observation; child exits naturally with code 0 |
+| Browser decoding and shutdown                                                       | PASS                      | Chrome receives 3,855 packets / 846,815 bytes; decoded RMS peak 0.06296. Server close stops packets, RMS returns to zero, and replaying the closed answer receives 404. One muted audio element; no captured browser warnings/errors              |
+| Failed-source negative control                                                      | PASS                      | An unavailable FFmpeg executable makes the real transport check fail at `receive-rtp`, exit 1, without a timeout; no synthetic success is supplied                                                                                                |
+| Native wrtc cleanup                                                                 | FAIL                      | `@roamhq/wrtc` 0.10.0 creates/stops a native audio track, then terminates with SIGSEGV on macOS arm64. The parent correctly reports FAIL despite the stop call completing                                                                         |
+| LiveKit synthetic media and removal                                                 | PASS                      | Server 1.13.10 / native SDK 1.1.0 / server SDK 2.19.1 on Linux arm64: 137 decoded frames, peak sample 705; RemoveParticipant emits client disconnection and the server list confirms absence; native cleanup completes                            |
+| LiveKit old-token revocation                                                        | FAIL                      | The exact unexpired listener token reconnects after removal; the isolated command exits 1 with `oldTokenRejoined: true`. No admission gateway is implemented or claimed                                                                           |
+| Discord REST access and guild discovery                                             | WAITING FOR CONFIGURATION | Bot token remains in ignored mode-0600 `.env`; authenticated guild lookup returns 200 and an empty list. Installation, voice channel and commander selection are pending                                                                          |
+| Babel credential revocation, live Discord, deployment transport and player networks | NOT RUN                   | The probes do not enter application sessions, authorize real command delivery, test DAVE or prove TURN/network/game behavior                                                                                                                      |
+
+See [media compatibility](media-compatibility.md) for exact versions, reproduction
+commands, platform limits and selection implications. No production media SDK was
+added. The harness uses identified synthetic audio and isolated fixture credentials.
+Temporary browser/encoder processes and both experimental Docker networks were
+removed; the unmerged implementation worktree and local credential remain preserved.
+
 ## Player subtitle window and Discord credential check — 2026-10-18
 
 The player panel now owns a feature-detected Document PiP presentation with shared

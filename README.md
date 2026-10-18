@@ -29,6 +29,9 @@ and save sample validation tied to the exact provider and terminology revisions.
 Player-language activation stays unavailable until authorized delivery is implemented.
 These candidates remain disabled for production subtitles; no live provider
 quality or Discord audio has been validated.
+Isolated [media compatibility checks](docs/media-compatibility.md) record native
+cleanup, actual synthetic audio reception and the self-hosted LiveKit token-reuse
+failure. Their candidate SDKs are separate from application dependencies.
 
 ## Start locally
 
