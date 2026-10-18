@@ -13,7 +13,7 @@ listener reconciliation sweep and closes it on server shutdown.
 Without database configuration the public lobby stays available; readiness and
 administrator sessions fail closed. No worker starts audio automatically.
 
-Apply migrations through `0007_dear_omega_red` before enabling media admission. Web readiness
+Apply migrations through `0008_quiet_doomsday` before this web build. Web readiness
 checks room configuration columns, listener lifecycle columns and player socket
 registrations, provider test/history columns, terminology tables, the initialized
 catalog revisions, output-language validation columns and administrator tables. Migration
@@ -30,6 +30,8 @@ Migration 0007 adds media connection owners, listener generations, negotiation
 attempts and physical-close receipts. Worker readiness checks this schema.
 Preserve these records consistently with listener and nickname records; do not
 clear a registration until its owning transport is confirmed stopped.
+Migration 0008 adds the capture-mode enum and preserves selected-member scope on
+existing rooms. Readiness checks this column; a previous schema returns 503.
 Migration 0003 adds room settings
 without enabling a source or adding credentials. Migration 0001 preserves old rows and marks their entry fingerprints as legacy, so
 they cannot be adopted by an unbound retry. Do not roll back or truncate nickname

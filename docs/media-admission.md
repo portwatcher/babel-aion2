@@ -95,9 +95,11 @@ Current control targets one worker URL. Owner routing, exclusive guild control,
 public ICE/TURN, Linux amd64 target testing, capacity and actual player networks
 remain unvalidated. Local direct ICE uses no external STUN by default.
 
-The next audio integration must decode each selected commander's Opus separately
+The next audio integration must decode each selected speaker's Opus separately
 and branch decoded PCM to media and recognition as specified in `design.md`.
 Source-generation fencing, independent audio/provider recovery, real pauses,
 bounded PCM queues, commander mixing for playback and original-audio latency
-still need implementation and live evidence. Candidate synthetic decoding alone
+still need implementation and live evidence. Room configuration supports selected
+member IDs or automatic all-channel scope; automatic discovery is not yet wired
+to the worker. Candidate synthetic decoding alone
 does not satisfy those gates.

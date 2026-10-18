@@ -27,12 +27,13 @@ function publicSettings(stored: StoredRoom): ManagementRoom {
     version: stored.configurationVersion,
     guildId: stored.discordGuildId,
     voiceChannelId: stored.discordVoiceChannelId,
+    captureMode: stored.captureMode,
     commanderIds: stored.commanderIds,
     credentialConfigured: Boolean(stored.encryptedDiscordCredential),
     sourceConfigured: Boolean(
       stored.discordGuildId &&
       stored.discordVoiceChannelId &&
-      stored.commanderIds.length &&
+      (stored.captureMode === 'ALL_CHANNEL' || stored.commanderIds.length > 0) &&
       stored.encryptedDiscordCredential,
     ),
     updatedAt: stored.updatedAt.toISOString(),
@@ -90,6 +91,7 @@ export async function updateRoomSettings(
     const sourceChanged =
       stored.discordGuildId !== input.guildId ||
       stored.discordVoiceChannelId !== input.voiceChannelId ||
+      stored.captureMode !== input.captureMode ||
       JSON.stringify([...stored.commanderIds].sort()) !==
         JSON.stringify([...input.commanderIds].sort()) ||
       stored.encryptedDiscordCredential !== encryptedCredential
@@ -99,6 +101,7 @@ export async function updateRoomSettings(
         name: input.name,
         discordGuildId: input.guildId,
         discordVoiceChannelId: input.voiceChannelId,
+        captureMode: input.captureMode,
         commanderIds: input.commanderIds,
         encryptedDiscordCredential: encryptedCredential,
         stopped: sourceChanged ? true : stored.stopped,

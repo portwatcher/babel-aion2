@@ -4,6 +4,7 @@ import {
   managementRoomSchema,
   roomUpdateSchema,
   type ManagementRoom,
+  type DiscordCaptureMode,
 } from '@babel/contracts'
 import { managementFailure } from '~/utils/management-errors'
 
@@ -12,6 +13,11 @@ const protectionReady = ref(false)
 const name = ref('')
 const guildId = ref('')
 const voiceChannelId = ref('')
+const captureMode = ref<DiscordCaptureMode>('SELECTED_USERS')
+const captureModes = [
+  { label: '指定成员', value: 'SELECTED_USERS' },
+  { label: '频道全部成员', value: 'ALL_CHANNEL' },
+]
 const commanderText = ref('')
 const credentialAction = ref<'keep' | 'replace' | 'remove'>('keep')
 const credential = ref('')
@@ -38,6 +44,7 @@ function accept(room: ManagementRoom) {
   name.value = room.name
   guildId.value = room.guildId ?? ''
   voiceChannelId.value = room.voiceChannelId ?? ''
+  captureMode.value = room.captureMode
   commanderText.value = room.commanderIds.join('\n')
   credentialAction.value = 'keep'
   credential.value = ''
@@ -75,13 +82,17 @@ async function save() {
     name: name.value,
     guildId: guildId.value.trim() || null,
     voiceChannelId: voiceChannelId.value.trim() || null,
-    commanderIds: commanderText.value.split(/[\s,，]+/).filter(Boolean),
+    captureMode: captureMode.value,
+    commanderIds:
+      captureMode.value === 'ALL_CHANNEL'
+        ? []
+        : commanderText.value.split(/[\s,，]+/).filter(Boolean),
     ...(credentialAction.value === 'replace' ? { credential: credential.value } : {}),
     removeCredential: credentialAction.value === 'remove',
   })
   if (!input.success) {
     error.value =
-      '请填写房间名称；服务器和语音频道 ID 需同时填写，指挥 ID 不可重复。新凭据不能包含空格。'
+      '请填写房间名称；服务器和语音频道 ID 需同时填写，成员 ID 不可重复。新凭据不能包含空格。'
     return
   }
   busy.value = true
@@ -192,7 +203,24 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div class="field">
-        <label for="commanders">指挥 Discord 用户 ID</label>
+        <label for="capture-mode">收听范围</label>
+        <Select
+          input-id="capture-mode"
+          v-model="captureMode"
+          :options="captureModes"
+          option-label="label"
+          option-value="value"
+          :disabled="busy"
+          aria-describedby="capture-mode-help"
+        />
+        <small id="capture-mode-help" class="muted">{{
+          captureMode === 'ALL_CHANNEL'
+            ? '自动接收该频道的发言成员，按 Discord 用户区分音源，无需填写成员 ID。'
+            : '只接收下方指定成员的语音。'
+        }}</small>
+      </div>
+      <div v-if="captureMode === 'SELECTED_USERS'" class="field">
+        <label for="commanders">成员 Discord 用户 ID</label>
         <Textarea
           id="commanders"
           v-model="commanderText"
@@ -240,7 +268,7 @@ onBeforeUnmount(() => {
         保存后将删除机器人凭据，并保持房间停止。
       </p>
       <p class="muted">
-        更换凭据、语音频道或指挥名单会停止当前来源，需要重新验证后才能启动。
+        更换凭据、语音频道、收听范围或成员名单会停止当前来源，需要重新验证后才能启动。
       </p>
       <div class="management-actions">
         <Button type="submit" label="保存设置" :loading="busy" />

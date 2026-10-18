@@ -1,6 +1,32 @@
 # Validation
 
-## Revocable media admission — 2026-10-19
+## Configurable Discord capture scope — 2026-10-19
+
+The administrator can select specific Discord members or every speaking channel
+member. All-channel configuration needs no commander IDs. The existing selected
+scope is the migration default, and changing scope stops the desired source and
+advances its generation. Actual speaker discovery and audio publication remain
+unfinished; this change does not claim a live receiving worker.
+
+| Check                                             | Status                    | Evidence                                                                                                                                                                                                                                                |
+| ------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                          | PASS                      | `npm run ci:local`; 166 source files, maximum 494 lines, strict types, 14 tests, web/worker/migration builds and HTTP smoke                                                                                                                             |
+| Migration and database regression                 | PASS                      | Migration 0008 applied to disposable PostgreSQL 16; `npm run test:db` passes seven tests                                                                                                                                                                |
+| Capture scope through built management HTTP       | PASS                      | `npm run test:management:db`: selected default, all-channel completeness with no member IDs, invalid mode rejection, scope-change stop/generation, unchanged generation on rename, incomplete empty selected list and persistence across server restart |
+| Browser configuration                             | PASS                      | Chrome/macOS: all-channel save and refresh retain the mode and hide the ID field; keyboard switching restores the selected-member field; reloading saved state restores all-channel; no captured warning/error entries                                  |
+| Bot identity and guild installation               | PASS                      | Credential stays in ignored mode-0600 `.env`; official bot API confirms the expected identity, installed test guild and selected private voice channel                                                                                                  |
+| Isolated native candidate loading                 | PASS                      | Node 24/macOS arm64 loads `@discordjs/voice` 0.19.2 with DAVE, `discord.js` 14.27.0 and `@discordjs/opus` 0.10.0; a known Opus silence packet decodes to 3,840 PCM bytes; natural exit 0                                                                |
+| Private-channel access                            | WAITING FOR CONFIGURATION | The channel denies everyone view/connect and has no bot override. The minimal grant is prepared in Discord, awaiting action-time approval                                                                                                               |
+| Live DAVE, individual speakers and original audio | NOT RUN                   | No actual speech decoded yet. Simultaneous users, dynamic join/leave, member re-entry, Go Live audio and player delivery remain integration gates                                                                                                       |
+
+`design.md` and `GOAL.md` are synchronized with the requested all-channel mode and
+identity limits: one member's locally mixed microphone/game/music is one source.
+The existing built HTTP suite owns the new persisted contract; no parallel unit
+suite or test-only production seam was introduced. Private fixture IDs, token,
+probe dependencies and screenshots remain in ignored local task files. No release
+or deployment was made.
+
+## Revocable media admission — 2026-10-19 (historical)
 
 The application now uses Werift 0.25.1 for authenticated, receive-only WebRTC.
 The worker registers each negotiation under the global nickname lock, closes

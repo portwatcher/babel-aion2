@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
     )
     await useDatabase(event).execute(sql`select id from player_connection limit 1`)
     await useDatabase(event).execute(
-      sql`select configuration_version, encrypted_discord_credential from room limit 1`,
+      sql`select configuration_version, capture_mode, encrypted_discord_credential from room limit 1`,
     )
     await useDatabase(event).execute(
       sql`select last_test, test_lease_id from provider_configuration limit 1`,

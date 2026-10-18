@@ -89,10 +89,14 @@ room, releases native media objects, and lets the parent observe process exit.
 
 ## Remaining integration gates
 
-- Install the dedicated Discord bot and supply the target voice channel and
-  commander selection. REST authentication succeeds, but its guild list is empty.
-- Validate live Discord/DAVE receipt and separate selected commanders. No Discord
-  library has been selected based on these media-only fixtures.
+- The dedicated bot is installed in the authorized test guild; the selected
+  private voice channel still needs a bot-specific view/connect grant. Capture
+  scope can now select specific members or all channel members without IDs.
+- Validate live Discord/DAVE receipt and independent member streams. An isolated
+  candidate install of `@discordjs/voice` 0.19.2, `discord.js` 14.27.0 and
+  `@discordjs/opus` 0.10.0 loads native DAVE/Opus on macOS arm64 and decodes an
+  Opus silence packet. That is not live compatibility evidence or a production
+  Discord dependency selection.
 - Extend the implemented admission/close proof to confirmed hard-crash recovery
   and production worker routing. Graceful restart and in-flight replacement pass;
   unknown owner registrations remain fail-closed.

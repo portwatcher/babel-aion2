@@ -1,0 +1,2 @@
+CREATE TYPE "public"."discord_capture_mode" AS ENUM('SELECTED_USERS', 'ALL_CHANNEL');--> statement-breakpoint
+ALTER TABLE "room" ADD COLUMN "capture_mode" "discord_capture_mode" DEFAULT 'SELECTED_USERS' NOT NULL;

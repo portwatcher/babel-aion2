@@ -13,6 +13,8 @@ const commanders = z
   .array(discordId)
   .max(100)
   .refine((ids) => new Set(ids).size === ids.length)
+export const discordCaptureModeSchema = z.enum(['SELECTED_USERS', 'ALL_CHANNEL'])
+export type DiscordCaptureMode = z.infer<typeof discordCaptureModeSchema>
 
 export const roomUpdateSchema = z
   .object({
@@ -20,6 +22,7 @@ export const roomUpdateSchema = z
     name: roomName,
     guildId: discordId.nullable(),
     voiceChannelId: discordId.nullable(),
+    captureMode: discordCaptureModeSchema,
     commanderIds: commanders,
     credential: z
       .string()
@@ -45,6 +48,7 @@ export const managementRoomSchema = z.object({
   version: configurationVersion,
   guildId: discordId.nullable(),
   voiceChannelId: discordId.nullable(),
+  captureMode: discordCaptureModeSchema,
   commanderIds: commanders,
   credentialConfigured: z.boolean(),
   sourceConfigured: z.boolean(),

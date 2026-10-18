@@ -1,9 +1,9 @@
 # Room configuration
 
 The administrator page can save room and Discord source settings and remove a
-specific listener connection. The voice worker is still stopped: saved IDs and
+specific listener connection. Discord reception is still stopped: saved IDs and
 credentials are not proof of Discord permissions, DAVE compatibility, or sound
-delivery. There is no start endpoint, provider form, or enabled subtitle language.
+delivery. There is no source-start endpoint or enabled subtitle language.
 
 ## HTTP operations
 
@@ -33,8 +33,21 @@ validation. Guild and voice channel must be supplied together; commanders requir
 a guild. The form accepts commander IDs on separate lines or separated by spaces
 or commas. Unknown JSON fields are refused.
 
+`captureMode` is required on full updates. `SELECTED_USERS` uses the commander ID
+list; `ALL_CHANNEL` selects speaking members automatically and requires no IDs.
+The form hides and clears the ID list when saving all-channel mode. Migration
+0008 preserves `SELECTED_USERS` on existing rooms, so upgrading never expands an
+existing source's scope. Guild, voice channel and credential are still required
+for `sourceConfigured`; selected mode additionally needs a nonempty ID list.
+This flag describes configuration completeness, not working audio reception.
+
+Audio sources are Discord user IDs, with member nicknames for display. Independent
+receivers/decoders must keep simultaneous speakers separate before recognition.
+One member's locally mixed microphone/game/music remains one Discord source.
+Screen-share/Go Live audio needs its own compatibility proof.
+
 Every successful save increments `configurationVersion` under the room row lock.
-Changes to guild, channel, commander membership, or saved credential also increment
+Changes to guild, channel, capture mode, commander membership, or saved credential also increment
 `sourceGeneration` and persist `stopped: true`. Reordering the same commander set
 does not change the source generation. Changing only the room name preserves the
 source state. Stopping a running desired state advances both versions. These are
@@ -81,7 +94,7 @@ version conflicts, ciphertext integrity/context/key failures, safe read/audit
 fields, process restart, stopped state and a real player WebSocket removed by an
 authenticated administrator. No live Discord token is used.
 
-An unconfirmed media shutdown remains DISCONNECTING in the list. The current
-unavailable media adapter never confirms delivery revocation or makes a listener
-ACTIVE. See [listener lifecycle](listener-sessions.md) and
+An unconfirmed media shutdown remains DISCONNECTING in the list. Optional private
+media admission now confirms actual peer closure, but the track has no Discord
+audio. See [listener lifecycle](listener-sessions.md) and
 [validation evidence](test-report.md) for these limits.

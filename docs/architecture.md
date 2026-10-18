@@ -29,7 +29,10 @@ The room form saves a configuration version and encrypted Discord credential;
 stale edits receive 409. Source changes persist a stopped room and advance the
 source generation. The administrator list shares the player list component and
 removes the selected session/generation through the revocation coordinator.
-These settings do not start a worker or validate a live Discord source.
+Capture scope is either selected member IDs or all channel speakers. Existing
+rooms retain selected mode; switching scope advances the source generation and
+persists stopped state. These settings do not start Discord reception or validate
+a live source. All-channel speaker discovery remains part of the Discord gate.
 The provider editor saves disabled candidates, performs explicit connection tests,
 and restores encrypted history as a new version. Candidate connection changes
 must pass a probe before replacing saved settings. Database leases prevent
@@ -107,7 +110,8 @@ See [provider configuration](providers-and-languages.md) for probe and sample li
 
 1. Select a DAVE-compatible Discord voice library with an actual audio-receive
    test. Add exclusive guild control using the established infra method. Use
-   one decoder per selected commander and bounded audio queues.
+   one decoder per selected speaker and bounded audio queues, with automatic
+   membership/speaker discovery in all-channel mode.
 2. Add decoded PCM publication independently from subtitle work, with source
    fencing and actual-network proof. Werift passes local synthetic decoding and
    application admission/closure checks on macOS and Linux arm64; these do not

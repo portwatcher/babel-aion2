@@ -26,6 +26,10 @@ export const listenerState = pgEnum('listener_state', [
   'REMOVED',
   'EXPIRED',
 ])
+export const discordCaptureMode = pgEnum('discord_capture_mode', [
+  'SELECTED_USERS',
+  'ALL_CHANNEL',
+])
 
 export const room = pgTable('room', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -38,6 +42,7 @@ export const room = pgTable('room', {
   configurationVersion: integer('configuration_version').notNull().default(1),
   discordGuildId: text('discord_guild_id'),
   discordVoiceChannelId: text('discord_voice_channel_id'),
+  captureMode: discordCaptureMode('capture_mode').notNull().default('SELECTED_USERS'),
   commanderIds: jsonb('commander_ids').$type<string[]>().notNull().default([]),
   encryptedDiscordCredential: text('encrypted_discord_credential'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

@@ -4,7 +4,7 @@ Nuxt 4 + Better Auth + PostgreSQL project scaffold for AION2 Steam Global / Asia
 Repository: [portwatcher/babel-aion2](https://github.com/portwatcher/babel-aion2),
 private today and prepared for eventual open source.
 The player interface is a dark, low-distraction battle panel. The original
-requirements are preserved verbatim in [design.md](design.md) and [GOAL.md](GOAL.md).
+requirements are kept in sync in [design.md](design.md) and [GOAL.md](GOAL.md).
 
 Listener storage, HTTP operations and player WebSockets implement atomic global
 nickname replacement, idempotent entry, browser restoration, language subscription
@@ -18,6 +18,9 @@ unfinished; a connected media track currently carries no audio.
 Administrators can save versioned room/Discord settings, protect the bot credential
 with server-side encryption, persist a stopped room, and remove a specific listener
 generation. Saving these settings does not connect Discord or enable audio.
+Discord scope can be either selected member IDs or all speaking members of the
+configured channel. All-channel mode requires no prefilled commander IDs;
+per-member reception/decoding still needs the live Discord integration.
 The administrator can also save encrypted Soniox/DeepL candidate configurations,
 run connection probes, replace credentials, and test/restore historical versions.
 An authorized PCM WAV sample can be recognized through Soniox and translated

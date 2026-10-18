@@ -38,6 +38,7 @@ function update(room, fields = {}) {
     name: room.name,
     guildId: room.guildId,
     voiceChannelId: room.voiceChannelId,
+    captureMode: room.captureMode,
     commanderIds: room.commanderIds,
     removeCredential: false,
     ...fields,
@@ -96,6 +97,7 @@ try {
     'Refuse to overwrite a preconfigured local room',
   )
   assert.equal(initial.credentialProtectionReady, true)
+  assert.equal(current.captureMode, 'SELECTED_USERS')
   const credential = `local-fixture-${randomBytes(32).toString('hex')}`
   const input = update(current, {
     name: '管理测试房间',
@@ -248,6 +250,73 @@ try {
   )
   assert.equal((await stoppedAgain.json()).version, current.version)
 
+  // Full-channel capture needs no hard-coded speakers. Switching scope must
+  // retire the old source generation even when guild/channel/credential match.
+  await pool.query('update room set stopped = false where id = $1', [current.id])
+  const allMembers = await request(
+    server,
+    auth,
+    '/api/management/room',
+    'PATCH',
+    update(current, { captureMode: 'ALL_CHANNEL', commanderIds: [] }),
+  )
+  assert.equal(allMembers.status, 200)
+  const all = await allMembers.json()
+  assert.equal(all.captureMode, 'ALL_CHANNEL')
+  assert.equal(all.sourceConfigured, true)
+  assert.equal(all.stopped, true)
+  assert.equal(all.sourceGeneration, current.sourceGeneration + 1)
+  current = all
+  assert.equal(
+    (
+      await request(
+        server,
+        auth,
+        '/api/management/room',
+        'PATCH',
+        update(current, { captureMode: 'EVERYWHERE' }),
+      )
+    ).status,
+    400,
+  )
+  const unchangedScope = await request(
+    server,
+    auth,
+    '/api/management/room',
+    'PATCH',
+    update(current, { name: '频道全部成员测试' }),
+  )
+  assert.equal(unchangedScope.status, 200)
+  const renamed = await unchangedScope.json()
+  assert.equal(renamed.captureMode, 'ALL_CHANNEL')
+  assert.equal(renamed.sourceGeneration, current.sourceGeneration)
+  current = renamed
+  const selectedAgain = await request(
+    server,
+    auth,
+    '/api/management/room',
+    'PATCH',
+    update(current, { captureMode: 'SELECTED_USERS' }),
+  )
+  assert.equal(selectedAgain.status, 200)
+  const selected = await selectedAgain.json()
+  assert.equal(
+    selected.sourceConfigured,
+    false,
+    'An empty selected list is not a source',
+  )
+  assert.equal(selected.sourceGeneration, current.sourceGeneration + 1)
+  current = selected
+  const restoreAll = await request(
+    server,
+    auth,
+    '/api/management/room',
+    'PATCH',
+    update(current, { captureMode: 'ALL_CHANNEL' }),
+  )
+  assert.equal(restoreAll.status, 200)
+  current = await restoreAll.json()
+
   const playerCredential = randomBytes(32).toString('base64url')
   const playerResponse = await fetch(`${server.origin}/api/player/sessions`, {
     method: 'POST',
@@ -367,7 +436,7 @@ try {
   await pool.query('delete from nickname where key = $1', [nickname])
   if (original) {
     await pool.query(
-      'update room set name=$1, stopped=$2, source_generation=$3, configuration_version=$4, discord_guild_id=$5, discord_voice_channel_id=$6, commander_ids=$7, encrypted_discord_credential=$8, updated_at=$9 where id=$10',
+      'update room set name=$1, stopped=$2, source_generation=$3, configuration_version=$4, discord_guild_id=$5, discord_voice_channel_id=$6, commander_ids=$7, encrypted_discord_credential=$8, updated_at=$9, capture_mode=$10 where id=$11',
       [
         original.name,
         original.stopped,
@@ -378,6 +447,7 @@ try {
         JSON.stringify(original.commander_ids),
         original.encrypted_discord_credential,
         original.updated_at,
+        original.capture_mode,
         original.id,
       ],
     )

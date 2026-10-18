@@ -72,7 +72,9 @@ Make a website that players can use during AION2 battles.
 Deploy the website at https://babel.juryquinn.com.
 Put the production deployment configuration in the infra repo.
 
-Use a server bot to receive audio from selected Discord commanders.
+Use a server bot to receive audio from a configured Discord voice channel.
+Support either selected member IDs or all speaking channel members.
+In all-channel mode, discover speakers automatically; do not require commander IDs.
 Send the original audio to players through the website.
 Make subtitles from that audio.
 Let each player select an output language.
@@ -461,13 +463,20 @@ Keep the test configuration separate from the production configuration.
 
 Keep the original audio path separate from subtitle processing.
 
-Use a separate audio receiver for each selected commander.
-Decode that commander's Opus data independently.
+Use a separate audio receiver for each selected speaker.
+In all-channel mode, select every speaking channel member automatically, excluding
+the receiving bot itself, and update selection as members join or leave.
+Decode each speaker's Opus data independently.
 Send the decoded audio to the media path.
 Send another copy to the recognition path.
 
-Do not mix commanders before speech recognition.
-Use the Discord user ID to identify each commander.
+Do not mix speakers before speech recognition.
+Use the Discord user ID as the stable speaker identity and display the member's
+current nickname. Different users with the same nickname remain distinct.
+Audio already mixed by one Discord member is one source; do not claim to separate
+that member's microphone, game audio and music from Discord identity alone.
+Screen-share/Go Live audio is a separate compatibility check, not an assumed part
+of ordinary voice reception.
 
 If the provider has this function, use one shared transcript for each commander.
 Translate that transcript once for each active output language.
@@ -620,7 +629,11 @@ Record the browser and game display mode.
 Use a normal Discord bot account.
 Keep the bot token on the server.
 
-Configure the guild, voice channel, and commander IDs.
+Configure the guild, voice channel and capture mode.
+SELECTED_USERS uses the configured commander IDs; ALL_CHANNEL discovers members
+automatically and does not require that list. Preserve SELECTED_USERS for existing
+configurations. A capture-mode change advances the source generation and stops
+the old source before the new scope may start.
 Store Discord IDs as strings.
 
 Use only the necessary bot permissions.
@@ -635,7 +648,7 @@ Do not let two workers control the same bot in the same guild.
 Use the existing infra method for exclusive control.
 Stop a worker's output when it loses that control.
 
-Use separate decoder state for each commander.
+Use separate decoder state for each speaker in either capture mode.
 Use small audio frames for media publication.
 Set the sample rate, channel count, and sample count correctly.
 
@@ -815,9 +828,10 @@ Use live services where the necessary credentials are available.
 
 ### Audio and subtitles
 
-- Selected Discord commanders reach the player.
-- Other Discord members do not reach the player.
-- Different commanders retain their correct identities.
+- Selected members, or all speaking members in all-channel mode, reach the player.
+- Excluded members and users in other channels do not reach the player.
+- Different speakers retain their correct identities, including simultaneous
+  speech, identical display names and members joining or leaving.
 - DAVE changes and member re-entry do not cause permanent audio loss.
 - Translation faults do not stop original audio.
 - Subtitle revisions do not produce duplicates.
