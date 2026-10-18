@@ -13,9 +13,10 @@ listener reconciliation sweep and closes it on server shutdown.
 Without database configuration the public lobby stays available; readiness and
 administrator sessions fail closed. No worker starts audio automatically.
 
-Apply migrations through `0002_majestic_galactus` before this web build. Readiness
-checks listener lifecycle columns and player socket registrations as well as
-administrator tables. Migration 0001 preserves old rows and marks their entry fingerprints as legacy, so
+Apply migrations through `0003_mature_the_phantom` before this web build. Readiness
+checks room configuration columns, listener lifecycle columns and player socket
+registrations as well as administrator tables. Migration 0003 adds room settings
+without enabling a source or adding credentials. Migration 0001 preserves old rows and marks their entry fingerprints as legacy, so
 they cannot be adopted by an unbound retry. Do not roll back or truncate nickname
 generation/session records while old credentials could still exist.
 
@@ -43,12 +44,21 @@ To prove restoration in an isolated environment:
    approved credential source. Do not put a production connection string in shell history.
 2. Restore with `pg_restore` into a separate database; do not overwrite a running room.
 3. Run readiness and the relevant database-backed tests against that database.
-4. Verify configuration versions and administrator session behavior. Once provider
-   encryption exists, verify that protected keys can recover a saved test credential.
+4. Verify configuration versions, stopped state and administrator session behavior.
+   With the original protected key, confirm that saving a retained test credential
+   succeeds. Missing/wrong keys and damaged or cross-room ciphertext must fail closed.
 5. Record the release, migration version, duration, and evidence before using
    the procedure for disaster recovery.
 
 No production backup or restore was performed during scaffolding.
+
+`NUXT_PROVIDER_ENCRYPTION_KEY` now protects saved Discord bot credentials. Generate
+a 32-byte random key with `openssl rand -base64 32`; store it in the approved secret
+facility, separately from the database. All web replicas need the same key.
+Changing this key does not re-encrypt saved data: retain the original key for
+recovery. A general re-key procedure is not implemented. A valid administrator
+can replace or remove an unreadable bot credential explicitly, but a normal save
+that retains it fails. No read or export operation returns its plaintext.
 
 ## Release rollback
 
@@ -58,8 +68,10 @@ GitOps release method. Confirm schema compatibility first. Do not reverse a
 destructive migration without an explicit data recovery plan. Verify probes,
 Access boundaries, sessions, and live media after the rollback.
 
-There is no production release to roll back yet. An application restart must
-eventually preserve a stopped room, provider settings, and current generations.
+These implementation checks do not establish a production rollback. Local process
+restart preserves the room's stopped state, configuration version, encrypted bot
+credential, administrator session and listener generations. Provider settings and
+live media recovery remain separate unfinished checks.
 
 ## Logging and task cleanup
 

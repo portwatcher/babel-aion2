@@ -5,7 +5,7 @@ import { createServer } from 'node:net'
 import { setTimeout } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 
-export async function startTestServer(databaseUrl = '') {
+export async function startTestServer(databaseUrl = '', options = {}) {
   const root = fileURLToPath(new URL('..', import.meta.url))
   const probe = createServer()
   probe.listen(0, '127.0.0.1')
@@ -15,21 +15,28 @@ export async function startTestServer(databaseUrl = '') {
     probe.close((error) => (error ? reject(error) : resolve())),
   )
   const origin = `http://127.0.0.1:${port}`
-  const processHandle = spawn(process.execPath, ['apps/web/.output/server/index.mjs'], {
-    cwd: root,
-    env: {
-      ...process.env,
-      NODE_ENV: 'production',
-      HOST: '127.0.0.1',
-      PORT: String(port),
-      NUXT_SITE_URL: origin,
-      NUXT_DATABASE_URL: databaseUrl,
-      NUXT_BETTER_AUTH_SECRET: '',
-      NUXT_ACCESS_TEAM_DOMAIN: 'babel-smoke.cloudflareaccess.com',
-      NUXT_ACCESS_AUDIENCE: 'babel-smoke',
+  const imports = (options.nodeImports ?? []).flatMap((path) => ['--import', path])
+  const processHandle = spawn(
+    process.execPath,
+    [...imports, 'apps/web/.output/server/index.mjs'],
+    {
+      cwd: root,
+      env: {
+        ...process.env,
+        NODE_ENV: 'production',
+        HOST: '127.0.0.1',
+        PORT: String(port),
+        NUXT_SITE_URL: origin,
+        NUXT_DATABASE_URL: databaseUrl,
+        NUXT_BETTER_AUTH_SECRET: '',
+        NUXT_PROVIDER_ENCRYPTION_KEY: '',
+        NUXT_ACCESS_TEAM_DOMAIN: 'babel-smoke.cloudflareaccess.com',
+        NUXT_ACCESS_AUDIENCE: 'babel-smoke',
+        ...options.environment,
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
     },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
+  )
   // Never include server logs or request data in assertions: a failing adapter
   // may accidentally log a secret. Report status/exit code only.
   processHandle.stdout.resume()

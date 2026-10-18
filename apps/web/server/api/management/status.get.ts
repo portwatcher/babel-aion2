@@ -10,6 +10,6 @@ export default defineEventHandler(async (event) => {
       subtitles: 'NOT_IMPLEMENTED',
     },
     availableProviders: [],
-    configurationEditable: false,
+    configurationEditable: true,
   }
 })

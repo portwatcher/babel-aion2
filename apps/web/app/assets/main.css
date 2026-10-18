@@ -186,6 +186,39 @@ small {
 .player-identity time {
   font-size: 0.875rem;
 }
+.player-actions,
+.management-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.player-actions {
+  justify-content: end;
+}
+.management-section {
+  display: grid;
+  gap: 24px;
+  margin-bottom: 40px;
+  padding-bottom: 40px;
+  border-bottom: 1px solid var(--babel-border);
+}
+.management-section .entry-form {
+  max-width: 720px;
+}
+.management-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: 24px;
+}
+.management-confirmation {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--babel-border);
+  border-radius: 12px;
+  background: var(--babel-surface);
+}
 .room-detail {
   display: grid;
   gap: 16px;

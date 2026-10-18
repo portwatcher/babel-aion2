@@ -26,10 +26,13 @@ function time(value: string) {
             >{{ time(player.joinedAt) }} 进入</time
           >
         </div>
-        <Tag
-          :value="states[player.state]"
-          :severity="player.state === 'ACTIVE' ? 'success' : 'secondary'"
-        />
+        <div class="player-actions">
+          <Tag
+            :value="states[player.state]"
+            :severity="player.state === 'ACTIVE' ? 'success' : 'secondary'"
+          />
+          <slot name="actions" :player="player" />
+        </div>
       </li>
     </ul>
     <p v-if="!current" class="muted" role="status">

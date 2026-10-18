@@ -22,6 +22,13 @@
       "when": 1792316762964,
       "tag": "0002_majestic_galactus",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792318675271,
+      "tag": "0003_mature_the_phantom",
+      "breakpoints": true
     }
   ]
 }

@@ -9,6 +9,9 @@ nickname replacement, idempotent entry, browser restoration, language subscripti
 metadata, removal and reconciliation. The browser preserves its current session
 across refresh/reconnection and stops after replacement. Live Discord audio, media
 revocation, provider configuration, subtitle delivery and PiP remain unfinished.
+Administrators can save versioned room/Discord settings, protect the bot credential
+with server-side encryption, persist a stopped room, and remove a specific listener
+generation. Saving these settings does not connect Discord or enable audio.
 
 ## Start locally
 
@@ -35,6 +38,9 @@ The `/admin` page fails closed until Access is configured. Set
 `NUXT_BETTER_AUTH_SECRET` of at least 32 characters in `.env`. Use the real Access
 proxy to test administrator sign-in. There is no development authentication
 bypass. `NUXT_SITE_URL` must match the browser origin.
+To save a bot credential, set `NUXT_PROVIDER_ENCRYPTION_KEY` to a protected,
+base64-encoded 32-byte random key. See [room configuration](docs/room-configuration.md)
+for field limits, version conflicts, and credential recovery requirements.
 
 `DATABASE_URL` is used by database tools. `NUXT_DATABASE_URL` is the private Nuxt
 runtime setting. Point both at the same database. The example database credentials
@@ -59,20 +65,21 @@ will run in a separate worker.
 
 ## Commands
 
-| Command                  | Purpose                                                                                                |
-| ------------------------ | ------------------------------------------------------------------------------------------------------ |
-| `npm run dev`            | Start the local Nuxt app                                                                               |
-| `npm run build`          | Build the web app and worker entry point                                                               |
-| `npm start`              | Run the built Nuxt server                                                                              |
-| `npm run ci:local`       | Source limits, formatting, types, unit tests, build, HTTP smoke                                        |
-| `npm run test:db`        | Real PostgreSQL administrator sessions and listener lifecycle tests                                    |
-| `npm run test:http:db`   | Built server + local PostgreSQL: entry, replacement, isolation and restart; run after build/migrations |
-| `npm run test:ws:db`     | Two built servers + local PostgreSQL: real player WebSockets, replacement, shutdown and recovery       |
-| `npm run db:generate`    | Generate a migration after schema changes                                                              |
-| `npm run db:migrate`     | Apply committed migrations using `.env`                                                                |
-| `npm run db:studio`      | Open the local schema browser using `.env`                                                             |
-| `npm run db:down`        | Stop the local database without deleting its volume                                                    |
-| `npm run worktree:audit` | Show worktrees and remote availability without deleting anything                                       |
+| Command                      | Purpose                                                                                                    |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `npm run dev`                | Start the local Nuxt app                                                                                   |
+| `npm run build`              | Build the web app and worker entry point                                                                   |
+| `npm start`                  | Run the built Nuxt server                                                                                  |
+| `npm run ci:local`           | Source limits, formatting, types, unit tests, build, HTTP smoke                                            |
+| `npm run test:db`            | Real PostgreSQL administrator sessions and listener lifecycle tests                                        |
+| `npm run test:http:db`       | Built server + local PostgreSQL: entry, replacement, isolation and restart; run after build/migrations     |
+| `npm run test:ws:db`         | Two built servers + local PostgreSQL: real player WebSockets, replacement, shutdown and recovery           |
+| `npm run test:management:db` | Built servers + local PostgreSQL: signed admin login, encrypted room settings, conflicts, stop and removal |
+| `npm run db:generate`        | Generate a migration after schema changes                                                                  |
+| `npm run db:migrate`         | Apply committed migrations using `.env`                                                                    |
+| `npm run db:studio`          | Open the local schema browser using `.env`                                                                 |
+| `npm run db:down`            | Stop the local database without deleting its volume                                                        |
+| `npm run worktree:audit`     | Show worktrees and remote availability without deleting anything                                           |
 
 Source files should remain below 600 lines; 800 is the enforced maximum.
 Configuration, generated migrations, lockfiles, and vendored skills are exempt.
@@ -82,6 +89,7 @@ See [AGENTS.md](AGENTS.md) for worktree, cleanup, security, and interface rules.
 
 - [Architecture and next implementation gates](docs/architecture.md)
 - [Administrator access](docs/access-control.md)
+- [Room settings and protected Discord credentials](docs/room-configuration.md)
 - [Listener lifecycle and API](docs/listener-sessions.md)
 - [Providers and output languages](docs/providers-and-languages.md)
 - [Deployment handoff](docs/deployment.md)

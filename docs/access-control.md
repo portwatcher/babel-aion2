@@ -7,13 +7,14 @@ audience or trust its email header.
 
 ## Boundaries
 
-| Route                      | Required checks                                                         |
-| -------------------------- | ----------------------------------------------------------------------- |
-| `/`, `/api/player/*`       | Public configuration or future listener-session authorization           |
-| `/admin`, `/admin/*`       | Verified Cloudflare Access assertion                                    |
-| `/api/management/identity` | Verified Access assertion, for administrator page bootstrap             |
-| `/api/management/status`   | Verified Access assertion plus matching Better Auth session             |
-| `/api/auth/*`              | Verified Access assertion; only the three mounted auth operations exist |
+| Route                                                                              | Required checks                                                                            |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `/`, `/api/player/*`                                                               | Public configuration/list or listener-session authorization                                |
+| `/admin`, `/admin/*`                                                               | Verified Cloudflare Access assertion                                                       |
+| `/api/management/identity`                                                         | Verified Access assertion, for administrator page bootstrap                                |
+| `/api/management/status`                                                           | Verified Access assertion plus matching Better Auth session                                |
+| `/api/management/room`, `/api/management/room/stop`, `/api/management/listeners/*` | Verified Access assertion plus matching Better Auth session; mutations require same origin |
+| `/api/auth/*`                                                                      | Verified Access assertion; only the three mounted auth operations exist                    |
 
 The server fetches keys from the configured team's fixed
 `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs` endpoint. It requires
@@ -33,6 +34,8 @@ After Access authorizes the page, it makes a same-origin
 the issuer/subject identity, and creates a one-hour session. Cookies are HTTP-only,
 SameSite=Lax, and Secure when the configured site URL uses HTTPS. The sign-in
 response does not expose a session token.
+The Nitro bridge preserves an absent POST body. H3 otherwise presents an empty
+stream to Better Auth, causing a bodyless browser sign-in to fail with 415.
 
 Subsequent status requests need both the current Access assertion and a session
 whose user ID matches that signed identity. Restarting the application preserves
@@ -49,5 +52,10 @@ Set `NUXT_ACCESS_TEAM_DOMAIN`, `NUXT_ACCESS_AUDIENCE`, `NUXT_SITE_URL`,
 `NUXT_BETTER_AUTH_SECRET`, and `NUXT_DATABASE_URL` from approved configuration.
 Never add a default token, local administrator password, or development bypass.
 
-Local tests use generated test keys and a stubbed JWKS transport. Real Cloudflare
-policy, token issuance, routing, and operator sign-in still require live checks.
+`npm run test:management:db` runs the built Nitro server with generated RS256 keys
+and a test-process-only JWKS transport. It signs in through the real bodyless POST,
+persists the Better Auth cookie, and uses both proofs for management operations.
+Cookie-only, JWT-only, forged JWT and foreign-origin requests are rejected.
+The preload is outside the production app; there is no alternate production JWKS
+URL or authentication bypass. Real Cloudflare policy, token issuance, routing,
+and operator sign-in still require live checks.

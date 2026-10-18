@@ -15,5 +15,15 @@ export default defineEventHandler(async (event) => {
       statusMessage: 'Auth operation not available',
     })
   }
-  return useAdministratorAuth(event).handler(toWebRequest(event))
+  // H3 gives every POST a stream, including an empty request. Better Auth then
+  // requires a media type for that artificial body. Preserve an absent body.
+  const request =
+    event.method === 'POST'
+      ? new Request(getRequestURL(event), {
+          method: event.method,
+          headers: event.headers,
+          body: (await readRawBody(event)) || undefined,
+        })
+      : toWebRequest(event)
+  return useAdministratorAuth(event).handler(request)
 })

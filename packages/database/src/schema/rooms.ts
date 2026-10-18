@@ -31,6 +31,12 @@ export const room = pgTable('room', {
     .notNull()
     .default(0),
   defaultOutputLanguage: text('default_output_language'),
+  configurationVersion: integer('configuration_version').notNull().default(1),
+  discordGuildId: text('discord_guild_id'),
+  discordVoiceChannelId: text('discord_voice_channel_id'),
+  commanderIds: jsonb('commander_ids').$type<string[]>().notNull().default([]),
+  encryptedDiscordCredential: text('encrypted_discord_credential'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

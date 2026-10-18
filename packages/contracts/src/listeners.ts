@@ -33,12 +33,12 @@ export const listenerSnapshotSchema: z.ZodType<ListenerSnapshot> = z.object({
   joinedAt: z.iso.datetime({ offset: true }),
 })
 
-export const publicListenerSchema: z.ZodType<PublicListener> = z.object({
+export const publicListenerSchema = z.object({
   sessionId: z.uuid(),
   nickname: z.string(),
   joinedAt: z.iso.datetime({ offset: true }),
   state: z.enum(['JOINING', 'ACTIVE', 'DISCONNECTING']),
-})
+}) satisfies z.ZodType<PublicListener>
 
 export type TerminalReason =
   | 'DUPLICATE_NICKNAME_REPLACED'

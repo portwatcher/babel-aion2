@@ -16,32 +16,35 @@ const { status, loading, error, connect } = useAdministratorStatus()
       <p>{{ error }}</p>
       <Button label="重试" severity="secondary" :loading="loading" @click="connect" />
     </section>
-    <section
-      v-else
-      class="room-detail"
-      :aria-busy="loading"
-      aria-labelledby="services-title"
-    >
-      <h2 id="services-title">服务接入</h2>
-      <p class="muted">房间和服务设置将在对应功能接入后开放。</p>
-      <dl class="service-list">
-        <div>
-          <dt>Discord 指挥原声</dt>
-          <dd>尚未接入</dd>
-        </div>
-        <div>
-          <dt>玩家音频分发</dt>
-          <dd>尚未接入</dd>
-        </div>
-        <div>
-          <dt>识别与翻译服务</dt>
-          <dd>尚未接入</dd>
-        </div>
-        <div>
-          <dt>字幕语言</dt>
-          <dd>尚未配置</dd>
-        </div>
-      </dl>
-    </section>
+    <template v-else-if="status">
+      <AdminRoomSettings />
+      <AdminListeners />
+      <section
+        class="room-detail"
+        :aria-busy="loading"
+        aria-labelledby="services-title"
+      >
+        <h2 id="services-title">服务接入</h2>
+        <p class="muted">以下服务尚未接通。保存房间设置不会启用这些通道。</p>
+        <dl class="service-list">
+          <div>
+            <dt>Discord 指挥原声</dt>
+            <dd>尚未接入</dd>
+          </div>
+          <div>
+            <dt>玩家音频分发</dt>
+            <dd>尚未接入</dd>
+          </div>
+          <div>
+            <dt>识别与翻译服务</dt>
+            <dd>尚未接入</dd>
+          </div>
+          <div>
+            <dt>字幕语言</dt>
+            <dd>尚未配置</dd>
+          </div>
+        </dl>
+      </section>
+    </template>
   </main>
 </template>

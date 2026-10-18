@@ -28,6 +28,7 @@
     "test:http": "node scripts/smoke.mjs",
     "test:http:db": "node --env-file=.env scripts/listener-smoke.mjs",
     "test:ws:db": "node --env-file=.env scripts/player-websocket-smoke.mjs",
+    "test:management:db": "node --env-file=.env scripts/management-smoke.mjs",
     "db:up": "docker compose up -d --wait postgres",
     "db:down": "docker compose down",
     "db:generate": "drizzle-kit generate --config packages/database/drizzle.config.ts",

@@ -1,8 +1,37 @@
 # Validation
 
-## Player WebSocket and browser sessions — 2026-10-18
+## Room administration and credential protection — 2026-10-18
 
-Current scope: persistent listeners plus real player sockets and the waiting-room
+Current branch scope: persistent listeners and player sockets, plus versioned
+room/Discord configuration, encrypted bot credentials and the administrator
+listener list. These additions have not been deployed by this implementation
+task. Discord audio, real subtitles, provider settings and PiP remain incomplete.
+
+| Check                                                         | Status  | Evidence                                                                                                                                                                                          |
+| ------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source checks and unconfigured boundaries                     | PASS    | `npm run ci:local`; 86 first-party source files, largest 386 lines; strict types, seven unit tests, web/migration/worker builds and built HTTP smoke                                              |
+| Existing database, HTTP and socket contracts                  | PASS    | `npm run test:db` (seven tests), `npm run test:http:db` and `npm run test:ws:db` on disposable PostgreSQL 16                                                                                      |
+| Authenticated management HTTP                                 | PASS    | `npm run test:management:db`; generated RS256 assertion plus persisted Better Auth cookie; no assertion, no cookie, forged assertion and foreign Origin rejected                                  |
+| Empty-POST administrator sign-in regression                   | PASS    | The new built-Nitro test first reproduced HTTP 415; preserving the absent request body makes the unchanged bodyless POST return 200                                                               |
+| Credential storage and failure handling                       | PASS    | Independent Node crypto decryption verifies AES-256-GCM storage; tag tampering, cross-room ciphertext, wrong key and missing key reject saves without advancing the version                       |
+| Versioning, redaction and restart                             | PASS    | Concurrent same-version writes yield one 200 and one 409; reads/audits omit credentials; replacement gets a fresh nonce; stopped state, settings and administrator cookie survive process restart |
+| Exact-generation administrator removal                        | PASS    | Signed administrator removes an actual WebSocket session; wrong generation returns 404, correct generation sends ADMINISTRATOR_REMOVED and closes the socket                                      |
+| Migration 0003                                                | PASS    | Applied the additive room configuration migration and repeated `npm run db:migrate` successfully; readiness and all database-backed checks use the migrated schema                                |
+| Administrator browser flow                                    | PASS    | Chrome on macOS with a local signed-identity fixture; save/reload persists settings, no credential is repopulated, stale second-tab edit is rejected, explicit reload recovers current version    |
+| Browser removal and narrow layout                             | PASS    | Player receives the administrator-removal message and does not re-enter after refresh; populated admin form/list at 320px has document width 320px                                                |
+| Real Access operator sign-in and Discord reception            | NOT RUN | Local keys and a test-only JWKS response do not validate live Access policy or Discord token permissions; token storage and guild/channel/commander inputs remain pending                         |
+| Audio, subtitle/provider paths, PiP and production acceptance | NOT RUN | No new transport or provider is enabled; the full design.md objective remains incomplete                                                                                                          |
+
+Browser screenshots are retained in ignored local task artifacts. Only a fake
+local bot credential and local test IDs were used; the fake credential was removed
+after verification. The browser fixture still goes through RSA verification and
+the database-backed session; no production authentication bypass was added.
+The source specification files remain byte-identical. Unconfirmed media shutdown
+continues to show DISCONNECTING and never grants a replacement command access.
+
+## Player WebSocket and browser sessions — 2026-10-18 (historical)
+
+Scope of the preceding stage: persistent listeners plus real player sockets and the waiting-room
 interface. With a migrated database, entry is available as JOINING. Original audio,
 actual subtitle delivery and media revocation remain unavailable; no listener is
 authorized for command delivery. The full design.md objective remains incomplete.

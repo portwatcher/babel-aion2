@@ -4,13 +4,14 @@
 
 There are no available provider adapters and no enabled output languages.
 The public API returns an empty list. No provider credential or private setting
-is exposed. The administrator page accurately reports that setup is unavailable
-until the adapter and settings implementation exists.
+is exposed. The administrator page reports that provider integration is unavailable;
+its room and Discord settings form does not enable any provider or language.
 
 The database already has versioned provider configurations and disabled-by-default
-language rows. Credential fields are reserved for ciphertext. Encryption,
-configuration forms, tests, validation, hot replacement, and rollback are not
-implemented yet; do not put a plain-text key in that column.
+language rows. Credential fields are reserved for ciphertext. The server credential
+cipher is implemented and tested for Discord room settings. Provider configuration
+forms, adapter validation, hot replacement, and rollback are not implemented yet;
+do not put a plain-text key in a provider credential column.
 
 ## Implementation requirements
 

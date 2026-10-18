@@ -17,6 +17,11 @@ protects those routes, `/admin` and its descendants, and `/api/auth/*`.
 Each management handler repeats its required authorization check. Access proves
 identity; Better Auth persists the administrator session in PostgreSQL. Status
 polling uses HTTP every ten seconds. There is no administrator WebSocket.
+The room form saves a configuration version and encrypted Discord credential;
+stale edits receive 409. Source changes persist a stopped room and advance the
+source generation. The administrator list shares the player list component and
+removes the selected session/generation through the revocation coordinator.
+These settings do not start a worker or validate a live Discord source.
 
 `apps/voice-worker` is a buildable entry point that reports STOPPED and exits.
 It has no Discord connection, lease, media publisher, or provider job. It must
@@ -32,6 +37,9 @@ subtitle output language.
 `@babel/database` uses Drizzle and `pg`. The schema contains Better Auth's four
 tables, rooms, global nickname generations, listener sessions, provider
 configurations, output languages, audit events and player socket registrations.
+Room settings use a row lock and optimistic version check. Credentials use
+AES-256-GCM with the room ID and credential purpose as authenticated context;
+read APIs expose only credential presence. See [room settings](room-configuration.md).
 The partial unique index
 allows at most one ACTIVE session per nickname key across rooms. The schema is
 backed by transactional listener operations. Request IDs bind to the original
@@ -65,9 +73,10 @@ tables and are not Better Auth user accounts.
    fencing. List, terminal-state delivery, browser restoration and socket closure
    are implemented; actual subtitle traffic is not. Orphaned socket registrations
    after a hard process failure remain fail-closed and need confirmed recovery.
-5. Implement provider adapters, encrypted dynamic settings, destination
+5. Implement provider adapters and their dynamic settings, destination
    restrictions, real connection tests, configuration versions, and audit records.
-   Validate the complete processing path before enabling a language.
+   Reuse the server credential cipher already used by Discord settings. Validate
+   the complete processing path before enabling a language.
 6. Add one shared processing path per commander and active output language,
    revision fencing, bounded queues, and independent failure recovery.
 7. Add feature-detected Document PiP from a player action, sharing the same
