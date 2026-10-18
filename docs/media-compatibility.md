@@ -92,14 +92,17 @@ room, releases native media objects, and lets the parent observe process exit.
 - The dedicated bot is installed in the authorized test guild; the selected
   private voice channel now has the approved bot-specific ViewChannel/Connect
   grant. An isolated receiver reaches Ready with DAVE protocol 1 negotiated,
-  self-mute on and self-deafen off. The channel is empty, so no real speech or
-  completed DAVE group session has been observed. Capture scope can now select
-  specific members or all channel members without IDs.
-- Validate live Discord/DAVE receipt and independent member streams. An isolated
-  candidate install of `@discordjs/voice` 0.19.2, `discord.js` 14.27.0 and
-  `@discordjs/opus` 0.10.0 loads native DAVE/Opus on macOS arm64 and decodes an
-  Opus silence packet. That is not live compatibility evidence or a production
-  Discord dependency selection.
+  self-mute on and self-deafen off. An authorized member then supplies real speech:
+  DAVE protocol 1 becomes ready; 1,129 packets decode independently to 48 kHz
+  stereo signed-16 PCM, with 884 nonzero frames and no errors. A fresh receiver
+  rejoins and decodes another 62 packets (53 nonzero frames), also without errors.
+  Both native receiver processes close and exit 0. No raw audio is saved. Capture
+  scope can select specific members or all channel members without IDs.
+- The live candidate versions are `@discordjs/voice` 0.19.2, `discord.js` 14.27.0
+  and `@discordjs/opus` 0.10.0 on Node 24.18.0/macOS arm64. One real member and
+  bot rejoin are now validated; simultaneous sources, same-nickname users, member
+  re-entry, Go Live audio and Linux live receipt are not. The candidate remains
+  isolated from production dependencies until application source integration.
 - Extend the implemented admission/close proof to confirmed hard-crash recovery
   and production worker routing. Graceful restart and in-flight replacement pass;
   unknown owner registrations remain fail-closed.
