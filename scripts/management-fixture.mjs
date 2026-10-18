@@ -16,6 +16,8 @@ export async function createManagementFixture(databaseUrl) {
   const key = randomBytes(32)
   const environment = {
     BABEL_TEST_JWKS: JSON.stringify({ keys: [jwk] }),
+    NUXT_ACCESS_TEAM_DOMAIN: new URL(issuer).hostname,
+    NUXT_ACCESS_AUDIENCE: 'babel-smoke',
     NUXT_PROVIDER_ENCRYPTION_KEY: key.toString('base64'),
     NUXT_BETTER_AUTH_SECRET: randomBytes(48).toString('base64'),
   }
@@ -30,6 +32,7 @@ export async function createManagementFixture(databaseUrl) {
       .sign(keys.privateKey)
   }
   return {
+    environment: Object.freeze(environment),
     key,
     actor: `cf_${createHash('sha256').update(`${issuer}\0${subject}`).digest('hex')}`,
     assertion,
@@ -43,7 +46,12 @@ export async function createManagementFixture(databaseUrl) {
       const jwt = await assertion()
       const response = await fetch(`${server.origin}/api/auth/sign-in/cloudflare`, {
         method: 'POST',
-        headers: { origin: server.origin, 'cf-access-jwt-assertion': jwt },
+        headers: {
+          origin: server.origin,
+          'cf-access-jwt-assertion': jwt,
+          'content-type': 'application/json',
+        },
+        body: '{}',
       })
       assert.equal(response.status, 200, 'Verified Access identity must sign in')
       const cookie = response.headers

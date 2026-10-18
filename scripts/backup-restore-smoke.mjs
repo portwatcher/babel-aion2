@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { once } from 'node:events'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -9,6 +9,7 @@ import { test } from 'node:test'
 import WebSocket from 'ws'
 import { createManagementFixture } from './management-fixture.mjs'
 import { isolatedDatabase } from './fixtures/isolated-database.mjs'
+import { storageDigest } from './fixtures/database-digest.mjs'
 import {
   assertMatchingPostgresTools,
   postgresTool,
@@ -16,26 +17,6 @@ import {
 import { createProviderFixture } from './fixtures/provider-server.mjs'
 import { syntheticWave } from './fixtures/audio-sample.mjs'
 import { startMediaWorker, until } from './fixtures/media-worker.mjs'
-
-async function storageDigest(client) {
-  const tables = (
-    await client.query(
-      "select schemaname, tablename from pg_tables where schemaname in ('public','drizzle') order by schemaname, tablename",
-    )
-  ).rows
-  const result = {}
-  const quoted = (value) => '"' + value.replaceAll('"', '""') + '"'
-  for (const table of tables) {
-    const name = `${quoted(table.schemaname)}.${quoted(table.tablename)}`
-    const rows = (
-      await client.query(
-        `select to_jsonb(t)::text as data from ${name} t order by data`,
-      )
-    ).rows
-    result[name] = createHash('sha256').update(JSON.stringify(rows)).digest('hex')
-  }
-  return result
-}
 
 test('custom-format backups restore application settings, credentials and terminal sessions while uncertain live receipts remain fail-closed', async (t) => {
   const databases = [],
