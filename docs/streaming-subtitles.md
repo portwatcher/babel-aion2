@@ -42,7 +42,11 @@ subscription generations continue to fence obsolete connections and work.
 Transient target connection faults retry independently with bounded exponential
 backoff. Permanent key/quota/model faults remain visible until configuration is
 corrected. No target failure switches the selected language or restarts original
-audio. Unused targets close after two seconds. Sessions rotate at 50 minutes and
+audio. Only currently subscribed languages open target connections. The last
+unsubscribe immediately fences and closes that target, discards connecting audio
+and cancels retries. A later subscriber opens a fresh connection. When no subtitle
+listeners remain, the worker closes recognition too, even if output languages
+remain enabled. Original audio continues independently. Sessions rotate at 50 minutes and
 also honor the provider's actual `expires_at`; reconnecting clears stale text.
 
 ## Receive, push and display

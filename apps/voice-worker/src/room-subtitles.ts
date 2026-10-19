@@ -47,11 +47,12 @@ export class RoomSubtitles {
       }
     }
     for (const [group, stream] of speaker.streams) {
-      // The shared engine supplies the short unused-language release grace.
-      stream.reconcile(this.consumers.values(), this.paths)
-      if (![...this.paths.values()].some((path) => path.group === group)) {
+      if (!groups.has(group)) {
         stream.close()
         speaker.streams.delete(group)
+        speaker.retries.delete(group)
+      } else {
+        stream.reconcile(this.consumers.values(), this.paths)
       }
     }
     for (const [group, path] of groups) {

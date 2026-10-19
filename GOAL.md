@@ -525,6 +525,12 @@ Translation sessions consume incoming audio directly in parallel with recognitio
 Push each translated fragment immediately and display it on the page and PiP.
 Do not wait for a complete sentence, original transcript or other output language.
 Send the same target stream to all players who select that language.
+Open a target translation session only while it has current subtitle subscribers.
+When its last subscriber leaves or changes language, immediately stop forwarding
+audio, discard pending frames and close that target without a release grace.
+Do not push that language's results to other listeners. A new subscriber starts
+a fresh target connection. If no subtitle subscribers remain, close recognition
+and translation sessions while original audio continues independently.
 
 Do not create a recognition or translation job for each player.
 
@@ -534,11 +540,9 @@ Record the extra provider use from this design.
 Do not invent multi-language parameters that a provider does not accept.
 
 Start a language path when a player needs it.
-Use a short release delay when no player needs it.
-Release unused provider connections.
+Release unused provider connections immediately, without a release delay or
+keeping unselected language paths warm.
 Do a periodic check for unused connections that an earlier event did not remove.
-
-If the provider has this function, let the administrator keep selected language paths ready.
 
 ### Stream control
 

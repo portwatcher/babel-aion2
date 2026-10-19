@@ -59,6 +59,9 @@ The administrator saves only one encrypted OpenAI API Key. Fixed server adapters
 use `gpt-live-transcribe` for original captions and `gpt-realtime-translate` for
 parallel direct-audio translation. Every translated fragment is pushed immediately
 to the page and PiP; translation never waits for a completed source transcript.
+Only languages with current subtitle subscribers open translation sessions. The
+last unsubscribe closes that target immediately; no listeners releases recognition
+too, while original audio continues independently.
 An authorized PCM WAV sample can verify a selected language path. Game terms
 can guide original-caption recognition; the realtime translation API does not
 support custom glossaries. Original and translated streams are independent.

@@ -102,6 +102,75 @@ test('direct audio fans out by language and translated fragments appear before s
     )
   }
 })
+test('unused targets close immediately, discard connecting audio and reopen only for new subscribers', async (t) => {
+  const network = await fixture(t)
+  const key = network.credential()
+  const japaneseKey = network.credential()
+  const held = network.hold(japaneseKey, 'translation', true)
+  const s = stream(network, key)
+  t.after(() => {
+    held.release()
+    s.close()
+  })
+  const japanese = [],
+    korean = []
+  const removeA = s.subscribe(path(japaneseKey, 'ja'), (event) => japanese.push(event))
+  const removeB = s.subscribe(path(japaneseKey, 'ja'), (event) => japanese.push(event))
+  const removeKorean = s.subscribe(path(key, 'ko'), (event) => korean.push(event))
+  await s.ready
+  await held.started
+  await until(
+    () => network.observations.filter((value) => value.configuration).length === 3,
+    'only the original and two subscribed target sessions exist',
+  )
+  let offset = 0
+  function write() {
+    s.write(Buffer.alloc(1920), offset)
+    offset += 960
+  }
+  write()
+  const old = network.observations.find((value) => value.key === japaneseKey)
+  const koreanOutput = network.observations.find(
+    (value) => value.protocol === 'translation' && value.key === key,
+  )
+  await until(() => koreanOutput.frames.length === 1, 'ready target receives audio')
+  removeA()
+  assert.equal(old.closed, false, 'remaining listener retains the shared target')
+  removeB()
+  await until(() => old.closed, 'last listener closes the connecting target', 1000)
+  held.release()
+  assert.equal(old.frames.length, 0, 'abandoned handshake never flushes queued audio')
+  assert.equal(koreanOutput.closed, false)
+  const resumed = []
+  const removeResumed = s.subscribe(path(japaneseKey, 'ja'), (event) =>
+    resumed.push(event),
+  )
+  await s.prepare()
+  const fresh = network.observations.filter((value) => value.key === japaneseKey).at(-1)
+  assert.notEqual(fresh, old)
+  const delta = (text) => ({
+    type: 'session.output_transcript.delta',
+    event_id: text,
+    delta: text,
+  })
+  network.emit(japaneseKey, delta('Fresh Japanese.'), fresh)
+  network.emit(key, delta('Korean continues.'), koreanOutput)
+  await until(
+    () =>
+      values(resumed).at(-1)?.translatedText === 'Fresh Japanese.' &&
+      values(korean).at(-1)?.translatedText === 'Korean continues.',
+    'new subscription and retained target publish independently',
+  )
+  assert.equal(japanese.length, 0, 'removed subscribers receive no later output')
+  removeResumed()
+  removeResumed()
+  removeKorean()
+  await until(
+    () => fresh.closed && koreanOutput.closed,
+    'all unused target sockets close without a release grace',
+    1000,
+  )
+})
 test('slow or failed translations never delay recognition or another output language', async (t) => {
   const network = await fixture(t)
   const sourceKey = network.credential('speech'),
