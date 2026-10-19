@@ -1,9 +1,6 @@
 export function useAdministratorStatus() {
-  const roomQuery = useManagementRoomQuery()
   const status = ref<{
     administrator: { email: string }
-    services: { discord: string; media: string; subtitles: string }
-    configurationEditable: boolean
   } | null>(null)
   const loading = ref(false)
   const error = ref('')
@@ -14,7 +11,6 @@ export function useAdministratorStatus() {
     try {
       status.value = await $fetch<NonNullable<typeof status.value>>(
         '/api/management/status',
-        { query: roomQuery.value },
       )
       error.value = ''
     } catch {

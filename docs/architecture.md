@@ -65,15 +65,22 @@ and owns its playback/mute control; PiP adds no audio element. Entry returns 503
 without database configuration. A separately configured and started Discord
 source supplies original audio and independently feeds per-member recognition.
 
-Administration uses separate `/api/management/*` HTTP routes. Server middleware
-protects those routes, `/admin` and its descendants, and `/api/auth/*`.
+Administration uses separate `/api/management/*` HTTP routes.
+The administrator page is website-wide and contains only the saved OpenAI API Key
+and game terminology. It never selects a room or loads Discord, listener or
+language management panels. Its authenticated status endpoint depends only on
+the administrator session, including when no rooms exist or an old room query
+is present. Legacy room operations remain server-side compatibility APIs.
+
+Server middleware protects those routes, `/admin` and its descendants, and `/api/auth/*`.
 Each management handler repeats its required authorization check. Access proves
 identity; Better Auth persists the administrator session in PostgreSQL. Status
 polling uses HTTP every ten seconds. There is no administrator WebSocket.
-The room form saves a configuration version and encrypted Discord credential;
+The legacy room API saves a configuration version and encrypted Discord credential;
 stale edits receive 409. Source changes persist a stopped room and advance the
-source generation. The administrator list shares the player list component and
-removes the selected session/generation through the revocation coordinator.
+source generation. Its listener endpoint removes a selected session/generation
+through the revocation coordinator. These compatibility controls have no website
+administration interface.
 Capture scope is either selected member IDs or all channel speakers. Existing
 rooms retain selected mode; switching scope advances the source generation and
 persists stopped state. The separate start action requests reception and source

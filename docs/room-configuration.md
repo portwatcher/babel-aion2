@@ -1,5 +1,10 @@
 # Room configuration
 
+Website administration contains only the OpenAI API Key and game terms. It has
+no room selector, Discord configuration, listener controls or room start/stop
+buttons. The room-control APIs described below remain for server-side legacy
+compatibility; they are not administrator-page features.
+
 New rooms are created by Discord bot installation. The verified OAuth grant
 supplies the guild and the permission-checked chooser supplies the channel.
 Administration selects actual installed rooms, without creating a default room
@@ -9,8 +14,8 @@ The settings/API details below include legacy compatibility for previously store
 broadcasts. Multiple rooms may use one guild; one receiver and encoder serve its
 active rooms. Each room's stop state applies to its own delivery.
 
-The administrator page can save room and Discord source settings and remove a
-specific listener connection. The separate start action requests Discord
+The legacy API can save room and Discord source settings and remove a
+specific listener connection. Its separate start operation requests Discord
 reception; source status reports actual worker state and decoded member counters.
 Saved IDs and credentials alone are not proof of permissions or sound delivery.
 Subtitle languages remain disabled until the complete delivery path is validated.

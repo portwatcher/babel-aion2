@@ -20,7 +20,9 @@ The player interface supports English, Simplified Chinese, Japanese and Korean.
 It detects browser preferences during SSR and falls back to English. The compact
 header selector overrides detection; its choice is stored in localStorage and
 mirrored in a cookie for subsequent server rendering. Administration always uses
-English. Interface language does not change the selected subtitle language or
+English and contains only the website-wide OpenAI API Key and game terms.
+Room creation handles Discord installation; administration does not select or
+manage individual rooms. Interface language does not change the selected subtitle language or
 listener session. See [interface localization](docs/interface-localization.md).
 
 The website and private voice worker are deployed at
@@ -73,8 +75,9 @@ support custom glossaries. Original and translated streams are independent.
 Administrators can prepare output-language paths, order them, choose a default,
 and save sample validation tied to the exact provider and terminology revisions.
 Activation requires current sample validation and a ready private subtitle worker.
-New installations still have no languages or credentials; the administrator chooses
-which validated paths to enable. Live provider quality is unvalidated.
+The requested Chinese, Japanese and Korean paths are configured and validated
+with the saved key as part of production setup. The administrator does not need
+to add or enable them manually. Battle-command quality remains a separate check.
 Isolated real DAVE receipt and rejoin passed with one member;
 see the test report for the separate application and browser evidence.
 Isolated [media compatibility checks](docs/media-compatibility.md) record native
