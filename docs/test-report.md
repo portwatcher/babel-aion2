@@ -17,7 +17,8 @@ PASS applies only to that named check, not automatically to production.
 | Production single-member receipt             | PASS                      | After the human joined the configured voice channel, the actual worker reported the correct member identity and 282 decoded frames at 02:03 UTC, generation 9, with no failure reason                            |
 | Production session and PiP lifecycle         | PASS                      | Real Chrome replacement, same-session refresh, playback action, administrator removal and PiP closure passed against deployed replicas; independent persisted transport receipts confirm closure                 |
 | Graceful production worker replacement       | PASS                      | Settings and listener generation survived GitOps replacement. A cross-node TURN routing regression was reproduced and corrected; the browser reconnected and the new source decoded another 29 frames            |
-| Audible playback and multiple members        | NOT RUN                   | The browser audio channel is connected. Human playback confirmation after receipt, simultaneous speakers and production member re-entry remain outstanding                                                       |
+| Single-member audible playback               | PASS                      | After the relay correction and browser reconnection, the human confirmed hearing their own Discord voice through the production Babel webpage                                                                    |
+| Multiple-member behavior                     | NOT RUN                   | Simultaneous speakers, production source separation and production member leave/re-entry remain outstanding                                                                                                      |
 | Live subtitle quality                        | WAITING FOR CONFIGURATION | Soniox/DeepL settings and validation are implemented. Authorized credentials and representative commands are needed to validate each chosen output language                                                      |
 | Native window and game use                   | NOT RUN                   | Real Chrome subtitle-window opening and replacement-driven closure passed with subtitles disabled. Native desktop inspection failed; background audible playback and actual AION2 display mode remain unverified |
 | Deployed latency and capacity                | NOT RUN                   | Production transport now connects, but actual source/playback timing, load and player networks including mainland China remain unmeasured; connection success is not end-to-end latency evidence                 |
@@ -36,7 +37,8 @@ remain identical.
 ## Production voice rollout — 2026-10-19
 
 The later session and controlled-restart checks below extend this initial rollout
-evidence. They do not establish audible playback or abrupt host-loss recovery.
+evidence. The human subsequently confirmed single-member audible playback after
+the relay correction. Abrupt host-loss recovery remains unverified.
 
 PASS: [current web and voice deployment](deployment.md#current-web-and-voice-verification--2026-10-19)
 records the published/running image digests, healthy two-web/one-worker rollout,
@@ -64,11 +66,11 @@ PASS: one real member's audio reached the production worker after the human
 joined the configured Discord channel. At 02:03 UTC the source still reported
 LISTENING, generation 9, no failure reason, the correct member identity and 282
 decoded frames. The first human attempt had no audible output while that account
-was outside the voice channel. Subsequent audible playback has not yet been
-confirmed. No voice recording was retained.
+was outside the voice channel. Audible playback was unconfirmed at that stage;
+the later recovery report records the subsequent human confirmation. No voice
+recording was retained.
 
-NOT RUN: confirmed audible production playback, multiple-member behavior,
-provider quality, restricted/TLS relay paths,
+NOT RUN: multiple-member behavior, provider quality, restricted/TLS relay paths,
 mainland-China latency, capacity, native game behavior and disaster recovery.
 
 ## Production sessions and graceful worker recovery — 2026-10-19
@@ -86,14 +88,15 @@ player was seeded. Only the named verification listener was replaced or removed.
 | Persistent settings and ownership  | PASS            | Two normal GitOps worker replacements log child exit code 0 and persist exited-owner/source/media closure. A digest including the encrypted room credential is unchanged. Each new source starts after the prior owner exits                                                                      |
 | Cross-node relay regression        | FAIL, then PASS | The first replacement lands on another node: Discord reconnects, but public-node TURN TCP allocation times out after 5 seconds and Chrome repeatedly renegotiates. The same pod reaches the existing internal Service, exchanging ten packets each way with an external public allocation         |
 | Deployed correction and recovery   | PASS            | Private infra switches only the worker TURN destination to the existing Service and rolls the worker. The deployed relay probe passes ten packets each way. Chrome reconnects without a new listener or manual refresh; source generation 11 reports the correct member and 29 new decoded frames |
+| Single-member audible playback     | PASS            | After recovery, the human confirmed hearing their own Discord voice through the production Babel webpage. This is a human listening result in addition to the transport and decoded-frame observations                                                                                            |
 
-The final worker is healthy and one generation-3 listener remains for the pending
-human listening check. Extra test pages and the PiP window are closed. The two web
+The final worker is healthy and the generation-3 listener remained connected for
+the successful human listening check. Extra test pages and the PiP window are closed. The two web
 replicas retain their process owners. No shared TURN service, key, public endpoint,
 port or network permission was expanded. The final running image is unchanged;
 the correction is private infrastructure configuration.
 
-These observations do not prove speaker-output audibility, simultaneous members,
+The single-member listening result does not establish simultaneous members,
 live translated subtitles, background sound, AION2 fullscreen behavior, capacity,
 or recovery after abrupt supervisor/container/host loss. Native desktop window
 inspection failed, while browser access to the actual PiP document succeeded.
@@ -835,10 +838,12 @@ was applied. This is not a claim that the entire dependency graph is vulnerabili
 
 ## External inputs for later live checks
 
-- Human playback confirmation after the verified single-member receipt, followed
-  by a second speaking member for source separation. The existing all-channel mode
+- A second speaking member for live source-separation and simultaneous-speaking
+  checks, followed by member leave/re-entry. Single-member audible playback is
+  human-confirmed. The existing all-channel mode
   does not require a commander-ID list; the production bot credential is saved
-  and the source is connected. Orchestration recovery evidence is still pending.
+  and the source is connected. Graceful worker replacement passed; abrupt-loss
+  fencing evidence is still pending.
 - Selected provider credentials and authorized battle-command samples for
   language-specific quality checks after configuration.
 - An unlocked supported browser/device, the actual AION2 display mode, and player

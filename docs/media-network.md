@@ -98,4 +98,6 @@ network permissions or public services. An initially healthy co-located worker
 does not prove the route works after rescheduling.
 
 See [production recovery evidence](test-report.md#production-sessions-and-graceful-worker-recovery--2026-10-19).
-Audible playback, player-network coverage and capacity remain separate checks.
+The human subsequently confirmed single-member audible playback through the
+production webpage. Multiple-member behavior, player-network coverage and
+capacity remain separate checks.
