@@ -24,6 +24,7 @@ export const communityRoom = pgTable('community_room', {
   creatorId: text('creator_id').notNull(),
   server: text('server').notNull(),
   allowedIds: jsonb('allowed_ids').$type<string[]>().notNull().default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
 export const listenerCharacter = pgTable('listener_character', {

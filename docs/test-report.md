@@ -1,5 +1,21 @@
 # Validation
 
+## Empty-room automatic disbanding — 2026-10-19
+
+The public room lifecycle uses a fixed five-minute empty window, with a 30-second
+web reconciliation interval. New entry prevents expiry, confirmed final transport
+shutdown starts a fresh window, and unpublished legacy rooms remain excluded.
+Migration 0016 preserves room history and gives existing community rooms an initial
+five-minute grace window. Newly published legacy rooms also start a full window.
+
+| Check                            | Result  | Evidence                                                                                                                                                                                                                                                               |
+| -------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Original regression              | PASS    | The new PostgreSQL lifecycle test failed on the original implementation because an unused room stayed running after its deadline.                                                                                                                                      |
+| PostgreSQL lifecycle             | PASS    | Normal listener service entry, leave and reconciliation verify pre-deadline retention, never-joined expiry, ACTIVE/JOINING retention, recent final leave, unconfirmed media closure, two replicas, racing entry, no re-entry/restart and an occupied guild sibling.    |
+| Full source validation           | PASS    | `npm run ci:local`: formatting, source limits, strict workspace types, 19 unit tests, all builds and built HTTP smoke. `npm run test:db`: 15 tests pass on a freshly migrated disposable local database.                                                               |
+| Built HTTP timer and access      | PASS    | `npm run test:community:db` triggers the built web timer and verifies directory removal and 404 responses for configuration, players, entry and administrator settings across two replicas. `npm run test:management:db` also passes after repairing H3 error mapping. |
+| Live five-minute waiting / audio | NOT RUN | Local time-boundary fixtures backdate persisted timestamps; they do not establish human playback or a five-minute production wall-clock observation.                                                                                                                   |
+
 ## Direct room links and character verification · 2026-10-19
 
 | Check                                                    | Status  | Evidence                                                                                                                                                                                                                            |

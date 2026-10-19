@@ -2,6 +2,7 @@ import type { CharacterProfile, ListenerReference } from '@babel/contracts'
 import { and, eq } from 'drizzle-orm'
 import type { Database } from '../client.ts'
 import { listenerSession } from '../schema/rooms.ts'
+import { disbandEmptyCommunityRooms } from '../room-lifecycle.ts'
 import { activateCurrent, prepareEntry } from './entry.ts'
 import {
   confirmDeliveryStopped,
@@ -153,6 +154,7 @@ export function createListenerService(db: Database, delivery: ListenerDelivery) 
       for (const record of waiting) {
         await advance(record)
       }
+      await disbandEmptyCommunityRooms(db)
     },
   }
 }

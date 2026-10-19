@@ -157,6 +157,13 @@ new rooms are created only through Discord installation.
   required server and optional IDs once. Preserve its Discord source, end old
   unverified sessions and enforce the new admission policy on legacy entry too.
   Do not skip old same-ID transport closure during the namespace transition.
+- Automatically disband a community room after five continuous minutes without
+  members, starting at community-room creation, publication of an existing room,
+  or confirmed shutdown of the last listener.
+  JOINING and ACTIVE sessions keep the room open; unconfirmed transport shutdown
+  blocks disbanding. New entry cancels expiry. Persist disbanding across replicas
+  and restarts, close entry and administration, and stop only that room’s audio
+  destination while other rooms in the guild continue.
 - The product name is “Babel · AION2 深渊战”.
 
 ## 4. Interface and API boundaries
