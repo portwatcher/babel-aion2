@@ -36,6 +36,12 @@ export const characterProfileSchema = characterRequestSchema.extend({
 export type CharacterProfile = z.infer<typeof characterProfileSchema>
 export const roomNameSchema = nicknameSchema
 export const DEFAULT_ROOM_ID = '00000000-0000-4000-8000-000000000001'
+export const roomNumberSchema = z.number().int().positive().max(2_147_483_647)
+export const roomNumberParameterSchema = z
+  .string()
+  .regex(/^[1-9][0-9]{0,9}$/)
+  .transform(Number)
+  .pipe(roomNumberSchema)
 export const roomAdmissionSchema = z.object({
   server: z.enum(ASIA_SERVERS),
   allowedIds: z.array(nicknameSchema).max(200).default([]),
@@ -46,6 +52,7 @@ export const roomCreationSchema = z.object({
 })
 export interface LobbyRoom {
   id: string
+  number: number
   name: string
   memberCount: number
   stopped: boolean

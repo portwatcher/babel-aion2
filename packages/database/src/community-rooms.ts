@@ -24,6 +24,17 @@ async function readGuildSource(db: Pick<Database, 'select'>, guildId: string) {
   return sources.find(voiceSourceConfigured)
 }
 
+async function creationResult(db: Pick<Database, 'select'>, roomId: string) {
+  const [record] = await db
+    .select({ roomNumber: communityRoom.number })
+    .from(communityRoom)
+    .where(eq(communityRoom.roomId, roomId))
+  if (!record) {
+    throw new CommunityRoomError('INVALID_INSTALLATION')
+  }
+  return { roomId, roomNumber: record.roomNumber }
+}
+
 export async function beginInstallation(db: Database, input: unknown) {
   const request = roomInstallSchema.parse(input)
   const state = randomBytes(32).toString('base64url')
@@ -62,7 +73,14 @@ export async function readInstallation(db: Database, id: string, browser: string
     record.authorizedAt && record.guildId
       ? await readGuildSource(db, record.guildId)
       : undefined
-  return { ...record, sharedVoiceChannelId: source?.discordVoiceChannelId ?? null }
+  const consumed = record.consumedRoomId
+    ? await creationResult(db, record.consumedRoomId)
+    : null
+  return {
+    ...record,
+    consumedRoomNumber: consumed?.roomNumber ?? null,
+    sharedVoiceChannelId: source?.discordVoiceChannelId ?? null,
+  }
 }
 
 export async function completeInstallation(
@@ -119,7 +137,7 @@ export async function createCommunityRoom(
       throw new CommunityRoomError('INVALID_INSTALLATION')
     }
     if (installation.consumedRoomId) {
-      return { roomId: installation.consumedRoomId }
+      return creationResult(tx, installation.consumedRoomId)
     }
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtextextended(${`babel:community-guild:${installation.guildId}`}, 0))`,
@@ -163,7 +181,7 @@ export async function createCommunityRoom(
         restricted: installation.allowedIds.length > 0,
       },
     })
-    return { roomId }
+    return creationResult(tx, roomId)
   })
 }
 
@@ -173,6 +191,7 @@ export async function listCommunityRooms(
   const rooms = await db
     .select({
       id: room.id,
+      number: communityRoom.number,
       name: room.name,
       stopped: room.stopped,
       server: communityRoom.server,

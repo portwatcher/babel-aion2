@@ -57,7 +57,7 @@ onBeforeUnmount(() => clearInterval(timer))
         <li v-for="room in rooms" :key="room.id">
           <div class="room-directory-identity">
             <h2>
-              <NuxtLink :to="`/rooms/${room.id}`">{{ room.name }}</NuxtLink>
+              <NuxtLink :to="`/rooms/${room.number}`">{{ room.name }}</NuxtLink>
             </h2>
             <p class="muted">
               Asia / {{ room.server }} ·
@@ -74,7 +74,7 @@ onBeforeUnmount(() => clearInterval(timer))
             }}</span>
             <Button
               as="a"
-              :href="`/rooms/${room.id}`"
+              :href="`/rooms/${room.number}`"
               :label="t('joinRoomLink')"
               severity="secondary"
             />

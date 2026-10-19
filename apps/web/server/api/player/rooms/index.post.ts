@@ -23,8 +23,11 @@ export default defineEventHandler(async (event) => {
   return communityOperation(async () => {
     const database = useDatabase(event)
     const installation = await readInstallation(database, id, browser)
-    if (installation.consumedRoomId) {
-      return { roomId: installation.consumedRoomId }
+    if (installation.consumedRoomId && installation.consumedRoomNumber) {
+      return {
+        roomId: installation.consumedRoomId,
+        roomNumber: installation.consumedRoomNumber,
+      }
     }
     if (!installation.guildId || !installation.authorizedAt) {
       throw createError({ statusCode: 401, statusMessage: '请先完成 Discord 安装' })

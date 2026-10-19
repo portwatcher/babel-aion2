@@ -120,6 +120,13 @@
       "when": 1792405705477,
       "tag": "0016_room_idle_disband",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792406182799,
+      "tag": "0017_sour_joystick",
+      "breakpoints": true
     }
   ]
 }
