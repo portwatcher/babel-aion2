@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { createServer } from 'node:net'
 import { once } from 'node:events'
-import type { AddressInfo } from 'node:net'
+import type { AddressInfo, Socket } from 'node:net'
 import {
   babelTracer,
   startTelemetry,
@@ -26,7 +26,10 @@ test('telemetry stays off without an endpoint or when disabled', () => {
 
 test('shutdown is bounded when the collector never answers', async () => {
   // Accept connections and never respond, like a blackholed collector.
-  const collector = createServer(() => {})
+  const sockets = new Set<Socket>()
+  const collector = createServer((socket) => {
+    sockets.add(socket)
+  })
   collector.listen(0, '127.0.0.1')
   await once(collector, 'listening')
   const { port } = collector.address() as AddressInfo
@@ -40,5 +43,9 @@ test('shutdown is bounded when the collector never answers', async () => {
   const started = performance.now()
   await stopTelemetry(300)
   assert.ok(performance.now() - started < 1_500)
+  // Release the held export so this process exits promptly.
+  for (const socket of sockets) {
+    socket.destroy()
+  }
   collector.close()
 })
