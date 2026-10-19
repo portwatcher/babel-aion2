@@ -72,7 +72,7 @@ export async function prepareEntry(
     const [destination] = await tx
       .select({ id: room.id })
       .from(room)
-      .where(eq(room.id, roomId))
+      .where(and(eq(room.id, roomId), isNull(room.disbandedAt)))
       .for('share')
     if (!destination) {
       throw new ListenerError('ROOM_NOT_FOUND')

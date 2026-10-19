@@ -44,7 +44,7 @@ function publicSettings(stored: StoredRoom): ManagementRoom {
 
 export async function readRoomSettings(db: Database, roomId: string) {
   const [stored] = await db.select().from(room).where(eq(room.id, roomId))
-  if (!stored) {
+  if (!stored || stored.disbandedAt) {
     throw new RoomConfigurationError('NOT_FOUND')
   }
   return publicSettings(stored)
@@ -68,7 +68,7 @@ export async function updateRoomSettings(
       .from(room)
       .where(eq(room.id, roomId))
       .for('update')
-    if (!stored) {
+    if (!stored || stored.disbandedAt) {
       throw new RoomConfigurationError('NOT_FOUND')
     }
     if (stored.configurationVersion !== input.expectedVersion) {
@@ -150,7 +150,7 @@ export async function startRoom(
       .from(room)
       .where(eq(room.id, roomId))
       .for('update')
-    if (!stored) {
+    if (!stored || stored.disbandedAt) {
       throw new RoomConfigurationError('NOT_FOUND')
     }
     if (stored.configurationVersion !== expectedVersion) {
@@ -204,7 +204,7 @@ export async function stopRoom(
       .from(room)
       .where(eq(room.id, roomId))
       .for('update')
-    if (!stored) {
+    if (!stored || stored.disbandedAt) {
       throw new RoomConfigurationError('NOT_FOUND')
     }
     if (stored.configurationVersion !== expectedVersion) {

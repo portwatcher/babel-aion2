@@ -1,6 +1,6 @@
 import { DEFAULT_ROOM_ID, type PublicRoomConfiguration } from '@babel/contracts'
 import { communityRoom, outputLanguage, room } from '@babel/database/schema'
-import { and, asc, eq, isNotNull, sql } from 'drizzle-orm'
+import { and, asc, eq, isNotNull, isNull, sql } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import { useDatabase } from './database'
 import { voiceSourceConfigured } from '@babel/database/voice-sources'
@@ -21,7 +21,7 @@ export async function useListenerRoom(event?: H3Event, selectedRoomId?: string) 
       const [saved] = await database
         .select({ id: room.id })
         .from(room)
-        .where(eq(room.id, parsed.data))
+        .where(and(eq(room.id, parsed.data), isNull(room.disbandedAt)))
       if (!saved) {
         throw createError({ statusCode: 404, statusMessage: 'Room not found' })
       }
@@ -34,6 +34,7 @@ export async function useListenerRoom(event?: H3Event, selectedRoomId?: string) 
   const [saved] = await database
     .select({ id: room.id })
     .from(room)
+    .where(isNull(room.disbandedAt))
     .orderBy(
       sql`case when ${room.id} = ${DEFAULT_ROOM_ID} then 0 else 1 end`,
       asc(room.createdAt),
@@ -66,7 +67,10 @@ export async function publicRoomConfiguration(
     )
     configuration.room.id = roomId
     await database.execute(sql`select id from player_connection limit 1`)
-    const [saved] = await database.select().from(room).where(eq(room.id, roomId))
+    const [saved] = await database
+      .select()
+      .from(room)
+      .where(and(eq(room.id, roomId), isNull(room.disbandedAt)))
     if (saved) {
       configuration.room.name = saved.name
       const [admission] = await database
@@ -107,7 +111,7 @@ export async function publicRoomConfiguration(
       }
     }
     // Entry persists JOINING, independently of command-delivery authorization.
-    configuration.entryAvailable = true
+    configuration.entryAvailable = Boolean(saved)
   } catch {
     /* Keep the public lobby available when storage is unavailable. */
   }

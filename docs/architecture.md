@@ -36,6 +36,12 @@ insertion. Author metadata is derived from the session. Reads and writes reject
 old generations and cross-room credentials. Only the original session can delete
 its stroke. PostgreSQL provides persistence and cross-replica synchronization.
 
+The web listener reconciler also disbands community rooms after five continuous
+minutes empty. An exclusive room lock serializes expiry with entry; live listeners
+and unconfirmed transport closures block it. Persisted creation and shutdown
+timestamps define the deadline. A room tombstone fences public entry and settings,
+stops its destination, and preserves the guild source generation for other rooms.
+
 See [multi-room setup, upstream dependencies and limits](multi-room-and-map.md).
 
 ## Current foundation

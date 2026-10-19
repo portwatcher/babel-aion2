@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import { communityRoom, room } from '@babel/database/schema'
 import { CommunityRoomError } from '@babel/database/community-rooms'
@@ -20,7 +20,7 @@ export async function requireCommunityRoom(event: H3Event) {
     .select({ room, admission: communityRoom })
     .from(room)
     .innerJoin(communityRoom, eq(room.id, communityRoom.roomId))
-    .where(eq(room.id, roomId))
+    .where(and(eq(room.id, roomId), isNull(room.disbandedAt)))
   if (!record) {
     throw createError({ statusCode: 404, statusMessage: '房间不存在' })
   }

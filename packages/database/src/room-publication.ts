@@ -27,7 +27,7 @@ export async function publishExistingRoom(
       .from(room)
       .where(eq(room.id, roomId))
       .for('update')
-    if (!stored) {
+    if (!stored || stored.disbandedAt) {
       throw new RoomPublicationError('NOT_FOUND')
     }
     if (

@@ -3,7 +3,7 @@ import {
   CredentialProtectionError,
 } from '@babel/database/credentials'
 import { RoomConfigurationError } from '@babel/database/room-settings'
-import type { H3Event } from 'h3'
+import { isError, type H3Event } from 'h3'
 
 export async function readRoomConfigurationBody(event: H3Event): Promise<unknown> {
   try {
@@ -25,6 +25,9 @@ export async function roomConfigurationOperation<T>(operation: () => Promise<T>)
   try {
     return await operation()
   } catch (error) {
+    if (isError(error)) {
+      throw error
+    }
     if (error instanceof CredentialProtectionError) {
       throw createError({
         statusCode: 503,

@@ -180,6 +180,7 @@ export async function listCommunityRooms(
     })
     .from(room)
     .innerJoin(communityRoom, eq(communityRoom.roomId, room.id))
+    .where(isNull(room.disbandedAt))
     .orderBy(asc(room.createdAt), asc(room.id))
   const counts = await db
     .select({ roomId: listenerSession.roomId, total: count() })
