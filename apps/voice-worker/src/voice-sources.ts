@@ -168,15 +168,28 @@ export class VoiceSources {
             : !this.cipher || !voiceSourceConfigured(next.configuration)
               ? 'CONFIGURATION'
               : 'DISCORD',
+          error,
         )
       })
     }
   }
 
-  private fail(source: Source, reason: VoiceSourceStatus['reason']) {
+  private fail(source: Source, reason: VoiceSourceStatus['reason'], error?: unknown) {
     if (source.closing) {
       return
     }
+    console.error(
+      JSON.stringify({
+        component: 'voice-sources',
+        roomId: source.configuration.id,
+        event: 'source-failed',
+        reason,
+        detail:
+          error instanceof Error
+            ? `${error.name}: ${error.message}`.slice(0, 300)
+            : undefined,
+      }),
+    )
     this.failures.set(source.configuration.id, {
       generation: source.configuration.sourceGeneration,
       retryAt:

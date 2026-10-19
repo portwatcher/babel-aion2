@@ -2,7 +2,7 @@
 
 ## Setup
 
-Apply database migrations, including `0013_fresh_mesmero.sql`. Supply the
+Apply database migrations, through `0017_sour_joystick.sql`. Supply the
 following server-only runtime configuration through the private infra secret
 store:
 
@@ -36,8 +36,12 @@ source readiness remains worker status, independently from the saved request.
 
 ## Room and character entry
 
-Share `/rooms/:roomId` directly. A valid listener session opens the room; absent,
-invalid or ended sessions go to `/rooms/:roomId/verify`. That page checks the
+Room numbers start at 1: share `/rooms/1`, `/rooms/2`, and so on. Existing
+community rooms receive numbers in creation order. Numbers stay fixed and are
+not reused after deletion. UUID room links are not supported.
+
+Share `/rooms/:roomNumber` directly. A valid listener session opens the room; absent,
+invalid or ended sessions go to `/rooms/:roomNumber/verify`. That page checks the
 character on the room's game server and returns to the same room after admission.
 No player account or Cloudflare login is required. Entry controls live only on
 verification; the room's listener panel, online members and map render only after

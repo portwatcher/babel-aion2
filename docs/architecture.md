@@ -12,7 +12,15 @@ The worker groups those rooms into one receiver and encoder and distributes
 packets to active room destinations; subtitle delivery keeps room authorization.
 No read operation creates a default room. Shared bot credentials use the existing room-bound cipher.
 
-`/rooms/:roomId` and its nested `/verify` page share a parent listener controller.
+A unique PostgreSQL identity column on `community_room` assigns public room
+numbers from 1. Migration `0017` numbers existing community rooms by creation time
+and UUID, then advances the sequence. Creation retries return the original
+number; concurrent creation and deletion cannot duplicate or reuse it. Public
+room API parameters resolve a canonical positive number to the internal UUID.
+Sessions, source ownership, encryption contexts and management keep their UUIDs.
+Directory links and completed installations use only the public number.
+
+`/rooms/:roomNumber` and its nested `/verify` page share a parent listener controller.
 The browser restores its saved room credential before selecting the destination:
 valid sessions open the room, missing/ended sessions open verification, and
 transient restore errors keep a retry action. Successful verification returns to
@@ -109,7 +117,12 @@ registers negotiations before creating peers, closes obsolete peers and persists
 the actual close acknowledgement. A PostgreSQL ownership session and durable
 source receipt exclude duplicate bot/guild controllers. The source controller
 connects Discord with DAVE, maintains separate member decoders and bounded PCM
-queues, and publishes mixed original audio independently of subtitle work. Source
+queues, and publishes mixed original audio independently of subtitle work. An
+undecodable packet (for example during a DAVE transition) is dropped, and a failed
+member receive stream is closed and resubscribed on that member's next speaking
+event; neither disconnects the bot. Only gateway/voice disconnection, the bot
+leaving the channel, or lost ownership retires the source, and each retirement
+writes a `source-failed` JSON line with the room and reason. Source
 retirement closes old browser peers before acknowledging shutdown. Separate
 member timelines feed shared provider jobs only while language demand exists.
 Version-checked private HTTP streams feed actual registered player sockets.

@@ -12,7 +12,13 @@ export async function verifyRoomDisband({
   b,
   administrator,
 }) {
-  const { roomId } = await create('Unused room timeout', 'siel', [], 'alpha', true)
+  const { roomId, roomNumber } = await create(
+    'Unused room timeout',
+    'siel',
+    [],
+    'alpha',
+    true,
+  )
   await database.pool.query(
     "update community_room set created_at=now()-interval '5 minutes 1 second' where room_id=$1",
     [roomId],
@@ -33,13 +39,13 @@ export async function verifyRoomDisband({
     assert.ok(!directory.rooms.some((room) => room.id === roomId))
     for (const path of ['config', 'players']) {
       assert.equal(
-        (await call(server, `/api/player/rooms/${roomId}/${path}`)).status,
+        (await call(server, `/api/player/rooms/${roomNumber}/${path}`)).status,
         404,
       )
     }
     assert.equal(
       (
-        await call(server, `/api/player/rooms/${roomId}/sessions`, {
+        await call(server, `/api/player/rooms/${roomNumber}/sessions`, {
           method: 'POST',
           token: randomBytes(32).toString('base64url'),
           body: { nickname: 'Pilot', outputLanguage: null, requestId: randomUUID() },

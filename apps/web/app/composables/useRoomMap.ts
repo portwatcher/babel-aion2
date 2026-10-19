@@ -13,7 +13,7 @@ class RoomMapError extends Error {
 }
 
 export function useRoomMap(
-  roomId: string,
+  roomNumber: string,
   session: Ref<ListenerSnapshot | null>,
   credential: Ref<string | null>,
 ) {
@@ -26,7 +26,7 @@ export function useRoomMap(
   const enabled = computed(() =>
     Boolean(session.value && credential.value && !denied.value),
   )
-  const path = `/api/player/rooms/${roomId}/map`
+  const path = `/api/player/rooms/${roomNumber}/map`
   let disposed = false
   let version = 0
   let reading = false

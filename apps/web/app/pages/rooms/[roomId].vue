@@ -1,17 +1,23 @@
 <script setup lang="ts">
-import type { PublicRoomConfiguration } from '@babel/contracts'
+import {
+  roomNumberParameterSchema,
+  type PublicRoomConfiguration,
+} from '@babel/contracts'
 const { t } = useInterfaceLocale()
-definePageMeta({ key: (route) => String(route.params.roomId) })
+definePageMeta({
+  key: (route) => String(route.params.roomId),
+  validate: (route) => roomNumberParameterSchema.safeParse(route.params.roomId).success,
+})
 const route = useRoute()
-const roomId = String(route.params.roomId)
-const roomPath = `/rooms/${encodeURIComponent(roomId)}`
+const roomNumber = String(route.params.roomId)
+const roomPath = `/rooms/${encodeURIComponent(roomNumber)}`
 const verificationPath = `${roomPath}/verify`
 const verifying = computed(() => route.path.replace(/\/$/, '') === verificationPath)
 const {
   data,
   error: configurationError,
   refresh,
-} = await useFetch<PublicRoomConfiguration>(`/api/player/rooms/${roomId}/config`)
+} = await useFetch<PublicRoomConfiguration>(`/api/player/rooms/${roomNumber}/config`)
 const configuration = shallowRef<PublicRoomConfiguration | null>(data.value ?? null)
 watch(data, (value) => {
   configuration.value = value ?? null
@@ -26,7 +32,7 @@ const {
   leavePending,
   restore,
   leave,
-} = provideRoomSession(configuration, roomId)
+} = provideRoomSession(configuration, roomNumber)
 
 watch(
   [active, restoring, restoreFailed, leavePending, configuration, () => route.path],

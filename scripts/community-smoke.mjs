@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { seedLegacyRoom } from './fixtures/legacy-room.mjs'
 import { isolatedDatabase } from './fixtures/isolated-database.mjs'
 import { communityService } from './fixtures/community-service.mjs'
+import { call, map } from './fixtures/community-client.mjs'
 import { startTestServer } from './test-server.mjs'
 import { createManagementFixture } from './management-fixture.mjs'
 import { verifyRoomDisband } from './fixtures/room-lifecycle.mjs'
@@ -30,24 +31,6 @@ const options = {
 let a
 let b
 let mismatchedApplication
-async function call(
-  server,
-  path,
-  { method = 'GET', body, cookie, token, sessionId, origin = server.origin } = {},
-) {
-  return fetch(`${server.origin}${path}`, {
-    method,
-    redirect: 'manual',
-    headers: {
-      ...(method === 'GET' ? {} : { origin }),
-      ...(body ? { 'content-type': 'application/json' } : {}),
-      ...(cookie ? { cookie } : {}),
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
-      ...(sessionId ? { 'x-listener-session': sessionId } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  })
-}
 async function create(name, server, allowedIds, code, shared = false) {
   const response = await call(a, '/api/player/rooms/install', {
     method: 'POST',
@@ -157,6 +140,12 @@ async function create(name, server, allowedIds, code, shared = false) {
     result,
     'creation retry is idempotent across replicas',
   )
+  assert.equal(
+    (await (await call(b, '/api/player/rooms/installation', { cookie })).json())
+      .roomNumber,
+    result.roomNumber,
+    'resuming a completed installation uses the same public number',
+  )
   return result
 }
 async function join(roomId, nickname, expected = 202) {
@@ -169,14 +158,6 @@ async function join(roomId, nickname, expected = 202) {
   })
   assert.equal(response.status, expected, `entry status: ${nickname}`)
   return { ...(await response.json()), token, body }
-}
-function map(server, roomId, listener, method = 'GET', body, suffix = '') {
-  return call(server, `/api/player/rooms/${roomId}/map${suffix}`, {
-    method,
-    body,
-    token: listener.token,
-    sessionId: listener.sessionId,
-  })
 }
 try {
   a = await startTestServer(database.url, options)
@@ -269,10 +250,15 @@ try {
     'alpha',
     true,
   )
+  assert.deepEqual(
+    [first.roomNumber, second.roomNumber, sibling.roomNumber],
+    [1, 2, 3],
+    'public room numbers start at one and increase across installations',
+  )
   assert.notEqual(sibling.roomId, first.roomId)
   assert.notEqual(sibling.roomId, second.roomId)
   const localizedVerification = await fetch(
-    `${a.origin}/rooms/${first.roomId}/verify`,
+    `${a.origin}/rooms/${first.roomNumber}/verify`,
     {
       headers: { 'accept-language': 'ja-JP' },
     },
@@ -291,7 +277,7 @@ try {
     !verificationHtml.includes('id="tactical-title"'),
     'verification does not mount the room map',
   )
-  const localizedRoom = await fetch(`${a.origin}/rooms/${first.roomId}`, {
+  const localizedRoom = await fetch(`${a.origin}/rooms/${first.roomNumber}`, {
     headers: { 'accept-language': 'ja-JP' },
   })
   assert.equal(localizedRoom.status, 200)
@@ -372,8 +358,23 @@ try {
   )
   const directory = await (await call(b, '/api/player/rooms')).json()
   assert.equal(directory.rooms.length, 3)
+  assert.deepEqual(
+    directory.rooms.map((room) => room.number),
+    [1, 2, 3],
+  )
+  const directoryHtml = await (await call(a, '/')).text()
+  assert.ok(directoryHtml.includes('href="/rooms/1"'))
+  assert.ok(!directoryHtml.includes(`href="/rooms/${first.roomId}"`))
+  for (const invalid of ['0', '01', '1e0', '2147483648', first.roomId]) {
+    assert.equal(
+      (await call(a, `/api/player/rooms/${invalid}/config`)).status,
+      400,
+      'only canonical positive room numbers are public addresses',
+    )
+  }
+  assert.equal((await call(a, '/api/player/rooms/999/config')).status, 404)
   const config = await (
-    await call(b, `/api/player/rooms/${second.roomId}/config`)
+    await call(b, `/api/player/rooms/${second.roomNumber}/config`)
   ).json()
   assert.deepEqual(config.admission, { server: 'nezekan', restricted: true })
   assert.equal(
@@ -382,16 +383,16 @@ try {
     'public configuration does not expose the allowlist',
   )
   assert.deepEqual(config.outputLanguages, [])
-  await join(second.roomId, 'Scout', 403)
+  await join(second.roomNumber, 'Scout', 403)
   for (const id of ['NotIndexed', 'OtherRealm', 'OtherRegion', 'CaseOnly']) {
-    await join(first.roomId, id, 404)
+    await join(first.roomNumber, id, 404)
   }
-  await join(first.roomId, 'SchemaFailure', 503)
-  await join(first.roomId, 'Unavailable', 503)
-  const pilot = await join(first.roomId, 'Pilot')
-  const scout = await join(first.roomId, 'Scout')
-  const remotePilot = await join(second.roomId, 'Pilot')
-  const siblingPilot = await join(sibling.roomId, 'Pilot')
+  await join(first.roomNumber, 'SchemaFailure', 503)
+  await join(first.roomNumber, 'Unavailable', 503)
+  const pilot = await join(first.roomNumber, 'Pilot')
+  const scout = await join(first.roomNumber, 'Scout')
+  const remotePilot = await join(second.roomNumber, 'Pilot')
+  const siblingPilot = await join(sibling.roomNumber, 'Pilot')
   assert.notEqual(siblingPilot.sessionId, pilot.sessionId)
   assert.equal(
     (
@@ -411,7 +412,7 @@ try {
     'same display name in another room is independent',
   )
   assert.equal(remotePilot.nickname, 'Pilot')
-  const replay = await call(b, `/api/player/rooms/${first.roomId}/sessions`, {
+  const replay = await call(b, `/api/player/rooms/${first.roomNumber}/sessions`, {
     method: 'POST',
     token: pilot.token,
     body: pilot.body,
@@ -426,9 +427,9 @@ try {
     ],
     nickname: 'forged',
   }
-  assert.equal((await map(a, first.roomId, scout, 'POST', stroke)).status, 200)
-  assert.equal((await map(b, first.roomId, scout, 'POST', stroke)).status, 200)
-  const drawing = (await (await map(b, first.roomId, pilot)).json()).strokes
+  assert.equal((await map(a, first.roomNumber, scout, 'POST', stroke)).status, 200)
+  assert.equal((await map(b, first.roomNumber, scout, 'POST', stroke)).status, 200)
+  const drawing = (await (await map(b, first.roomNumber, pilot)).json()).strokes
   assert.equal(drawing.length, 1, 'retry never duplicates a stroke')
   assert.equal(drawing[0].nickname, 'Scout', 'author comes from authenticated session')
   assert.deepEqual(
@@ -437,18 +438,18 @@ try {
     'world coordinates survive storage',
   )
   assert.deepEqual(
-    (await (await map(b, second.roomId, remotePilot)).json()).strokes,
+    (await (await map(b, second.roomNumber, remotePilot)).json()).strokes,
     [],
   )
-  assert.equal((await map(b, second.roomId, scout)).status, 403)
+  assert.equal((await map(b, second.roomNumber, scout)).status, 403)
   assert.equal(
-    (await map(b, first.roomId, pilot, 'POST', stroke)).status,
+    (await map(b, first.roomNumber, pilot, 'POST', stroke)).status,
     409,
     'another author cannot adopt a stroke ID',
   )
   assert.equal(
     (
-      await map(b, first.roomId, scout, 'POST', {
+      await map(b, first.roomNumber, scout, 'POST', {
         ...stroke,
         id: randomUUID(),
         points: [
@@ -459,27 +460,27 @@ try {
     ).status,
     400,
   )
-  await map(b, first.roomId, pilot, 'DELETE', undefined, `/${stroke.id}`)
+  await map(b, first.roomNumber, pilot, 'DELETE', undefined, `/${stroke.id}`)
   assert.equal(
-    (await (await map(a, first.roomId, scout)).json()).strokes.length,
+    (await (await map(a, first.roomNumber, scout)).json()).strokes.length,
     1,
     'members cannot erase each other',
   )
-  await map(a, first.roomId, scout, 'DELETE', undefined, `/${stroke.id}`)
+  await map(a, first.roomNumber, scout, 'DELETE', undefined, `/${stroke.id}`)
   assert.deepEqual(
-    (await (await map(b, first.roomId, pilot)).json()).strokes,
+    (await (await map(b, first.roomNumber, pilot)).json()).strokes,
     [],
     'erasure propagates across replicas',
   )
   const ownStroke = { ...stroke, id: randomUUID() }
-  await map(a, first.roomId, pilot, 'POST', ownStroke)
-  const replacement = await join(first.roomId, 'Pilot')
+  await map(a, first.roomNumber, pilot, 'POST', ownStroke)
+  const replacement = await join(first.roomNumber, 'Pilot')
   for (const method of ['GET', 'POST', 'DELETE']) {
     assert.equal(
       (
         await map(
           b,
-          first.roomId,
+          first.roomNumber,
           pilot,
           method,
           method === 'POST' ? { ...stroke, id: randomUUID() } : undefined,
@@ -491,13 +492,13 @@ try {
     )
   }
   assert.equal(
-    (await (await map(b, first.roomId, replacement)).json()).strokes[0].nickname,
+    (await (await map(b, first.roomNumber, replacement)).json()).strokes[0].nickname,
     'Pilot',
   )
   await a.close()
   a = await startTestServer(database.url, options)
   assert.equal(
-    (await (await map(a, first.roomId, scout)).json()).strokes[0].id,
+    (await (await map(a, first.roomNumber, scout)).json()).strokes[0].id,
     ownStroke.id,
     'drawings persist through runtime restart',
   )

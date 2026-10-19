@@ -9,7 +9,8 @@ requirements are kept in sync in [design.md](design.md) and [GOAL.md](GOAL.md).
 Create rooms by installing the bot through Discord. Server identity comes from
 the OAuth grant. The same Discord server can host multiple independent rooms;
 they share one voice-channel audio receiver. No administrator room setup is
-required. Share `/rooms/:roomId` to join directly; without a valid room session,
+required. Rooms use increasing numbers from 1, such as `/rooms/1`. Share
+`/rooms/:roomNumber` to join directly; without a valid room session,
 players first visit character verification and return to that room after passing.
 Community rooms automatically disband after five continuous minutes empty, from
 creation or confirmed last-listener shutdown. The server checks every 30 seconds;
@@ -88,8 +89,10 @@ application admission tests. Other candidate SDKs remain isolated from the app.
 ## Multi-room entry and tactical map
 
 The current source adds a public room directory at `/`, room entry at
-`/rooms/:roomId`, and Discord installation at `/rooms/create`. These changes need
-migration `0013` and server-side Discord application configuration before release.
+`/rooms/:roomNumber`, and Discord installation at `/rooms/create`. These changes need
+all database migrations and server-side Discord application configuration.
+Migration `0017` assigns existing community rooms their public numbers; old UUID
+room links are not supported.
 The existing production acceptance evidence above predates this feature.
 
 Creators must select an Asia server and may restrict entry to up to 200 character

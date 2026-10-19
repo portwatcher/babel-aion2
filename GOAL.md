@@ -117,9 +117,13 @@ This amendment takes precedence over the original single-room entry and global
 nickname requirements below for community rooms. Previously stored rooms and legacy APIs remain available for compatibility;
 new rooms are created only through Discord installation.
 
-- `/` lists community rooms; `/rooms/:roomId` is one independent broadcast room.
+- `/` lists community rooms; `/rooms/:roomNumber` is one independent broadcast room.
+  Public room numbers start at 1 and increase on creation. Assign existing
+  community rooms numbers in creation order, preserve each number for its
+  lifetime, and never reuse deleted numbers. Use numbers in shared links and
+  public room APIs; UUID room links are not supported.
   A shared room URL is a direct entry point. Restore an existing valid room
-  listener session; otherwise redirect to `/rooms/:roomId/verify` to verify a
+  listener session; otherwise redirect to `/rooms/:roomNumber/verify` to verify a
   game character. Successful verification returns to the original room without
   creating another session. Do not require a player account or administrator
   login. Ended sessions return to verification; temporary restoration failures
