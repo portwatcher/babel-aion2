@@ -6,8 +6,11 @@
 HTTP-only browser binding and one-use OAuth2 state; Discord's token response
 supplies the guild identity. User guild permissions and effective bot channel
 permissions are verified before a transaction creates the room, its admission
-policy and an audit event. A guild lock prevents duplicate rooms; retries return
-the original creation. Shared bot credentials use the existing room-bound cipher.
+policy and an audit event. An installation lock makes retries return the original creation. A guild lock
+serializes source selection while allowing multiple rooms for the same guild.
+The worker groups those rooms into one receiver and encoder and distributes
+packets to active room destinations; subtitle delivery keeps room authorization.
+No read operation creates a default room. Shared bot credentials use the existing room-bound cipher.
 
 Room-specific entry checks the immutable server/allowlist and then AION2 Index's
 fixed public search endpoint. The returned exact character ID is the display

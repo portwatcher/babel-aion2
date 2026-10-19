@@ -1,3 +1,4 @@
+import { seedLegacyRoom } from './fixtures/legacy-room.mjs'
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
@@ -9,6 +10,7 @@ import { startTestServer } from './test-server.mjs'
 
 test('confirmed web process exit releases only its sockets, preserves reconnect identity and unblocks replacement without accepting old credentials', async (t) => {
   const database = await isolatedDatabase()
+  await seedLegacyRoom(database.url)
   const secret = randomBytes(32).toString('base64url')
   const sockets = []
   let worker, first, second, held

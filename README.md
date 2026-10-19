@@ -6,6 +6,11 @@ private today and prepared for eventual open source.
 The player interface is a dark, low-distraction battle panel. The original
 requirements are kept in sync in [design.md](design.md) and [GOAL.md](GOAL.md).
 
+Create rooms by installing the bot through Discord. Server identity comes from
+the OAuth grant. The same Discord server can host multiple independent rooms;
+they share one voice-channel audio receiver. No administrator room setup is
+required. See [community rooms](docs/multi-room-and-map.md).
+
 The player interface supports English, Simplified Chinese, Japanese and Korean.
 It detects browser preferences during SSR and falls back to English. The compact
 header selector overrides detection; its choice is stored in localStorage and

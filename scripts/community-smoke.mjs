@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
+import { seedLegacyRoom } from './fixtures/legacy-room.mjs'
 import { isolatedDatabase } from './fixtures/isolated-database.mjs'
 import { communityService } from './fixtures/community-service.mjs'
 import { startTestServer } from './test-server.mjs'
@@ -11,7 +12,7 @@ import { createManagementFixture } from './management-fixture.mjs'
 // supplies provider responses only; it never supplies admission or DB receipts.
 const database = await isolatedDatabase()
 const upstream = await communityService()
-const management = await createManagementFixture(database.url)
+const management = await createManagementFixture(database.url, { legacyRoom: false })
 const options = {
   nodeImports: [
     './scripts/fixtures/community-network.mjs',
@@ -46,7 +47,7 @@ async function call(
     ...(body ? { body: JSON.stringify(body) } : {}),
   })
 }
-async function create(name, server, allowedIds, code) {
+async function create(name, server, allowedIds, code, shared = false) {
   const response = await call(a, '/api/player/rooms/install', {
     method: 'POST',
     body: { name, server, allowedIds },
@@ -97,11 +98,21 @@ async function create(name, server, allowedIds, code) {
   const installation = await (
     await call(a, '/api/player/rooms/installation', { cookie })
   ).json()
+  assert.equal(
+    installation.roomId,
+    null,
+    'a fresh installation creates a fresh room, including the same guild',
+  )
   assert.equal(installation.server, server)
   assert.deepEqual(installation.allowedIds, allowedIds)
   assert.deepEqual(
     installation.channels,
-    [{ id: upstream.channel, name: '指挥频道' }],
+    shared
+      ? [{ id: upstream.channel, name: '指挥频道' }]
+      : [
+          { id: upstream.channel, name: '指挥频道' },
+          { id: upstream.alternateChannel, name: '备用频道' },
+        ],
     'channel overwrite blocks insufficient bot permissions',
   )
   assert.equal(
@@ -114,14 +125,24 @@ async function create(name, server, allowedIds, code) {
     ).status,
     403,
   )
+  if (shared) {
+    assert.equal(
+      (
+        await call(a, '/api/player/rooms', {
+          method: 'POST',
+          cookie,
+          body: { voiceChannelId: upstream.alternateChannel },
+        })
+      ).status,
+      409,
+      'another room cannot move the guild receiver to a different channel',
+    )
+  }
   const created = await call(a, '/api/player/rooms', {
     method: 'POST',
     cookie,
     body: { voiceChannelId: upstream.channel },
   })
-  if (created.status === 409) {
-    return { conflict: true }
-  }
   assert.equal(created.status, 200)
   const result = await created.json()
   assert.deepEqual(
@@ -220,9 +241,35 @@ try {
   for (const tile of ['8_0_0.jpg', '1_2_0.jpg', '0_0_1.jpg', 'https.jpg']) {
     assert.equal((await call(a, `/api/player/map-tiles/${tile}`)).status, 400)
   }
+  await call(a, '/api/player/config')
+  const emptyAdmin = await management.signIn(a)
+  assert.equal(
+    (
+      await fetch(`${a.origin}/api/management/status`, {
+        headers: {
+          'cf-access-jwt-assertion': emptyAdmin.jwt,
+          cookie: emptyAdmin.cookie,
+        },
+      })
+    ).status,
+    200,
+  )
+  assert.equal(
+    Number((await database.pool.query('select count(*) from room')).rows[0].count),
+    0,
+    'player and administrator reads never seed a hard-coded room',
+  )
   const first = await create('第一战术室', 'siel', [], 'alpha')
   const second = await create('第二战术室', 'nezekan', ['Pilot'], 'beta')
-  assert.equal((await create('Duplicate guild', 'siel', [], 'alpha')).conflict, true)
+  const sibling = await create(
+    'Same Discord, independent room',
+    'nezekan',
+    ['Pilot'],
+    'alpha',
+    true,
+  )
+  assert.notEqual(sibling.roomId, first.roomId)
+  assert.notEqual(sibling.roomId, second.roomId)
   const localizedRoom = await fetch(`${a.origin}/rooms/${first.roomId}`, {
     headers: { 'accept-language': 'ja-JP' },
   })
@@ -237,7 +284,7 @@ try {
     'map controls are translated during SSR',
   )
   const administrator = await management.signIn(a)
-  async function manage(path, body, method = body ? 'POST' : 'GET') {
+  async function manage(path, body, method = body ? 'POST' : 'GET', expected = 200) {
     const response = await fetch(`${a.origin}${path}`, {
       method,
       headers: {
@@ -248,7 +295,7 @@ try {
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
     })
-    assert.equal(response.status, 200, 'authenticated room management')
+    assert.equal(response.status, expected, 'authenticated room management')
     return response.json()
   }
   const localizedAdmin = await fetch(`${a.origin}/admin?roomId=${second.roomId}`, {
@@ -263,6 +310,31 @@ try {
   assert.match(adminHtml, /<html[^>]*lang="en"/)
   assert.ok(adminHtml.includes('Room administration'))
   const selected = await manage(`/api/management/room?roomId=${second.roomId}`)
+  for (const fields of [
+    { guildId: '100000000000000099' },
+    { voiceChannelId: upstream.alternateChannel },
+    { credential: randomBytes(32).toString('base64url') },
+  ]) {
+    await manage(
+      `/api/management/room?roomId=${second.roomId}`,
+      {
+        expectedVersion: selected.room.version,
+        name: selected.room.name,
+        guildId: selected.room.guildId,
+        voiceChannelId: selected.room.voiceChannelId,
+        captureMode: selected.room.captureMode,
+        commanderIds: selected.room.commanderIds,
+        ...fields,
+      },
+      'PATCH',
+      400,
+    )
+  }
+  assert.equal(
+    (await manage(`/api/management/room?roomId=${second.roomId}`)).room.version,
+    selected.room.version,
+    'management cannot reassign an installed Discord source',
+  )
   assert.equal(selected.room.id, second.roomId)
   await manage(`/api/management/room/stop?roomId=${second.roomId}`, {
     expectedVersion: selected.room.version,
@@ -278,7 +350,7 @@ try {
     true,
   )
   const directory = await (await call(b, '/api/player/rooms')).json()
-  assert.equal(directory.rooms.length, 2)
+  assert.equal(directory.rooms.length, 3)
   const config = await (
     await call(b, `/api/player/rooms/${second.roomId}/config`)
   ).json()
@@ -298,6 +370,17 @@ try {
   const pilot = await join(first.roomId, 'Pilot')
   const scout = await join(first.roomId, 'Scout')
   const remotePilot = await join(second.roomId, 'Pilot')
+  const siblingPilot = await join(sibling.roomId, 'Pilot')
+  assert.notEqual(siblingPilot.sessionId, pilot.sessionId)
+  assert.equal(
+    (
+      await (
+        await call(a, `/api/player/sessions/${pilot.sessionId}`, { token: pilot.token })
+      ).json()
+    ).state,
+    'JOINING',
+    'same-guild rooms retain independent nickname sessions',
+  )
   const stillPresent = await (
     await call(a, `/api/player/sessions/${pilot.sessionId}`, { token: pilot.token })
   ).json()
@@ -409,6 +492,7 @@ try {
       options.environment.NUXT_DISCORD_BOT_TOKEN,
     ),
   )
+  await seedLegacyRoom(database.url)
   const legacy = await manage('/api/management/room')
   await manage(
     '/api/management/room',
@@ -480,7 +564,7 @@ try {
     allowedIds: ['Solo'],
   })
   console.log(
-    'PASS multi-room HTTP + PostgreSQL: required realm, OAuth state/browser binding, bot/channel permissions, optional ID allowlist, API admission, independent sessions, cross-replica strokes and erasure, replacement fencing and restart persistence.',
+    'PASS multi-room HTTP + PostgreSQL: repeated same-guild installations create independent rooms, no implicit room seeding, required realm, OAuth state/browser binding, bot/channel permissions, optional ID allowlist, API admission, independent sessions, cross-replica strokes and erasure, replacement fencing and restart persistence.',
   )
 } finally {
   await Promise.allSettled([a?.close(), b?.close(), mismatchedApplication?.close()])

@@ -1,5 +1,14 @@
 # Room configuration
 
+New rooms are created by Discord bot installation. The verified OAuth grant
+supplies the guild and the permission-checked chooser supplies the channel.
+Administration selects actual installed rooms, without creating a default room
+or requiring a manually entered server ID or bot token. Installed source bindings
+are read-only in administration and cannot be reassigned through its update API.
+The settings/API details below include legacy compatibility for previously stored
+broadcasts. Multiple rooms may use one guild; one receiver and encoder serve its
+active rooms. Each room's stop state applies to its own delivery.
+
 The administrator page can save room and Discord source settings and remove a
 specific listener connection. The separate start action requests Discord
 reception; source status reports actual worker state and decoded member counters.

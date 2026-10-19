@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { exportJWK, generateKeyPair, SignJWT } from 'jose'
+import { seedLegacyRoom } from './fixtures/legacy-room.mjs'
 import { startTestServer } from './test-server.mjs'
 
-export async function createManagementFixture(databaseUrl) {
+export async function createManagementFixture(databaseUrl, { legacyRoom = true } = {}) {
+  if (legacyRoom) {
+    await seedLegacyRoom(databaseUrl)
+  }
   assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(new URL(databaseUrl).hostname))
   const subject = randomUUID()
   const issuer = 'https://babel-smoke.cloudflareaccess.com'
