@@ -94,10 +94,17 @@ probe observed nine, below the role limit; these idle checks are not a capacity
 test. Pool settings account for web rollout overlap and the worker's separate
 pools. Operational values and network policy details stay in private infra.
 
-The production room remains UNCONFIGURED. Provider/language lists remain empty,
-and the authenticated human administrator flow still waits at the Access email
-login form. No Discord source was moved from the existing local preview. This
-release proves deployment and media connectivity, not live speech, provider
+The human administrator subsequently completed Access login. Through the normal
+management form, the existing authorized bot credential and test channel were
+saved with ALL_CHANNEL capture; saving and starting were separate operations.
+The worker reported LISTENING, no failure reason and zero observed speakers at
+01:59 UTC. A second normal Chrome listener connected while this source was live.
+The earlier local preview is no longer running, so it does not compete for the bot.
+The first start temporarily retried; the next start connected without an image,
+permission or network-policy change. That transient failure remains unexplained.
+
+Provider/language lists remain empty. These checks prove administrator setup,
+Discord connection and media connectivity, not live speech, provider
 quality, TURN TLS/restricted-network compatibility, mainland-China performance,
 native game-window behavior, host-loss fencing or production disaster recovery.
 

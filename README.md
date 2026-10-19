@@ -8,8 +8,8 @@ requirements are kept in sync in [design.md](design.md) and [GOAL.md](GOAL.md).
 
 The website and private voice worker are deployed at
 [babel.juryquinn.com](https://babel.juryquinn.com/); a real browser relay connection
-is verified. Production Discord source configuration and live speech remain
-unfinished. The
+is verified. The production Discord source is configured in all-channel mode and
+reports LISTENING; live speech and playback acceptance remain unfinished. The
 [current acceptance status](docs/test-report.md#current-acceptance-status--2026-10-19)
 separates shipped web behavior, local proofs and outstanding live checks.
 
@@ -189,7 +189,7 @@ The deployed web URLs are `https://babel.juryquinn.com` and
 the separate private infra repository. The current web and voice release passed
 production migrations, replica readiness, private control authentication, public
 TURN forwarding and actual browser media connection/exit checks. The production
-Discord source still needs administrator configuration; real speech, subtitle
-quality and player-network acceptance remain unfinished;
+Discord source now connects after authenticated administrator setup; real speech,
+subtitle quality and player-network acceptance remain unfinished;
 see [deployment evidence](docs/deployment.md) and
 [source and secret boundaries](docs/source-and-secrets.md).

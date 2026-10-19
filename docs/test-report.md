@@ -8,17 +8,17 @@ unchanged from `bbe9fc2`; private infra now deploys the worker and relay policie
 The dated reports below retain the conditions of each run. A local or isolated
 PASS applies only to that named check, not automatically to production.
 
-| Acceptance area                              | Result                    | Evidence and remaining dependency                                                                                                                                                                                   |
-| -------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Web release and access boundaries            | PASS                      | Two production web replicas, 12 migrations, public browser/assets and direct-origin rejection checks passed; see the production release report below                                                                |
-| Local listener, media and subtitle contracts | PASS                      | Built application suites cover nickname replacement, actual peer closure, per-member PCM, shared subtitle transport and child-process recovery; live provider responses are not part of these proofs                |
-| Production voice infrastructure              | PASS                      | One ready worker, authenticated private control, configured pool budgets, actual pod/public TURN forwarding and normal Chrome media connection/exit passed; see the current deployment report                       |
-| Production voice delivery                    | WAITING FOR CONFIGURATION | The production room remains UNCONFIGURED. Its administrator Access login and Discord source setup are pending; the local test configuration is retained                                                             |
-| Integrated real speech                       | NOT RUN                   | Isolated single-member DAVE receipt/re-entry passed. The last recorded integrated preview connected with zero received frames and zero browser audio energy; fresh speech and simultaneous members are still needed |
-| Live subtitle quality                        | WAITING FOR CONFIGURATION | Soniox/DeepL settings and validation are implemented. Authorized credentials and representative commands are needed to validate each chosen output language                                                         |
-| Native window and game use                   | NOT RUN                   | Browser controls and shared subtitle state passed; earlier native inspection was blocked by the locked Mac. Background audio and the actual AION2 display mode still need direct device validation                  |
-| Deployed latency and capacity                | NOT RUN                   | Production transport now connects, but actual source/playback timing, load and player networks including mainland China remain unmeasured; connection success is not end-to-end latency evidence                    |
-| Production disaster recovery                 | NOT RUN                   | Child-process recovery, isolated database restore and published-image rollback passed. Supervisor/container/host-loss fencing and actual production restore/rollback remain outstanding                             |
+| Acceptance area                              | Result                    | Evidence and remaining dependency                                                                                                                                                                    |
+| -------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web release and access boundaries            | PASS                      | Two production web replicas, 12 migrations, public browser/assets and direct-origin rejection checks passed; see the production release report below                                                 |
+| Local listener, media and subtitle contracts | PASS                      | Built application suites cover nickname replacement, actual peer closure, per-member PCM, shared subtitle transport and child-process recovery; live provider responses are not part of these proofs |
+| Production voice infrastructure              | PASS                      | One ready worker, authenticated private control, configured pool budgets, actual pod/public TURN forwarding and normal Chrome media connection/exit passed; see the current deployment report        |
+| Production Discord configuration             | PASS                      | Human Access login, normal encrypted-credential save and separate start succeeded. ALL_CHANNEL reports LISTENING with no failure reason; a real browser listener connected while the source was live |
+| Integrated real speech                       | NOT RUN                   | Production observed zero speakers at 01:59 UTC. Isolated single-member DAVE receipt/re-entry passed earlier, but fresh production speech, audible playback and simultaneous members are still needed |
+| Live subtitle quality                        | WAITING FOR CONFIGURATION | Soniox/DeepL settings and validation are implemented. Authorized credentials and representative commands are needed to validate each chosen output language                                          |
+| Native window and game use                   | NOT RUN                   | Browser controls and shared subtitle state passed; earlier native inspection was blocked by the locked Mac. Background audio and the actual AION2 display mode still need direct device validation   |
+| Deployed latency and capacity                | NOT RUN                   | Production transport now connects, but actual source/playback timing, load and player networks including mainland China remain unmeasured; connection success is not end-to-end latency evidence     |
+| Production disaster recovery                 | NOT RUN                   | Child-process recovery, isolated database restore and published-image rollback passed. Supervisor/container/host-loss fencing and actual production restore/rollback remain outstanding              |
 
 Empty production provider and language lists are intentional and do not block
 the web release or original-audio deployment. Optional character enrichment is
@@ -46,7 +46,14 @@ publication. The production probe exposed the host-network TURN identity rule;
 its narrow policy correction was verified with actual traffic. Configuration,
 secret values, addresses and operational release automation remain in infra.
 
-WAITING FOR CONFIGURATION: administrator login and production Discord source.
+PASS: authenticated human administrator setup subsequently saved the existing
+authorized Discord source in ALL_CHANNEL mode and started it. At 01:59 UTC the
+private control response was LISTENING, source generation 9, no failure reason
+and no observed speakers. The form retains the encrypted credential without
+returning it; a new normal browser listener established its audio connection.
+The first start temporarily retried and the next start connected without code,
+permission or network changes; the initial failure cause was not established.
+
 NOT RUN: live production speech, provider quality, restricted/TLS relay paths,
 mainland-China latency, capacity, native game behavior and disaster recovery.
 
@@ -787,11 +794,10 @@ was applied. This is not a claim that the entire dependency graph is vulnerabili
 
 ## External inputs for later live checks
 
-- Authenticated administrator login and production Discord source configuration.
-  Worker/relay deployment is verified; orchestration recovery evidence is pending.
 - Fresh speech after starting a receiver for the configured Discord test channel,
   including a second speaking member for source separation. The existing all-channel mode
-  does not require a commander-ID list; the local bot credential is already saved.
+  does not require a commander-ID list; the production bot credential is saved
+  and the source is connected. Orchestration recovery evidence is still pending.
 - Selected provider credentials and authorized battle-command samples for
   language-specific quality checks after configuration.
 - An unlocked supported browser/device, the actual AION2 display mode, and player
