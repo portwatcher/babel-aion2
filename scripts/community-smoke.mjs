@@ -5,6 +5,7 @@ import { isolatedDatabase } from './fixtures/isolated-database.mjs'
 import { communityService } from './fixtures/community-service.mjs'
 import { startTestServer } from './test-server.mjs'
 import { createManagementFixture } from './management-fixture.mjs'
+import { verifyRoomDisband } from './fixtures/room-lifecycle.mjs'
 
 // Primary proof for public room admission and collaborative map persistence.
 // Real HTTP and PostgreSQL detect cross-replica leakage, permission bypasses,
@@ -582,6 +583,14 @@ try {
   await manage('/api/management/room/admission', {
     server: 'siel',
     allowedIds: ['Solo'],
+  })
+  await verifyRoomDisband({
+    database,
+    create,
+    call,
+    a,
+    b,
+    administrator,
   })
   console.log(
     'PASS multi-room HTTP + PostgreSQL: repeated same-guild installations create independent rooms, no implicit room seeding, required realm, OAuth state/browser binding, bot/channel permissions, optional ID allowlist, API admission, independent sessions, cross-replica strokes and erasure, replacement fencing and restart persistence.',

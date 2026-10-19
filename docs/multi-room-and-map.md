@@ -89,6 +89,25 @@ the new policy. Existing community-room admission rules are immutable. `/admin` 
 status, member lists and room language defaults follow that selection. Provider
 and language catalogs remain shared.
 
+## Automatic disbanding
+
+Apply migration `0016_room_idle_disband.sql`. A community room with no JOINING or
+ACTIVE listeners automatically disbands after five continuous minutes. The first
+window starts at community-room creation or legacy publication; later windows
+start after the last listener’s confirmed
+audio and subtitle shutdown. Unconfirmed delivery blocks expiry. Entry takes the
+same room lock as disbanding, so a concurrent join either keeps the room open or
+receives room-not-found after disbanding commits.
+
+The existing web reconciler checks every 30 seconds, so normal disbanding occurs
+within 30 seconds after the five-minute threshold. PostgreSQL timestamps survive
+restarts and web replica changes. Existing community rooms receive an initial
+five-minute grace window when this migration is first applied. A durable tombstone removes the room from the
+public and administrator selectors, rejects new entry and prevents restart. Room,
+map and listener history remain stored, with one `room.disband` audit event. The
+worker stops that room’s delivery and leaves occupied sibling rooms’ shared Discord
+receiver running. Unpublished legacy rooms are excluded.
+
 ## Map behavior and limits
 
 The original map is

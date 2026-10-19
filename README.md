@@ -11,6 +11,9 @@ the OAuth grant. The same Discord server can host multiple independent rooms;
 they share one voice-channel audio receiver. No administrator room setup is
 required. Share `/rooms/:roomId` to join directly; without a valid room session,
 players first visit character verification and return to that room after passing.
+Community rooms automatically disband after five continuous minutes empty, from
+creation or confirmed last-listener shutdown. The server checks every 30 seconds;
+joining cancels expiry. Disbanded rooms leave the directory and reject further entry.
 See [community rooms](docs/multi-room-and-map.md).
 
 The player interface supports English, Simplified Chinese, Japanese and Korean.

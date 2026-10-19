@@ -47,6 +47,7 @@ export const room = pgTable('room', {
   encryptedDiscordCredential: text('encrypted_discord_credential'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  disbandedAt: timestamp('disbanded_at', { withTimezone: true }),
 })
 
 // All lifecycle mutations lock this global key before changing a session.
