@@ -12,7 +12,7 @@ See [source and secret boundaries](source-and-secrets.md).
 ## Application package
 
 `Dockerfile` builds the Nuxt Node server and a standalone PostgreSQL migration
-runner with Node 24.18.0. The runtime runs as UID 1000. It contains no production
+runner and the independent Pod-recovery entry point with Node 24.18.0. The runtime runs as UID 1000. It contains no production
 configuration or credentials and does not start the optional voice worker.
 The `voice-worker` build target packages Discord/DAVE reception, shared subtitle
 processing and private WebRTC admission with pruned dependencies and UID 1000.
@@ -20,6 +20,9 @@ Keep its authenticated control service private. Source ownership and explicit
 [STUN/TURN settings](media-network.md) are implemented. The private infra release
 now publishes and deploys both images with authenticated control, explicit pool
 budgets and existing TURN routing; see the current verification below.
+The recovery Deployment uses the web image with `node recovery/index.mjs`, a
+namespace-scoped Kubernetes token and only the database connection secret.
+See [Kubernetes recovery](kubernetes-recovery.md) for admission and evidence rules.
 
 The migration command is `node database/migrate.mjs` with `DATABASE_URL` supplied
 at runtime. The infra release applies migrations before starting the new web
@@ -43,7 +46,8 @@ resources are updated only after publication; ArgoCD owns reconciliation.
 
 The first image can be published before the initial Kubernetes resources exist.
 Those resources are then committed in infra with the verified image reference.
-Subsequent releases update their image references through the same workflow.
+Subsequent releases update their image references through the same workflow,
+including the recovery controller's web-image reference.
 No production image is published from a local checkout.
 
 ## Remaining product work
@@ -55,13 +59,45 @@ native PiP/game behavior, restricted player networks and capacity remain unfinis
 connection cannot receive commands. Production may start with an empty language
 list; the administrator later validates and enables configured paths.
 See [validation](test-report.md) for local and production evidence. Production
-web/worker rollout and one real browser relay connection are verified; configured
-Discord speech and full player-network acceptance remain separate gates.
+web/worker rollout, one real member's Discord speech and human-confirmed browser
+playback are verified; multiple-member and full player-network acceptance remain
+separate gates.
 
 Verify Access, database readiness, routing, and actual rollout state separately.
 Use the private infra runbook for operational credentials, backup and recovery.
 
 ## Current web and voice verification — 2026-10-19
+
+Source `e5a7499ed7558e5d8ed34590053c0806b2480ccd` includes the Pod-recovery
+implementation merged in [PR #10](https://github.com/portwatcher/babel-aion2/pull/10).
+The private Linux AMD64 workflow passed CI with 18 tests, 11 PostgreSQL tests,
+repeatable migrations and both packaged runtime probes before publishing:
+
+- Web and recovery: `sha256:5dabe0495f153c5200f48cf60776cdb3b4abda1223feb0f5fc2ef2e3eb7b11b2`.
+- Voice: `sha256:335f712c94ae02eef67124a45ade5862f5b206792ad89e95ab4b9378515f3cc0`.
+
+GitOps applied the thirteenth migration, then the private controller, two web
+replicas and one voice worker. At 04:09 UTC, all were ready with zero restarts,
+running the published digests; ArgoCD reported Synced / Healthy. Runtime owners
+match all three supervised Pod UIDs and the required finalizers are present.
+The controller's probes return 200. Its role allows only namespace Pod operations;
+Secret reads, cluster-wide Pod listing and Pod-status mutation are rejected.
+Web and voice Pods continue to have no Kubernetes token.
+
+Room settings and the saved encrypted credential remained unchanged. The open
+Chrome listener recovered its media connection without a refresh, keeping its
+session and generation; the management page remained authenticated. Discord
+needed repeated connection attempts before returning to LISTENING, generation 22. The old source closed at 04:02:13 UTC and the successful source was claimed
+at 04:04:03; it was observed healthy at 04:06 and 04:09. This is automatic recovery,
+not uninterrupted audio; the transient cause remains unconfirmed. No new speech
+or provider configuration was supplied in this rollout check.
+
+The earlier single-member audible result below remains valid evidence for that
+run. Isolated whole-container failures pass, but destructive production failure
+and unknown-host fencing remain unverified. See the
+[recovery rollout report](test-report.md#production-recovery-controller-rollout--2026-10-19).
+
+## Initial web and voice verification — 2026-10-19
 
 Source `4b763079b5c07261ce64845d8c4c58121eb1edb6` was released through the
 private self-hosted Linux AMD64 workflow. Local-equivalent CI passed 18 tests;

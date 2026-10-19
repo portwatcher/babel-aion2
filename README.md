@@ -17,6 +17,9 @@ Production Chrome also passed nickname replacement, same-session refresh,
 administrator removal, subtitle-window closure and recovery after a graceful
 worker restart. A cross-node relay routing failure found during that restart
 was corrected in private infra.
+The private Pod-recovery controller is also deployed. Isolated whole-container
+crashes recover with confirmed termination evidence; the production rollout kept
+room settings and listener identity, with a temporary Discord reconnect delay.
 
 Listener storage, HTTP operations and player WebSockets implement atomic global
 nickname replacement, idempotent entry, browser restoration, language subscription
@@ -199,6 +202,8 @@ production migrations, replica readiness, private control authentication, public
 TURN forwarding and actual browser media connection/exit checks. The production
 Discord source now connects after authenticated administrator setup and has
 decoded one real member's audio with human-confirmed browser playback.
+The deployed recovery controller and Pod-bound owners have passed readiness and
+permission checks; abrupt production failure remains untested.
 Multiple-speaker behavior, subtitle quality and player-network acceptance remain unfinished;
 see [deployment evidence](docs/deployment.md) and
 [source and secret boundaries](docs/source-and-secrets.md).

@@ -133,15 +133,17 @@ See [provider configuration](providers-and-languages.md) for probe and sample li
    member re-entry, DAVE changes and configured Linux targets. Single-member
    isolated receipt and rejoin are proven; per-member decoding, bounded mixing
    and exclusive source control are implemented.
-2. Complete actual-network publication proof. Source fencing and local real
-   Opus publication pass on Linux ARM64 and emulated AMD64; these do not
-   establish public TURN routing, native AMD64 performance, background/game behavior or capacity.
+2. Complete player-network and performance acceptance. Production public TURN
+   routing and single-member audible playback pass; native AMD64 throughput,
+   restricted networks, background/game behavior and capacity remain unmeasured.
    Local Coturn UDP/TCP/TLS and credential expiry pass separate checks. See the
    [candidate evidence](media-compatibility.md).
 3. Complete production confirmation of Kubernetes container recovery, independent
    fencing for hosts whose termination remains unknown, and worker routing before
    scaling beyond one configured control endpoint. Local whole-container crashes
    now recover from verified kubelet receipts while preserving listener identity.
+   The controller is deployed with confirmed Pod binding, scoped permissions and
+   a healthy rollout; abrupt production failure is not covered by that check.
 4. Complete legacy/unknown-host player-owner reconciliation and live background
    recovery acceptance. Local child and container crashes recover through scoped
    receipts; other live web connections survive. Unknown owners remain fail-closed.
@@ -158,10 +160,10 @@ See [provider configuration](providers-and-languages.md) for probe and sample li
 7. Verify native PiP rendering, background updates and actual game display modes
    with live speech. Main-page and PiP subtitle content share state and one media
    output. See [PiP scope and evidence](picture-in-picture.md).
-8. Complete production voice deployment, transport, restore, rollback and
-   real-network evidence from `design.md`. The production web rollout, isolated
+8. Complete remaining production recovery and real-network evidence from
+   `design.md`. Web/voice deployment, single-member audible delivery, isolated
    database restoration and published-image rollback rehearsal have passed;
-   those checks do not establish production command delivery or disaster recovery.
+   those checks do not establish multiple-member acceptance or disaster recovery.
    Optional character lookup remains disabled because the source's published
    crawler policy excludes its search and API paths. See the
    [source probe](test-report.md#optional-character-source-probe--2026-10-19).

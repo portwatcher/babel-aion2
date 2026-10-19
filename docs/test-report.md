@@ -2,29 +2,31 @@
 
 ## Current acceptance status — 2026-10-19
 
-The complete `design.md` delivery is unfinished. Production runs web and voice
-source `4b763079b5c07261ce64845d8c4c58121eb1edb6`. Its application runtime is
-unchanged from `bbe9fc2`; private infra now deploys the worker and relay policies.
+The complete `design.md` delivery is unfinished. Production runs web, voice and
+the private recovery controller from source
+`e5a7499ed7558e5d8ed34590053c0806b2480ccd`. The latest rollout preserves the
+configured room and existing listener while adding confirmed Pod retirement.
 The dated reports below retain the conditions of each run. A local or isolated
 PASS applies only to that named check, not automatically to production.
 
-| Acceptance area                              | Result                    | Evidence and remaining dependency                                                                                                                                                                                   |
-| -------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Web release and access boundaries            | PASS                      | Two production web replicas, 12 migrations, public browser/assets and direct-origin rejection checks passed; see the production release report below                                                                |
-| Local listener, media and subtitle contracts | PASS                      | Built application suites cover nickname replacement, actual peer closure, per-member PCM, shared subtitle transport and child-process recovery; live provider responses are not part of these proofs                |
-| Production voice infrastructure              | PASS                      | One ready worker, authenticated private control, configured pool budgets, actual pod/public TURN forwarding and normal Chrome media connection/exit passed; see the current deployment report                       |
-| Production Discord configuration             | PASS                      | Human Access login, normal encrypted-credential save and separate start succeeded. ALL_CHANNEL reports LISTENING with no failure reason; a real browser listener connected while the source was live                |
-| Production single-member receipt             | PASS                      | After the human joined the configured voice channel, the actual worker reported the correct member identity and 282 decoded frames at 02:03 UTC, generation 9, with no failure reason                               |
-| Production session and PiP lifecycle         | PASS                      | Real Chrome replacement, same-session refresh, playback action, administrator removal and PiP closure passed against deployed replicas; independent persisted transport receipts confirm closure                    |
-| Graceful production worker replacement       | PASS                      | Settings and listener generation survived GitOps replacement. A cross-node TURN routing regression was reproduced and corrected; the browser reconnected and the new source decoded another 29 frames               |
-| Production snapshot restoration              | PASS                      | A read-only production snapshot restored all 19 application/migration tables, schema, sequences and one encrypted Discord credential into isolated local PostgreSQL; the exact published web image passed readiness |
-| Isolated whole-container recovery            | PASS                      | Real Kubernetes SIGKILL closes scoped web/media records, unblocks nickname replacement and preserves a surviving web connection; synthetic unknown status stays blocked while another Pod can retire                |
-| Single-member audible playback               | PASS                      | After the relay correction and browser reconnection, the human confirmed hearing their own Discord voice through the production Babel webpage                                                                       |
-| Multiple-member behavior                     | NOT RUN                   | Simultaneous speakers, production source separation and production member leave/re-entry remain outstanding                                                                                                         |
-| Live subtitle quality                        | WAITING FOR CONFIGURATION | Soniox/DeepL settings and validation are implemented. Authorized credentials and representative commands are needed to validate each chosen output language                                                         |
-| Native window and game use                   | NOT RUN                   | Real Chrome subtitle-window opening and replacement-driven closure passed with subtitles disabled. Native desktop inspection failed; background audible playback and actual AION2 display mode remain unverified    |
-| Deployed latency and capacity                | NOT RUN                   | Production transport now connects, but actual source/playback timing, load and player networks including mainland China remain unmeasured; connection success is not end-to-end latency evidence                    |
-| Production disaster recovery                 | NOT RUN                   | Production-snapshot restoration and isolated published-image rollback passed. Durable backup retention, old-service fencing, production failover and live deployment rollback remain outstanding                    |
+| Acceptance area                              | Result                    | Evidence and remaining dependency                                                                                                                                                                                    |
+| -------------------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web release and access boundaries            | PASS                      | Two production web replicas and 13 migrations are ready; public browser/assets and direct-origin rejection checks passed in the earlier release and protected management remains accessible after the latest rollout |
+| Local listener, media and subtitle contracts | PASS                      | Built application suites cover nickname replacement, actual peer closure, per-member PCM, shared subtitle transport and child-process recovery; live provider responses are not part of these proofs                 |
+| Production voice infrastructure              | PASS                      | One ready worker, authenticated private control, configured pool budgets, actual pod/public TURN forwarding and normal Chrome media connection/exit passed; see the current deployment report                        |
+| Production Discord configuration             | PASS                      | Human Access login, normal encrypted-credential save and separate start succeeded. ALL_CHANNEL reports LISTENING with no failure reason; a real browser listener connected while the source was live                 |
+| Production single-member receipt             | PASS                      | After the human joined the configured voice channel, the actual worker reported the correct member identity and 282 decoded frames at 02:03 UTC, generation 9, with no failure reason                                |
+| Production session and PiP lifecycle         | PASS                      | Real Chrome replacement, same-session refresh, playback action, administrator removal and PiP closure passed against deployed replicas; independent persisted transport receipts confirm closure                     |
+| Graceful production worker replacement       | PASS                      | Settings and listener generation survived GitOps replacement. A cross-node TURN routing regression was reproduced and corrected; the browser reconnected and the new source decoded another 29 frames                |
+| Production snapshot restoration              | PASS                      | A read-only production snapshot restored all 19 application/migration tables, schema, sequences and one encrypted Discord credential into isolated local PostgreSQL; the exact published web image passed readiness  |
+| Isolated whole-container recovery            | PASS                      | Real Kubernetes SIGKILL closes scoped web/media records, unblocks nickname replacement and preserves a surviving web connection; synthetic unknown status stays blocked while another Pod can retire                 |
+| Production recovery deployment               | PASS                      | Healthy private controller, scoped permissions, Pod-bound runtime owners and finalizers are deployed. Settings and listener generation survive; Discord reconnects automatically after about two minutes of retries  |
+| Single-member audible playback               | PASS                      | After the relay correction and browser reconnection, the human confirmed hearing their own Discord voice through the production Babel webpage                                                                        |
+| Multiple-member behavior                     | NOT RUN                   | Simultaneous speakers, production source separation and production member leave/re-entry remain outstanding                                                                                                          |
+| Live subtitle quality                        | WAITING FOR CONFIGURATION | Soniox/DeepL settings and validation are implemented. Authorized credentials and representative commands are needed to validate each chosen output language                                                          |
+| Native window and game use                   | NOT RUN                   | Real Chrome subtitle-window opening and replacement-driven closure passed with subtitles disabled. Native desktop inspection failed; background audible playback and actual AION2 display mode remain unverified     |
+| Deployed latency and capacity                | NOT RUN                   | Production transport now connects, but actual source/playback timing, load and player networks including mainland China remain unmeasured; connection success is not end-to-end latency evidence                     |
+| Production disaster recovery                 | NOT RUN                   | Production-snapshot restoration and isolated published-image rollback passed. Durable backup retention, old-service fencing, production failover and live deployment rollback remain outstanding                     |
 
 Empty production provider and language lists are intentional and do not block
 the web release or original-audio deployment. Optional character enrichment is
@@ -34,6 +36,38 @@ Latest source checks: `npm run ci:local` is PASS with 229 first-party sources,
 maximum 495 lines, formatting, strict types, 18 tests, builds and built HTTP
 smoke. `test:db` passes 11 real PostgreSQL tests, and both child-process recovery
 checks pass. `design.md` and `GOAL.md` remain identical.
+
+## Production recovery-controller rollout — 2026-10-19
+
+The private self-hosted Linux AMD64 release of source `e5a7499` passed the same
+18-test CI suite, 11 PostgreSQL tests, repeatable migrations and both packaged
+runtime probes before publication. GitOps then applied migration 0012 and the
+controller before rolling managed web and voice Pods. All four Pods were ready
+with zero restarts; the running image digests matched publication and ArgoCD was
+Synced / Healthy. See [current deployment](deployment.md#current-web-and-voice-verification--2026-10-19).
+
+At 04:09 UTC, the database had 13 migrations and three active runtime owners,
+each bound to its actual immutable Pod UID. Both web Pods and the voice Pod had
+the required finalizer and no Kubernetes token; only the controller mounted its
+scoped token. Controller liveness and readiness returned 200. Authorization
+checks allowed namespace Pod list/delete and rejected Secret reads, cluster-wide
+Pod listing and `patch pods --subresource=status`. Ten sampled database
+connections were below the configured role limit; this is not a capacity test.
+
+A digest covering stored room settings and the encrypted Discord credential was
+unchanged. The same listener session and nickname generation remained ACTIVE,
+with one player socket and one media connection. Chrome reconnected without a
+manual refresh or new entry, and the authenticated management page displayed the
+connected source. No provider or output language was enabled.
+
+The source retried with the generic DISCORD reason during the rollout. The old
+source closed at 04:02:13 UTC; the successful new source was claimed at 04:04:03
+and observed LISTENING at 04:06 and 04:09, generation 22. No room settings,
+permissions or network changes were needed. The underlying transient failure was
+not diagnosed; the outage must not be described as uninterrupted audio. No new
+speech was supplied during this rollout check. The earlier human-confirmed
+audible playback remains a separate result. Production abrupt container loss
+and independent fencing of an unknown host were not tested by this rollout.
 
 ## Kubernetes container-loss recovery — 2026-10-19
 
@@ -72,7 +106,7 @@ The later session and controlled-restart checks below extend this initial rollou
 evidence. The human subsequently confirmed single-member audible playback after
 the relay correction. Abrupt host-loss recovery remains unverified.
 
-PASS: [current web and voice deployment](deployment.md#current-web-and-voice-verification--2026-10-19)
+PASS: [initial web and voice deployment](deployment.md#initial-web-and-voice-verification--2026-10-19)
 records the published/running image digests, healthy two-web/one-worker rollout,
 authenticated and unauthorized control results, public responses/assets, and
 successful relay-only browser entry/exit. The real worker exchanged ten packets

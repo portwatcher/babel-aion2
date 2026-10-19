@@ -18,8 +18,10 @@ listener on another live web process is unaffected.
 
 ## Exit and restart
 
-Only a supervisor observing its own child `exit` event confirms physical process
-shutdown. The child's sockets and native threads have stopped at that point.
+For child-process recovery, a supervisor observing its own child `exit` event
+confirms physical process shutdown. The child's sockets and native threads have
+stopped at that point. Whole-container recovery instead requires the independent
+evidence described in [Kubernetes recovery](kubernetes-recovery.md).
 A failed spawn also has no transports to retire. Heartbeat expiry, advisory-lock
 loss, elapsed time and a PID lookup never supply this receipt.
 
