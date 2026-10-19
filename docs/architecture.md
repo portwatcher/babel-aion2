@@ -102,7 +102,12 @@ registers negotiations before creating peers, closes obsolete peers and persists
 the actual close acknowledgement. A PostgreSQL ownership session and durable
 source receipt exclude duplicate bot/guild controllers. The source controller
 connects Discord with DAVE, maintains separate member decoders and bounded PCM
-queues, and publishes mixed original audio independently of subtitle work. Source
+queues, and publishes mixed original audio independently of subtitle work. An
+undecodable packet (for example during a DAVE transition) is dropped, and a failed
+member receive stream is closed and resubscribed on that member's next speaking
+event; neither disconnects the bot. Only gateway/voice disconnection, the bot
+leaving the channel, or lost ownership retires the source, and each retirement
+writes a `source-failed` JSON line with the room and reason. Source
 retirement closes old browser peers before acknowledging shutdown. Separate
 member timelines feed shared provider jobs only while language demand exists.
 Version-checked private HTTP streams feed actual registered player sockets.
