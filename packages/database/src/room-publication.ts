@@ -6,8 +6,7 @@ import { communityRoom } from './schema/room-community.ts'
 
 export class RoomPublicationError extends Error {
   constructor(
-    readonly code:
-      'NOT_FOUND' | 'SOURCE_UNCONFIGURED' | 'ALREADY_PUBLISHED' | 'GUILD_IN_USE',
+    readonly code: 'NOT_FOUND' | 'SOURCE_UNCONFIGURED' | 'ALREADY_PUBLISHED',
   ) {
     super(code)
   }
@@ -55,13 +54,6 @@ export async function publishExistingRoom(
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtextextended(${`babel:community-guild:${guildId}`}, 0))`,
     )
-    const [taken] = await tx
-      .select()
-      .from(communityRoom)
-      .where(eq(communityRoom.guildId, guildId))
-    if (taken) {
-      throw new RoomPublicationError('GUILD_IN_USE')
-    }
     const old = await tx
       .select()
       .from(listenerSession)

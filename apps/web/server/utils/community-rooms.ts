@@ -70,10 +70,10 @@ export async function communityOperation<T>(operation: () => Promise<T>) {
   } catch (error) {
     if (error instanceof CommunityRoomError) {
       throw createError({
-        statusCode: error.code === 'GUILD_IN_USE' ? 409 : 401,
+        statusCode: error.code === 'SOURCE_CHANNEL_CONFLICT' ? 409 : 401,
         statusMessage:
-          error.code === 'GUILD_IN_USE'
-            ? '此 Discord 服务器已有房间，请加入现有房间'
+          error.code === 'SOURCE_CHANNEL_CONFLICT'
+            ? '同一 Discord 服务器的房间共享音频来源，请使用现有语音频道'
             : '安装已过期，请重新安装',
       })
     }

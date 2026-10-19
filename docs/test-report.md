@@ -4,10 +4,10 @@
 
 | Check                          | Result  | Evidence                                                                                                                                                                                                            |
 | ------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Full source and runtime checks | PASS    | `npm run ci:local`: source limits, formatting, strict types, 18 tests, all builds and built HTTP smoke                                                                                                              |
+| Full source and runtime checks | PASS    | `npm run ci:local`: source limits, formatting, strict types, 19 tests, all builds and built HTTP smoke after reconciling the independent-room changes                                                               |
 | Shared target lifetime         | PASS    | Real loopback WebSockets retain a target for its remaining listener, close on the last unsubscribe, discard held-handshake audio, and reopen a fresh target while another language continues                        |
 | Listener transport lifetime    | PASS    | `npm run test:subtitles:db`: closing all actual player sockets closes recognition and translation while languages remain enabled; a returning listener opens only its requested target and receives fresh fragments |
-| Database regression suite      | PASS    | `npm run test:db`: all 13 tests on an isolated local database                                                                                                                                                       |
+| Database regression suite      | PASS    | `npm run test:db`: all 14 tests on an isolated local database                                                                                                                                                       |
 | Regression controls            | PASS    | The target-lifetime case failed before removing the release grace. The real-player case failed with the old room owner restored, then passed after subscriber-driven cleanup                                        |
 | Production rollout             | NOT RUN | Source and local runtime validation only; merging `main` triggers the existing automatic deployment                                                                                                                 |
 
@@ -15,6 +15,28 @@ The provider regression owns the connection and pending-audio lifecycle contract
 the existing player integration owns cross-transport release and recovery. Both
 exercise actual sockets without adding production-only test hooks. Loopback
 evidence does not measure real-provider latency, quality or billing.
+
+## Multiple rooms sharing a Discord source · 2026-10-19
+
+Scope: creation and audio fan-out for multiple independent rooms on one Discord
+guild. Discord installation supplies server identity; no read seeds a default
+room and no administrator setup is required. Migration 0015 removes the guild's
+community-room uniqueness constraint without deleting existing rooms or sessions.
+
+| Check                                        | Status  | Evidence                                                                                                                                                                                                  |
+| -------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Default-room regression                      | PASS    | The added HTTP/PostgreSQL check failed against the preceding runtime because public/admin reads inserted one room; the repaired runtime leaves the room table empty until explicit creation.              |
+| Source checks, native audio and builds       | PASS    | `npm run ci:local`: 18 tests, including actual Opus decoding in two destinations and continued delivery after stopping one; built HTTP/Access smoke passes.                                               |
+| Durable source grouping and ownership        | PASS    | `npm run test:db`: 14 tests, including one receiver group for two same-guild rooms and source eligibility while the canonical room is stopped and its sibling runs.                                       |
+| Repeated bot installation and room isolation | PASS    | `npm run test:community:db`: separate OAuth installations for the same guild produce distinct rooms, same-install retries preserve the room, and nickname/admission/map checks remain scoped to the room. |
+| Management and runtime recovery              | PASS    | `npm run test:management:db` and `npm run test:recovery:db`: installed bindings reject reassignment; existing credential/state boundaries and killed web/voice runtime recovery pass.                     |
+| Live multi-room Discord playback             | NOT RUN | The shared receiver/encoder and authorization boundaries are tested locally. Simultaneous human playback in multiple production rooms has not been verified.                                              |
+
+The worker receives Discord audio once per guild and encodes original audio once.
+Room subtitle consumers retain their own authorization and provider processing;
+this is not evidence of cross-room sharing of recognition/translation sessions.
+The first configured source channel is shared by additional rooms; creation
+cannot silently switch that receiver to another channel.
 
 ## Interface localization — 2026-10-19
 

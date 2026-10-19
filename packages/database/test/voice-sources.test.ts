@@ -8,7 +8,11 @@ import { createCredentialCipher } from '../src/credentials.ts'
 import { startRoom, stopRoom, updateRoomSettings } from '../src/room-settings.ts'
 import { auditEvent, room } from '../src/schema/rooms.ts'
 import { voiceSourceRun } from '../src/schema/voice-sources.ts'
-import { claimVoiceSource, readVoiceSources } from '../src/voice-sources.ts'
+import {
+  claimVoiceSource,
+  readVoiceSources,
+  readVoiceSourceGroups,
+} from '../src/voice-sources.ts'
 import { registerRuntimeOwner } from '../src/runtime-owners.ts'
 import { runtimeOwner } from '../src/schema/runtime-owners.ts'
 
@@ -240,5 +244,47 @@ test('PostgreSQL ownership excludes duplicate controllers and preserves an uncon
       await f.owner(),
       () => {},
     ),
+  )
+})
+
+test('same-guild rooms resolve one receiver and keep it eligible while any room is running', async (t) => {
+  const f = await fixture(t)
+  for (const id of f.ids) {
+    await f.configure(id)
+  }
+  let group = (await readVoiceSourceGroups(f.database.db)).find((group) =>
+    group.rooms.some((room) => room.id === f.ids[0]),
+  )
+  assert.ok(group)
+  assert.deepEqual(new Set(group.rooms.map((room) => room.id)), new Set(f.ids))
+  assert.equal(group.configuration.stopped, true)
+  const receiverId = group.configuration.id
+  const other = f.ids.find((id) => id !== receiverId)!
+  await startRoom(
+    f.database.db,
+    other,
+    (await f.stored(other)).configurationVersion,
+    f.actor,
+    f.cipher,
+  )
+  group = (await readVoiceSourceGroups(f.database.db)).find((group) =>
+    group.rooms.some((room) => room.id === f.ids[0]),
+  )
+  assert.ok(group)
+  assert.equal(group.configuration.stopped, false)
+  assert.equal((await f.stored(group.configuration.id)).stopped, true)
+  const lease = await claimVoiceSource(
+    f.database.db,
+    f.database.pool,
+    group.configuration,
+    '10000000000000005',
+    await f.owner(),
+    () => {},
+  )
+  f.leases.push(lease)
+  assert.equal(
+    lease.valid(),
+    true,
+    'a stopped room cannot suppress its active sibling source',
   )
 })

@@ -1,20 +1,24 @@
 <script setup lang="ts">
-import { DEFAULT_ROOM_ID, type ProviderSummary } from '@babel/contracts'
+import type { ProviderSummary } from '@babel/contracts'
 
 definePageMeta({
   middleware: 'administrator',
   key: (route) => String(route.query.roomId ?? 'default'),
 })
 const route = useRoute()
-const { data: directory, refresh: refreshDirectory } =
-  await useFetch('/api/player/rooms')
+const { data: directory } = await useFetch('/api/player/rooms')
+if (!route.query.roomId && directory.value?.rooms[0]) {
+  await navigateTo(
+    { path: '/admin', query: { roomId: directory.value.rooms[0].id } },
+    { replace: true },
+  )
+}
 const selectedRoomId = computed(() =>
-  typeof route.query.roomId === 'string' ? route.query.roomId : null,
+  typeof route.query.roomId === 'string'
+    ? route.query.roomId
+    : (directory.value?.rooms[0]?.id ?? null),
 )
-const roomChoices = computed(() => [
-  { id: null, name: 'Original listening room' },
-  ...(directory.value?.rooms ?? []).filter((room) => room.id !== DEFAULT_ROOM_ID),
-])
+const roomChoices = computed(() => directory.value?.rooms ?? [])
 async function selectRoom(id: string | null) {
   await navigateTo({ path: '/admin', query: id ? { roomId: id } : {} })
 }
@@ -39,7 +43,7 @@ const providers = shallowRef<ProviderSummary[]>([])
       <Button label="Retry" severity="secondary" :loading="loading" @click="connect" />
     </section>
     <template v-else-if="status">
-      <div class="field management-section">
+      <div v-if="roomChoices.length" class="field management-section">
         <label for="management-room">Managed room</label>
         <Select
           input-id="management-room"
@@ -50,14 +54,20 @@ const providers = shallowRef<ProviderSummary[]>([])
           @update:model-value="selectRoom"
         />
       </div>
-      <AdminRoomSettings />
-      <AdminRoomAdmission @published="refreshDirectory" />
-      <AdminListeners />
+      <template v-if="selectedRoomId">
+        <AdminRoomSettings />
+        <AdminListeners />
+      </template>
+      <p v-else class="muted">
+        No rooms installed. Create a room and install the bot through Discord to get
+        started.
+      </p>
       <AdminProviders
         :terminology-version="terminologyVersion"
         @change="providers = $event"
       />
       <AdminLanguages
+        v-if="selectedRoomId"
         :providers="providers"
         :terminology-version="terminologyVersion"
       />

@@ -8,6 +8,7 @@ import type { Database } from './client.ts'
 import type { CredentialCipher } from './credentials.ts'
 import { CredentialProtectionError } from './credentials.ts'
 import { auditEvent, room } from './schema/rooms.ts'
+import { communityRoom } from './schema/room-community.ts'
 import { voiceSourceConfigured } from './voice-sources.ts'
 
 type StoredRoom = typeof room.$inferSelect
@@ -96,6 +97,13 @@ export async function updateRoomSettings(
       JSON.stringify([...stored.commanderIds].sort()) !==
         JSON.stringify([...input.commanderIds].sort()) ||
       stored.encryptedDiscordCredential !== encryptedCredential
+    const [installed] = await tx
+      .select({ id: communityRoom.roomId })
+      .from(communityRoom)
+      .where(eq(communityRoom.roomId, roomId))
+    if (installed && sourceChanged) {
+      throw new RoomConfigurationError('INVALID_CONFIGURATION')
+    }
     const [updated] = await tx
       .update(room)
       .set({

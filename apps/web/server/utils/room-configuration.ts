@@ -31,11 +31,19 @@ export async function useListenerRoom(event?: H3Event, selectedRoomId?: string) 
   if (selectedRoomId) {
     return { database, roomId: selectedRoomId }
   }
-  await database
-    .insert(room)
-    .values({ id: DEFAULT_ROOM_ID, name: 'AION2 深渊战' })
-    .onConflictDoNothing()
-  return { database, roomId: DEFAULT_ROOM_ID }
+  const [saved] = await database
+    .select({ id: room.id })
+    .from(room)
+    .orderBy(
+      sql`case when ${room.id} = ${DEFAULT_ROOM_ID} then 0 else 1 end`,
+      asc(room.createdAt),
+      asc(room.id),
+    )
+    .limit(1)
+  if (!saved) {
+    throw createError({ statusCode: 404, statusMessage: 'No installed rooms' })
+  }
+  return { database, roomId: saved.id }
 }
 
 export async function publicRoomConfiguration(
@@ -56,6 +64,7 @@ export async function publicRoomConfiguration(
       event,
       selectedRoomId === DEFAULT_ROOM_ID ? undefined : selectedRoomId,
     )
+    configuration.room.id = roomId
     await database.execute(sql`select id from player_connection limit 1`)
     const [saved] = await database.select().from(room).where(eq(room.id, roomId))
     if (saved) {

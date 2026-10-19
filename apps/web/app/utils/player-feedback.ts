@@ -7,7 +7,7 @@ const messages: Record<string, InterfaceMessageKey> = {
   'Discord 房间创建尚未配置': 'creationUnavailable',
   '请先安装 Discord Bot': 'installFirst',
   '请先完成 Discord 安装': 'installFirst',
-  '此 Discord 服务器已有房间，请加入现有房间': 'guildInUse',
+  '同一 Discord 服务器的房间共享音频来源，请使用现有语音频道': 'sharedSourceChannel',
   '安装已过期，请重新安装': 'installationExpired',
   '房间服务暂时不可用，请稍后重试': 'roomsUnavailable',
   '请填写房间名称、区服和有效的角色 ID 列表': 'roomSettingsInvalid',

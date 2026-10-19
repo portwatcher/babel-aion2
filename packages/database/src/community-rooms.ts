@@ -5,13 +5,23 @@ import type { Database } from './client.ts'
 import type { CredentialCipher } from './credentials.ts'
 import { auditEvent, listenerSession, room } from './schema/rooms.ts'
 import { communityRoom, roomInstallation } from './schema/room-community.ts'
+import { voiceSourceConfigured } from './voice-sources.ts'
 
 export const hashInstallationSecret = (value: string) =>
   createHash('sha256').update(value).digest('hex')
 export class CommunityRoomError extends Error {
-  constructor(readonly code: 'INVALID_INSTALLATION' | 'GUILD_IN_USE') {
+  constructor(readonly code: 'INVALID_INSTALLATION' | 'SOURCE_CHANNEL_CONFLICT') {
     super(code)
   }
+}
+
+async function readGuildSource(db: Pick<Database, 'select'>, guildId: string) {
+  const sources = await db
+    .select()
+    .from(room)
+    .where(eq(room.discordGuildId, guildId))
+    .orderBy(asc(room.createdAt), asc(room.id))
+  return sources.find(voiceSourceConfigured)
 }
 
 export async function beginInstallation(db: Database, input: unknown) {
@@ -48,7 +58,11 @@ export async function readInstallation(db: Database, id: string, browser: string
   if (!record) {
     throw new CommunityRoomError('INVALID_INSTALLATION')
   }
-  return record
+  const source =
+    record.authorizedAt && record.guildId
+      ? await readGuildSource(db, record.guildId)
+      : undefined
+  return { ...record, sharedVoiceChannelId: source?.discordVoiceChannelId ?? null }
 }
 
 export async function completeInstallation(
@@ -110,12 +124,12 @@ export async function createCommunityRoom(
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtextextended(${`babel:community-guild:${installation.guildId}`}, 0))`,
     )
-    const [existing] = await tx
-      .select()
-      .from(room)
-      .where(eq(room.discordGuildId, installation.guildId))
-    if (existing) {
-      throw new CommunityRoomError('GUILD_IN_USE')
+    const existing = await readGuildSource(tx, installation.guildId)
+    if (
+      existing?.discordVoiceChannelId &&
+      existing.discordVoiceChannelId !== voiceChannelId
+    ) {
+      throw new CommunityRoomError('SOURCE_CHANNEL_CONFLICT')
     }
     const roomId = randomUUID()
     await tx.insert(room).values({
@@ -123,7 +137,8 @@ export async function createCommunityRoom(
       name: installation.name,
       discordGuildId: installation.guildId,
       discordVoiceChannelId: voiceChannelId,
-      captureMode: 'ALL_CHANNEL',
+      captureMode: existing?.captureMode ?? 'ALL_CHANNEL',
+      commanderIds: existing?.commanderIds ?? [],
       stopped: false,
       sourceGeneration: 1,
       encryptedDiscordCredential: cipher.encrypt(botToken, `room:${roomId}:discord`),

@@ -10,7 +10,6 @@ import {
 import { managementFailure } from '~/utils/management-errors'
 
 const current = shallowRef<ManagementRoom | null>(null)
-const protectionReady = ref(false)
 const name = ref('')
 const guildId = ref('')
 const voiceChannelId = ref('')
@@ -20,27 +19,10 @@ const captureModes = [
   { label: 'All channel members', value: 'ALL_CHANNEL' },
 ]
 const commanderText = ref('')
-const credentialAction = ref<'keep' | 'replace' | 'remove'>('keep')
-const credential = ref('')
 const busy = ref(false)
 const error = ref('')
 const notice = ref('')
 let disposed = false
-const credentialActions = computed(() => [
-  {
-    label: current.value?.credentialConfigured
-      ? 'Keep saved credential'
-      : 'Leave credential unset',
-    value: 'keep',
-    disabled: false,
-  },
-  { label: 'Save new credential', value: 'replace', disabled: !protectionReady.value },
-  {
-    label: 'Remove saved credential',
-    value: 'remove',
-    disabled: !current.value?.credentialConfigured,
-  },
-])
 
 function accept(room: ManagementRoom) {
   current.value = room
@@ -49,8 +31,6 @@ function accept(room: ManagementRoom) {
   voiceChannelId.value = room.voiceChannelId ?? ''
   captureMode.value = room.captureMode
   commanderText.value = room.commanderIds.join('\n')
-  credentialAction.value = 'keep'
-  credential.value = ''
 }
 
 async function load() {
@@ -63,7 +43,6 @@ async function load() {
     )
     if (!disposed) {
       accept(result.room)
-      protectionReady.value = result.credentialProtectionReady
     }
   } catch (failure) {
     if (!disposed) {
@@ -90,8 +69,7 @@ async function save() {
       captureMode.value === 'ALL_CHANNEL'
         ? []
         : commanderText.value.split(/[\s,，]+/).filter(Boolean),
-    ...(credentialAction.value === 'replace' ? { credential: credential.value } : {}),
-    removeCredential: credentialAction.value === 'remove',
+    removeCredential: false,
   })
   if (!input.success) {
     error.value =
@@ -116,7 +94,6 @@ async function save() {
       error.value = managementFailure(failure)
     }
   } finally {
-    credential.value = ''
     busy.value = false
   }
 }
@@ -153,13 +130,9 @@ async function setRunning(running: boolean) {
   }
 }
 
-watch(credentialAction, () => {
-  credential.value = ''
-})
 onMounted(load)
 onBeforeUnmount(() => {
   disposed = true
-  credential.value = ''
 })
 </script>
 
@@ -178,8 +151,8 @@ onBeforeUnmount(() => {
       />
     </div>
     <p class="muted">
-      Save source settings, then start the room. Connection status and received member
-      audio appear below.
+      Discord server and voice channel are obtained when the bot is installed. Rooms on
+      the same Discord server share one audio source.
     </p>
     <AdminVoiceSource />
     <p v-if="notice" role="status">{{ notice }}</p>
@@ -201,7 +174,7 @@ onBeforeUnmount(() => {
           <InputText
             id="discord-guild"
             v-model="guildId"
-            :disabled="busy"
+            readonly
             inputmode="numeric"
             autocomplete="off"
           />
@@ -211,7 +184,7 @@ onBeforeUnmount(() => {
           <InputText
             id="discord-channel"
             v-model="voiceChannelId"
-            :disabled="busy"
+            readonly
             inputmode="numeric"
             autocomplete="off"
           />
@@ -225,7 +198,7 @@ onBeforeUnmount(() => {
           :options="captureModes"
           option-label="label"
           option-value="value"
-          :disabled="busy"
+          disabled
           aria-describedby="capture-mode-help"
         />
         <small id="capture-mode-help" class="muted">{{
@@ -239,7 +212,7 @@ onBeforeUnmount(() => {
         <Textarea
           id="commanders"
           v-model="commanderText"
-          :disabled="busy"
+          readonly
           rows="3"
           aria-describedby="commanders-help"
         />
@@ -247,44 +220,9 @@ onBeforeUnmount(() => {
           >One ID per line. Receive audio only from these members.</small
         >
       </div>
-      <div class="field">
-        <label for="credential-action">Bot credential</label>
-        <Select
-          input-id="credential-action"
-          v-model="credentialAction"
-          :options="credentialActions"
-          option-label="label"
-          option-value="value"
-          option-disabled="disabled"
-          :disabled="busy"
-        />
-        <small class="muted">{{
-          current.credentialConfigured
-            ? 'Credential saved. Its value is never returned to this page.'
-            : 'No credential saved.'
-        }}</small>
-        <p v-if="!protectionReady" class="muted">
-          Credential protection is not configured. New credentials cannot be saved yet.
-        </p>
-      </div>
-      <div v-if="credentialAction === 'replace'" class="field">
-        <label for="discord-credential">New bot token</label>
-        <InputText
-          id="discord-credential"
-          v-model="credential"
-          type="password"
-          autocomplete="new-password"
-          :spellcheck="false"
-          :disabled="busy"
-          required
-        />
-      </div>
-      <p v-if="credentialAction === 'remove'" class="form-error">
-        Saving removes the bot credential and keeps the room stopped.
-      </p>
       <p class="muted">
-        Changing credentials, voice channel, capture scope or members stops the current
-        source. Revalidate before restarting.
+        Bot credentials are managed by the installation service. Stopping this room does
+        not stop other rooms on the same Discord server.
       </p>
       <div class="management-actions">
         <Button type="submit" label="Save settings" :loading="busy" />

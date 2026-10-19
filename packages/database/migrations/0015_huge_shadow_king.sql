@@ -1,0 +1,1 @@
+ALTER TABLE "community_room" DROP CONSTRAINT "community_room_guild_id_unique";

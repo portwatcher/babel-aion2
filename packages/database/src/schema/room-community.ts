@@ -20,7 +20,7 @@ export const communityRoom = pgTable('community_room', {
   roomId: uuid('room_id')
     .primaryKey()
     .references(() => room.id, { onDelete: 'cascade' }),
-  guildId: text('guild_id').notNull().unique(),
+  guildId: text('guild_id').notNull(),
   creatorId: text('creator_id').notNull(),
   server: text('server').notNull(),
   allowedIds: jsonb('allowed_ids').$type<string[]>().notNull().default([]),

@@ -21,10 +21,16 @@ export default defineEventHandler(async (event) => {
       server: installation.server,
       allowedIds: installation.allowedIds,
       roomId: installation.consumedRoomId,
-      channels: await installationChannels(
-        installation.guildId,
-        config.botToken,
-        config.clientId,
+      channels: (
+        await installationChannels(
+          installation.guildId,
+          config.botToken,
+          config.clientId,
+        )
+      ).filter(
+        (channel) =>
+          !installation.sharedVoiceChannelId ||
+          channel.id === installation.sharedVoiceChannelId,
       ),
     }
   })

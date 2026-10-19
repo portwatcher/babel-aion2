@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, eq, isNull, or } from 'drizzle-orm'
+import { and, asc, eq, isNull, or } from 'drizzle-orm'
 import type { Pool, PoolClient, QueryResultRow } from 'pg'
 import type { Database } from './client.ts'
 import { room } from './schema/rooms.ts'
@@ -23,7 +23,24 @@ export function voiceSourceConfigured(source: VoiceSourceConfiguration) {
 }
 
 export async function readVoiceSources(db: Database) {
-  return db.select().from(room)
+  return db.select().from(room).orderBy(asc(room.createdAt), asc(room.id))
+}
+
+export async function readVoiceSourceGroups(db: Database) {
+  const groups = new Map<string, VoiceSourceConfiguration[]>()
+  for (const configuration of await readVoiceSources(db)) {
+    const key = configuration.discordGuildId ?? configuration.id
+    const rooms = groups.get(key) ?? []
+    rooms.push(configuration)
+    groups.set(key, rooms)
+  }
+  return [...groups.values()].map((rooms) => {
+    const source = rooms.find(voiceSourceConfigured) ?? rooms[0]!
+    return {
+      configuration: { ...source, stopped: rooms.every((room) => room.stopped) },
+      rooms,
+    }
+  })
 }
 
 export async function claimVoiceSource(
@@ -75,9 +92,21 @@ export async function claimVoiceSource(
         .from(room)
         .where(eq(room.id, source.id))
         .for('update')
+      const [running] = await tx
+        .select({ id: room.id })
+        .from(room)
+        .where(
+          and(
+            source.discordGuildId
+              ? eq(room.discordGuildId, source.discordGuildId)
+              : eq(room.id, source.id),
+            eq(room.stopped, false),
+          ),
+        )
+        .limit(1)
       if (
         !current ||
-        current.stopped ||
+        !running ||
         current.sourceGeneration !== source.sourceGeneration ||
         !voiceSourceConfigured(current)
       ) {
@@ -118,7 +147,7 @@ export async function claimVoiceSource(
         controlKey,
         ownerId,
       })
-      return { runId, source: next }
+      return { runId, source: { ...next, stopped: false } }
     })
     timer = setInterval(() => {
       if (checking || invalid || released) {

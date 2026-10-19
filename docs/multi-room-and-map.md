@@ -24,8 +24,13 @@ its application identity to the OAuth client.
 
 Channel-level overwrites can reduce installation permissions. The chooser lists
 only ordinary voice channels with all required effective permissions; creation
-checks them again. A single bot can receive one channel per guild, so a guild can
-have one community room. New rooms request all-channel reception. The form states
+checks them again. A single bot receives one channel per guild. A guild can have multiple community
+rooms, created by separate Discord installations. The first installation selects
+the shared voice channel; later installations offer that channel and create
+separate rooms with their own server, admission rules, members and maps. Each
+installation is idempotent across replicas. One receiver and Opus encoder feed
+all active rooms in that guild. Stopping a room retires only its delivery; the
+source continues while another room is running. New guilds use all-channel reception. The form states
 that the creator should inform speakers before starting the broadcast. Actual
 source readiness remains worker status, independently from the saved request.
 
@@ -52,12 +57,13 @@ the existing revocation coordinator. Different rooms have independent generation
 Refresh restores the saved room session. New credentials never grant audio or
 subtitles before old transport shutdown has been confirmed.
 
-To retain the existing configured broadcast, open `/admin`, select the original
-room, and set its server and optional IDs under “加入规则”. The one-time action
-publishes the existing room without changing its Discord source or credential.
-It ends unverified listeners, who must explicitly re-enter with Index validation.
-Its previous nickname/media registrations still block same-ID authorization until
-shutdown is confirmed across the namespace change.
+Room creation requires no administrator setup or manually entered Discord IDs.
+The guild comes from the verified OAuth grant and the channel comes from Discord's
+permission-checked channel list. Installed source bindings cannot be reassigned
+through the administrator settings API. Administration lists actual installed
+rooms, without a synthetic original-room option. Reads never seed a default room.
+The older publication API is retained for previously stored broadcasts; it is
+not part of creation. Publication still fences old unverified listener delivery.
 
 The default administrator room retains its legacy API for compatibility with
 existing clients and validation tools. Before publication it keeps the original
@@ -65,8 +71,7 @@ entry behavior and stays out of the directory. After publication the legacy API
 performs the same server/allowlist/Index verification as room-specific entry.
 The entry transaction shares a room lock with publication and requires the
 server's validated character context, so an in-flight old request cannot bypass
-the new policy. Existing community-room admission rules are immutable. `/admin` now selects
-between the original room and installed community rooms; room settings, source
+the new policy. Existing community-room admission rules are immutable. `/admin` selects installed rooms; room settings, source
 status, member lists and room language defaults follow that selection. Provider
 and language catalogs remain shared.
 
