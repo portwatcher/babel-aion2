@@ -158,11 +158,12 @@ production backup.
 
 Private infra also provides `babel-restore-rehearsal.mjs`, exercised against a
 read-only production snapshot on 2026-10-19. It uses the deployed database and web
-image digests, restores into an isolated local Docker database, checks all 19
+image digests, restores into an isolated local Docker database, checks all 20
 application/migration tables and schema, repeats migrations and starts the actual
 web runtime without a voice worker. The existing key decrypts the restored room
 credential; a wrong key is rejected. Restored unknown owners and transport receipts
-remain unconfirmed. See the [production snapshot report](test-report.md#production-snapshot-restoration--2026-10-19).
+remain unconfirmed, including the current release's Pod ownership records and
+13 migration entries. See the [production snapshot report](test-report.md#production-snapshot-restoration--2026-10-19).
 
 Run that command from private infra using its documented Kubernetes access and
 local Docker prerequisites. Restore destinations are created by the tool, not
@@ -195,6 +196,11 @@ Use only previously published, verified image references. The earlier scaffold
 does not implement the current listener and configuration features. A downgrade
 to that version requires stopped command delivery and an explicit plan to return
 to the current version; database compatibility alone does not preserve features.
+Likewise, a release before Pod admission cannot safely replace an active managed
+runtime. Stop and confirm all web/voice delivery, resolve outstanding retirement
+requests, and retain the compatible recovery controller through that transition.
+Do not clear unknown owners or remove finalizers to force a downgrade. See
+[Pod recovery limits](kubernetes-recovery.md#private-deployment).
 
 Before a rollout, pull the previous and candidate published images using the
 approved registry access method. Keep registry credentials outside this repository.
@@ -220,6 +226,10 @@ and retains the encrypted room credential through a normal save. It starts no
 Discord connection, seeds no production data and removes its containers and
 temporary database storage. Exact-image functional checks on an emulated CPU are
 not a native capacity measurement.
+The current recovery release and its preceding production web image pass this
+sequence with 12-to-13 migration compatibility. That Docker check supplies no Pod
+identity and therefore covers the post-drain web/database sequence only; see
+[published-image evidence](test-report.md#published-image-rollback-compatibility--2026-10-19).
 
 These implementation checks do not establish a production GitOps rollback or
 live media recovery. Local process
