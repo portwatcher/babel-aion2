@@ -3,6 +3,7 @@ import { fork, type ChildProcess } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createDatabase } from '@babel/database'
+import { runtimePodIdentity } from './pod-identity.ts'
 import {
   confirmRuntimeExit,
   registerRuntimeOwner,
@@ -13,6 +14,7 @@ export async function superviseRuntime(options: {
   moduleUrl: URL
   component: 'voice-worker' | 'web'
 }) {
+  const pod = runtimePodIdentity()
   const database = createDatabase(options.databaseUrl, {
     queryTimeoutMs: 2_000,
     maxConnections: 1,
@@ -57,7 +59,9 @@ export async function superviseRuntime(options: {
   try {
     while (!stopping) {
       const ownerId = randomUUID()
-      if (!(await persist(() => registerRuntimeOwner(database.db, ownerId), true))) {
+      if (
+        !(await persist(() => registerRuntimeOwner(database.db, ownerId, pod), true))
+      ) {
         break
       }
       if (stopping) {

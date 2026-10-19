@@ -11,6 +11,7 @@
     "./room-settings": "./src/room-settings.ts",
     "./voice-sources": "./src/voice-sources.ts",
     "./runtime-owners": "./src/runtime-owners.ts",
+    "./runtime-pods": "./src/runtime-pods.ts",
     "./subtitles": "./src/subtitles.ts",
     "./providers": "./src/providers/index.ts",
     "./terms": "./src/terms.ts",

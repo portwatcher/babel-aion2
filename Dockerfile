@@ -33,6 +33,7 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/apps/web/.output ./.output
 COPY --from=build --chown=node:node /app/packages/database/dist/migrate.mjs ./database/migrate.mjs
 COPY --from=build --chown=node:node /app/packages/database/migrations ./migrations
+COPY --from=build --chown=node:node /app/apps/runtime-recovery/dist ./recovery
 USER node
 EXPOSE 3000
 CMD ["node", ".output/server/supervisor.mjs"]

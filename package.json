@@ -12,7 +12,7 @@
   },
   "scripts": {
     "dev": "npm run dev --workspace=@babel/web",
-    "build": "npm run build --workspace=@babel/web && npm run build:migrations && npm run build --workspace=@babel/voice-worker",
+    "build": "npm run build --workspace=@babel/web && npm run build:migrations && npm run build --workspace=@babel/voice-worker && npm run build --workspace=@babel/runtime-recovery",
     "build:migrations": "node scripts/build-migrations.mjs",
     "start": "npm run start --workspace=@babel/web",
     "dev:worker": "npm run dev --workspace=@babel/voice-worker",

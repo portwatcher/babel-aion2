@@ -45,7 +45,7 @@ shutdown. No HTTP endpoint can submit an exit receipt or choose an owner ID.
 
 ## Operations and limits
 
-Apply migrations through `0011_tough_psylocke` before starting these versions.
+Apply migrations through `0012_parallel_toad` before starting these versions.
 Migration 0010 creates runtime ownership; 0011 adds an indexed nullable owner to
 player connections. Existing rows remain unknown rather than receiving an invented
 owner. Never infer that these historical sockets have stopped from their age.
@@ -67,10 +67,11 @@ crash leaves an unknown owner. Administrator Access has no development bypass.
 
 Allow at least fifteen seconds for normal container termination. A storage outage
 can prevent acknowledgement within that period and must remain fail-closed.
-Recovery here requires a surviving supervisor. If the supervisor/container/host
-itself disappears, proving old transport shutdown and reconciling its unknown
-owners still requires orchestration-level evidence. Multi-worker media routing
-also remains unfinished.
+Child recovery requires a surviving supervisor. The separate
+[Kubernetes recovery controller](kubernetes-recovery.md) can reconcile a lost
+container after verified kubelet termination. Unknown host termination and
+historical owners without Pod identity remain fail-closed. Multi-worker media
+routing also remains unfinished.
 
 ## Evidence
 

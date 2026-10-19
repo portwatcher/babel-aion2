@@ -94,6 +94,9 @@ Both services supervise a child runtime and reconcile its confirmed exit before
 restarting it. The web production entry is `apps/web/.output/server/supervisor.mjs`
 (`npm run start` and the Docker image use it). Apply all migrations first; see
 [process recovery](docs/worker-recovery.md) for storage fencing and host-crash limits.
+The private [Kubernetes recovery controller](docs/kubernetes-recovery.md) handles
+whole-container loss using Pod admission barriers and verified termination
+evidence. Its deployment, credentials and API permissions belong in infra.
 
 The `/admin` page fails closed until Access is configured. Set
 `NUXT_ACCESS_TEAM_DOMAIN`, `NUXT_ACCESS_AUDIENCE`, and a random
