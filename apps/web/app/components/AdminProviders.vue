@@ -6,14 +6,11 @@ import {
   type ProviderSummary,
 } from '@babel/contracts'
 import { providerFailure, providerTestLabel } from '~/utils/provider-feedback'
-defineProps<{ terminologyVersion: number | null }>()
-const emit = defineEmits<{ change: [providers: ProviderSummary[]] }>()
 const providers = shallowRef<ProviderSummary[]>([])
 const current = computed(() => providers.value[0] ?? null)
 const protectionReady = ref(false)
 const busy = ref(false)
 const loaded = ref(false)
-const sampleBusy = ref(false)
 const error = ref('')
 const notice = ref('')
 let disposed = false
@@ -26,7 +23,6 @@ async function load() {
       providers.value = value.configurations
       protectionReady.value = value.credentialProtectionReady
       loaded.value = true
-      emit('change', providers.value)
     }
   } catch (failure) {
     if (!disposed) {
@@ -37,7 +33,7 @@ async function load() {
   }
 }
 async function operation(action: () => Promise<unknown>, message: string) {
-  if (busy.value || sampleBusy.value) {
+  if (busy.value) {
     return
   }
   busy.value = true
@@ -47,7 +43,6 @@ async function operation(action: () => Promise<unknown>, message: string) {
     const value = providerSummarySchema.parse(await action())
     if (!disposed) {
       providers.value = [value]
-      emit('change', providers.value)
       notice.value = message
     }
   } catch (failure) {
@@ -96,17 +91,11 @@ onBeforeUnmount(() => {
     :aria-busy="busy"
   >
     <div class="section-heading">
-      <h2 id="providers-title">OpenAI subtitle service</h2>
-      <Button
-        label="Reload"
-        severity="secondary"
-        :disabled="busy || sampleBusy"
-        @click="load"
-      />
+      <h2 id="providers-title">OpenAI API Key</h2>
+      <Button label="Reload" severity="secondary" :disabled="busy" @click="load" />
     </div>
     <p class="muted">
-      One API Key enables streaming recognition and multilingual live translation. No
-      model or endpoint settings are needed.
+      One API Key is used for live captions in Chinese, Japanese and Korean.
     </p>
     <p v-if="loaded && !protectionReady" class="muted">
       Credential protection is unavailable. Saving and testing are disabled.
@@ -116,7 +105,7 @@ onBeforeUnmount(() => {
     <ProviderEditor
       v-if="loaded && protectionReady"
       :current="current"
-      :busy="busy || sampleBusy"
+      :busy="busy"
       @save="save"
     />
     <div v-if="current" class="management-actions">
@@ -129,19 +118,9 @@ onBeforeUnmount(() => {
       <Button
         label="Test connection"
         severity="secondary"
-        :disabled="busy || sampleBusy || !protectionReady"
+        :disabled="busy || !protectionReady"
         @click="test"
       />
     </div>
-    <p class="muted">
-      Connection tests check access to both models. Use authorized audio samples to
-      verify captions. Tests may incur service charges.
-    </p>
-    <ProviderSample
-      :providers="providers"
-      :disabled="busy || !protectionReady"
-      :terminology-version="terminologyVersion"
-      @busy="sampleBusy = $event"
-    />
   </section>
 </template>

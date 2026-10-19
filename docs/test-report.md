@@ -1,5 +1,22 @@
 # Validation
 
+## Website administration scope and requested languages — 2026-10-19
+
+| Check                                | Result  | Evidence                                                                                                                                                                                                                   |
+| ------------------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source and runtime gate              | PASS    | `npm run ci:local`: 19 tests, strict types, formatting, all runtime builds and built HTTP smoke                                                                                                                            |
+| Website-wide administration          | PASS    | `npm run test:community:db`: authenticated status succeeds without rooms even with an obsolete room ID; reads create no room. The same regression returned 404 before the repair                                           |
+| Existing room workflows              | PASS    | Community HTTP/PostgreSQL checks preserve installation, admission, room isolation, map synchronization, nickname revocation and automatic empty-room disbanding                                                            |
+| Requested production languages       | PASS    | The saved key configured both actual OpenAI models. A clearly synthetic 4.507-second English command passed real path validation for `zh-Hans`, `ja` and `ko`; all three were enabled through the existing domain services |
+| Credential preservation              | PASS    | The operator checked the encrypted key envelope before and after language setup; it was unchanged and plaintext stayed inside the production pod                                                                           |
+| Battle quality and game display mode | NOT RUN | Functional sample validation does not establish real PVP accuracy, mixed-language command quality or AION2/PiP acceptance                                                                                                  |
+
+Administration contains only the website OpenAI API Key and game terms. The room
+selector, Discord fields, members, language editor, audio sample UI, service
+dashboard and room start/stop controls were removed. No rename feature was added.
+Production output languages are actual configured paths; no players, subtitles
+or validation results were fabricated.
+
 ## Numbered room links · 2026-10-19
 
 | Check                             | Status  | Evidence                                                                                                                                                                                                                                                                                                          |

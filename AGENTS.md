@@ -84,8 +84,13 @@
 - Use HTTP polling for administration. Never add `/admin/ws` or an admin WebSocket.
 - Use same-origin checks for management mutations. Do not add a development
   bypass or accept an arbitrary forwarded origin as a trusted configuration.
-- Keep languages empty and providers unavailable until implemented paths pass
-  validation. Never seed production languages or fabricate subtitles or players.
+- Keep providers unavailable until implemented paths pass validation. Complete
+  setup of the requested Simplified Chinese, Japanese and Korean output paths
+  with the saved OpenAI key; do not require repeated language configuration.
+  Never fabricate validation results, subtitles or players.
+- `/admin` is website-wide and contains only the OpenAI API Key and game terms.
+  Do not add room selection, Discord settings, listener management, language
+  controls or room start/stop actions. Rooms bind Discord through creation.
 - Authorize a new nickname generation only after confirming old subtitle and
   media delivery have stopped. Fail closed while transport revocation is absent.
 - Keep original audio independent from transcription and translation. Select

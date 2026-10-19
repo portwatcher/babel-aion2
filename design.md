@@ -170,6 +170,17 @@ new rooms are created only through Discord installation.
   destination while other rooms in the guild continue.
 - The product name is “Babel · AION2 深渊战”.
 
+### Website administration scope · 2026-10-19
+
+This amendment takes precedence over earlier room-administration instructions.
+`/admin` is the website administrator page, not a room administration page.
+It contains only the OpenAI API Key and game terminology. Do not show a room
+selector, Discord server/channel fields, member controls, subtitle-language
+configuration, sample uploads, service dashboards or room start/stop controls.
+No room administrator feature is required. Discord server and channel bindings
+come from the room-creation installation flow. Administrator authentication and
+key/term configuration must work without any room being present or selected.
+
 ## 4. Interface and API boundaries
 
 Keep the player functions separate from the administrator functions.
@@ -368,8 +379,9 @@ Use BCP 47 language codes.
 Keep the website code separate from the provider's language parameter.
 Map between these codes in the provider adapter.
 
-The user plans to enable Chinese, Japanese, and Korean after deployment.
-Do not enable these languages in production without that configuration.
+Set up Simplified Chinese (`zh-Hans`), Japanese (`ja`) and Korean (`ko`) using
+the saved OpenAI key. Validate their actual paths before enabling them. Complete
+this production setup without asking the administrator to repeat language setup.
 Do not hard-code the player menu to these three languages.
 
 Show only the administrator's enabled languages in the player menu.
@@ -509,8 +521,9 @@ In this state:
 - Do not show fabricated subtitles.
 - Do not show nonexistent language choices.
 
-The user will configure production languages after deployment.
-Do not make that action a condition for website deployment.
+Production setup includes the three requested languages. The administrator
+provides only the OpenAI API Key and game terminology; do not require manual
+language creation, path configuration or activation in administration.
 
 After the user saves valid settings, start the selected subtitle path.
 Start the configured path without another software change.
@@ -1000,15 +1013,16 @@ Give evidence for each PASS result.
 Delivery is complete when the required functions operate on the production domain and the core checks pass.
 The administrator can then configure providers and languages without another software change.
 
-The user has reserved production language setup for after deployment.
-An empty production language list is an allowed initial state.
+Complete the requested Chinese, Japanese and Korean language setup before
+handover when the authorized key is available. An empty language list is allowed
+when no valid credential exists.
 This state does not prove that live subtitle quality has passed.
 
 Report the actual state of each subtitle provider and language.
 Do not report unperformed core audio, access, or session tests as complete.
 
 Give a final report for the website.
-State how the user enables Chinese, Japanese, and Korean.
+State the actual enabled status of Chinese, Japanese and Korean.
 State which live checks passed.
 State any remaining external inputs or measured limits.
 

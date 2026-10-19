@@ -227,7 +227,7 @@ try {
   const emptyAdmin = await management.signIn(a)
   assert.equal(
     (
-      await fetch(`${a.origin}/api/management/status`, {
+      await fetch(`${a.origin}/api/management/status?roomId=${randomUUID()}`, {
         headers: {
           'cf-access-jwt-assertion': emptyAdmin.jwt,
           cookie: emptyAdmin.cookie,
@@ -315,7 +315,7 @@ try {
   assert.equal(localizedAdmin.status, 200)
   const adminHtml = await localizedAdmin.text()
   assert.match(adminHtml, /<html[^>]*lang="en"/)
-  assert.ok(adminHtml.includes('Room administration'))
+  assert.ok(adminHtml.includes('Website administration'))
   const selected = await manage(`/api/management/room?roomId=${second.roomId}`)
   for (const fields of [
     { guildId: '100000000000000099' },
