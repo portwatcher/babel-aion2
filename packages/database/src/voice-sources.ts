@@ -14,6 +14,9 @@ export class VoiceSourceOwnershipError extends Error {
 }
 
 export function voiceSourceConfigured(source: VoiceSourceConfiguration) {
+  if (source.audioSource === 'PLAYER') {
+    return Boolean(source.hostCharacterId)
+  }
   return Boolean(
     source.discordGuildId &&
     source.discordVoiceChannelId &&
@@ -43,15 +46,36 @@ export async function readVoiceSourceGroups(db: Database) {
   })
 }
 
+/** The exact host character whose media peer may publish a room's audio. */
+export async function readUplinkHost(db: Pick<Database, 'select'>, roomId: string) {
+  const [record] = await db
+    .select({ host: room.hostCharacterId })
+    .from(room)
+    .where(
+      and(
+        eq(room.id, roomId),
+        eq(room.audioSource, 'PLAYER'),
+        eq(room.stopped, false),
+        isNull(room.disbandedAt),
+      ),
+    )
+  return record?.host ?? null
+}
+
 export async function claimVoiceSource(
   db: Database,
   pool: Pool,
   source: VoiceSourceConfiguration,
-  botId: string,
+  botId: string | null,
   ownerId: string,
   lost: () => void,
 ) {
-  const controlKey = `${botId}:${source.discordGuildId}`
+  // Discord receivers are exclusive per bot and guild; a player source is
+  // exclusive per room because its only input is that room's host peer.
+  const controlKey =
+    source.audioSource === 'PLAYER'
+      ? `player:${source.id}`
+      : `${botId}:${source.discordGuildId}`
   const client = await pool.connect()
   let released = false
   let invalid = false

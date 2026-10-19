@@ -52,6 +52,11 @@ stops its destination, and preserves the guild source generation for other rooms
 
 See [multi-room setup, upstream dependencies and limits](multi-room-and-map.md).
 
+A room's audio source is fixed at creation. A player-source room has no Discord
+binding: the worker owns it per room and adds a receive transceiver only to the
+host character's media peer, whose decoded microphone feeds the same broadcast
+and subtitle path as Discord. See [player audio source](player-audio-source.md).
+
 ## Current foundation
 
 `apps/web` uses Nuxt 4 and Nitro's Node server preset. The player page reads public

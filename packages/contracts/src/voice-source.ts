@@ -11,7 +11,9 @@ export const voiceSourceStatusSchema = z.object({
   roomId: z.uuid(),
   sourceGeneration: z.number().int().nonnegative(),
   state: voiceSourceStateSchema,
-  reason: z.enum(['CONFIGURATION', 'OWNERSHIP', 'DISCORD', 'STORAGE']).nullable(),
+  reason: z
+    .enum(['CONFIGURATION', 'OWNERSHIP', 'DISCORD', 'MEDIA', 'STORAGE'])
+    .nullable(),
   speakers: z.array(
     z.object({
       id: z.string(),

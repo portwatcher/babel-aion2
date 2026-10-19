@@ -181,6 +181,15 @@ No room administrator feature is required. Discord server and channel bindings
 come from the room-creation installation flow. Administrator authentication and
 key/term configuration must work without any room being present or selected.
 
+### Player audio source · 2026-10-19
+
+Room creation offers a choice of audio source: player capture or Discord
+capture. Player capture needs no Discord server, channel or bot installation.
+The creator supplies the host character ID; when that character joins the room,
+its own browser client publishes microphone audio as the room's original audio,
+feeding both playback and subtitles. Other listeners only receive. Discord
+capture keeps the existing installation flow.
+
 ## 4. Interface and API boundaries
 
 Keep the player functions separate from the administrator functions.

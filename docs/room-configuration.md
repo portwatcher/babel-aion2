@@ -5,7 +5,8 @@ no room selector, Discord configuration, listener controls or room start/stop
 buttons. The room-control APIs described below remain for server-side legacy
 compatibility; they are not administrator-page features.
 
-New rooms are created by Discord bot installation. The verified OAuth grant
+New Discord rooms are created by Discord bot installation; player-source rooms
+have no Discord binding (see [player audio source](player-audio-source.md)). The verified OAuth grant
 supplies the guild and the permission-checked chooser supplies the channel.
 Administration selects actual installed rooms, without creating a default room
 or requiring a manually entered server ID or bot token. Installed source bindings

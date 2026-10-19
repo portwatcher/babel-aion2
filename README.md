@@ -6,7 +6,10 @@ private today and prepared for eventual open source.
 The player interface is a dark, low-distraction battle panel. The original
 requirements are kept in sync in [design.md](design.md) and [GOAL.md](GOAL.md).
 
-Create rooms by installing the bot through Discord. Server identity comes from
+Create a room with one of two audio sources. **Host microphone** needs no
+Discord: enter the host character ID, and that character's browser publishes its
+microphone after joining. See [player audio source](docs/player-audio-source.md).
+**Discord** creates rooms by installing the bot. Server identity comes from
 the OAuth grant. The same Discord server can host multiple independent rooms;
 they share one voice-channel audio receiver. No administrator room setup is
 required. Rooms use increasing numbers from 1, such as `/rooms/1`. Share
@@ -22,7 +25,7 @@ It detects browser preferences during SSR and falls back to English. The compact
 header selector overrides detection; its choice is stored in localStorage and
 mirrored in a cookie for subsequent server rendering. Administration always uses
 English and contains only the website-wide OpenAI API Key and game terms.
-Room creation handles Discord installation; administration does not select or
+Room creation handles the audio source; administration does not select or
 manage individual rooms. Interface language does not change the selected subtitle language or
 listener session. See [interface localization](docs/interface-localization.md).
 

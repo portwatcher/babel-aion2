@@ -12,12 +12,13 @@ import {
 import { DiscordSource, describeError } from './discord-source.ts'
 import { GuildBroadcast } from './guild-broadcast.ts'
 import type { MediaPeers } from './media-peers.ts'
+import { PlayerSource } from './player-source.ts'
 import type { SubtitleService } from './subtitle-service.ts'
 
 interface Source {
   configuration: VoiceSourceConfiguration
   lease: Awaited<ReturnType<typeof claimVoiceSource>> | null
-  discord: DiscordSource | null
+  input: DiscordSource | PlayerSource | null
   broadcast: GuildBroadcast | null
   rooms: VoiceSourceConfiguration[]
   starting: Promise<void> | null
@@ -68,12 +69,12 @@ export class VoiceSources {
           : source
             ? source.closing
               ? 'STOPPING'
-              : source.discord?.ready() && performance.now() < source.validUntil
+              : source.input?.ready() && performance.now() < source.validUntil
                 ? 'LISTENING'
                 : 'CONNECTING'
             : 'UNAVAILABLE',
       reason: failure?.reason ?? null,
-      speakers: source?.closing ? [] : (source?.discord?.status() ?? []),
+      speakers: source?.closing ? [] : (source?.input?.status() ?? []),
     }
   }
 
@@ -122,6 +123,8 @@ export class VoiceSources {
           configuration.discordVoiceChannelId !==
             source.configuration.discordVoiceChannelId ||
           configuration.captureMode !== source.configuration.captureMode ||
+          configuration.audioSource !== source.configuration.audioSource ||
+          configuration.hostCharacterId !== source.configuration.hostCharacterId ||
           JSON.stringify(configuration.commanderIds) !==
             JSON.stringify(source.configuration.commanderIds) ||
           configuration.encryptedDiscordCredential !==
@@ -150,7 +153,7 @@ export class VoiceSources {
       const next: Source = {
         configuration,
         lease: null,
-        discord: null,
+        input: null,
         broadcast: null,
         rooms,
         starting: null,
@@ -165,9 +168,10 @@ export class VoiceSources {
           next,
           error instanceof VoiceSourceOwnershipError
             ? 'OWNERSHIP'
-            : !this.cipher || !voiceSourceConfigured(next.configuration)
+            : !voiceSourceConfigured(next.configuration) ||
+                (next.configuration.audioSource === 'DISCORD' && !this.cipher)
               ? 'CONFIGURATION'
-              : 'DISCORD',
+              : inputFailure(next.configuration),
           error,
         )
       })
@@ -199,11 +203,72 @@ export class VoiceSources {
 
   private async start(source: Source) {
     const configuration = source.configuration
-    if (
-      !this.cipher ||
-      !configuration.encryptedDiscordCredential ||
-      !voiceSourceConfigured(configuration)
-    ) {
+    if (!voiceSourceConfigured(configuration)) {
+      throw new Error('Voice source configuration unavailable')
+    }
+    const discord =
+      configuration.audioSource === 'DISCORD'
+        ? await this.discordIdentity(configuration)
+        : null
+    if (source.closing) {
+      return
+    }
+    source.lease = await claimVoiceSource(
+      this.database.db,
+      this.database.pool,
+      configuration,
+      discord?.botId ?? null,
+      this.ownerId,
+      () => this.fail(source, 'OWNERSHIP'),
+    )
+    source.configuration = source.lease.source
+    if (source.closing || !source.lease.valid()) {
+      return
+    }
+    const allowed = () =>
+      this.sources.get(configuration.id) === source &&
+      !source.closing &&
+      source.lease?.valid() === true &&
+      performance.now() < source.validUntil &&
+      source.input?.ready() === true
+    source.broadcast = new GuildBroadcast(allowed, this.peers, this.subtitles, () =>
+      this.fail(source, inputFailure(configuration)),
+    )
+    await source.broadcast.reconcile(
+      source.rooms.map((room) =>
+        room.id === source.configuration.id
+          ? { ...room, sourceGeneration: source.configuration.sourceGeneration }
+          : room,
+      ),
+    )
+    if (source.closing) {
+      return
+    }
+    const frame = (id: string, pcm: Buffer, name: string) => {
+      source.broadcast?.receive(id, name, pcm)
+    }
+    const removed = (id: string) => {
+      source.broadcast?.remove(id)
+    }
+    if (!discord) {
+      const player = new PlayerSource(
+        source.configuration.hostCharacterId ?? '',
+        frame,
+        removed,
+      )
+      source.input = player
+      this.peers.attachUplink(source.configuration.id, player)
+      return
+    }
+    const input = new DiscordSource(source.configuration, frame, removed, () =>
+      this.fail(source, 'DISCORD'),
+    )
+    source.input = input
+    await input.open(discord.token)
+  }
+
+  private async discordIdentity(configuration: VoiceSourceConfiguration) {
+    if (!this.cipher || !configuration.encryptedDiscordCredential) {
       throw new Error('Voice source configuration unavailable')
     }
     const token = this.cipher.decrypt(
@@ -232,51 +297,7 @@ export class VoiceSources {
     ) {
       throw new Error('Discord bot identity required')
     }
-    if (source.closing) {
-      return
-    }
-    source.lease = await claimVoiceSource(
-      this.database.db,
-      this.database.pool,
-      configuration,
-      identity.id,
-      this.ownerId,
-      () => this.fail(source, 'OWNERSHIP'),
-    )
-    source.configuration = source.lease.source
-    if (source.closing || !source.lease.valid()) {
-      return
-    }
-    const allowed = () =>
-      this.sources.get(configuration.id) === source &&
-      !source.closing &&
-      source.lease?.valid() === true &&
-      performance.now() < source.validUntil &&
-      source.discord?.ready() === true
-    source.broadcast = new GuildBroadcast(allowed, this.peers, this.subtitles, () =>
-      this.fail(source, 'DISCORD'),
-    )
-    await source.broadcast.reconcile(
-      source.rooms.map((room) =>
-        room.id === source.configuration.id
-          ? { ...room, sourceGeneration: source.configuration.sourceGeneration }
-          : room,
-      ),
-    )
-    if (source.closing) {
-      return
-    }
-    source.discord = new DiscordSource(
-      source.configuration,
-      (id, pcm, name) => {
-        source.broadcast?.receive(id, name, pcm)
-      },
-      (id) => {
-        source.broadcast?.remove(id)
-      },
-      () => this.fail(source, 'DISCORD'),
-    )
-    await source.discord.open(token)
+    return { token, botId: identity.id }
   }
 
   private close(source: Source): Promise<void> {
@@ -287,10 +308,13 @@ export class VoiceSources {
     const broadcastClosed = source.broadcast?.close()
     source.closingTask = (async () => {
       // Retire browser playout immediately, independently of Discord shutdown.
-      await Promise.all([broadcastClosed, source.discord?.close()])
+      await Promise.all([broadcastClosed, source.input?.close()])
       await source.starting
+      if (source.input instanceof PlayerSource) {
+        this.peers.detachUplink(source.configuration.id, source.input)
+      }
       await source.broadcast?.close()
-      await source.discord?.close()
+      await source.input?.close()
       // Closing old peers discards browser decoder/jitter state as well as the
       // worker's PCM queues. New negotiation is fenced by the room epoch.
       await source.lease?.close()
@@ -315,4 +339,10 @@ export class VoiceSources {
       [...this.sources.values()].map((source) => source.lease?.abandon()),
     )
   }
+}
+
+function inputFailure(
+  configuration: VoiceSourceConfiguration,
+): VoiceSourceStatus['reason'] {
+  return configuration.audioSource === 'PLAYER' ? 'MEDIA' : 'DISCORD'
 }

@@ -2,7 +2,9 @@
 
 ## Setup
 
-Apply database migrations, through `0017_sour_joystick.sql`. Supply the
+Apply database migrations, through `0018_player_audio_source.sql`.
+Player-source rooms need only the database and media worker; the Discord settings
+below apply to Discord rooms. See [player audio source](player-audio-source.md). Supply the
 following server-only runtime configuration through the private infra secret
 store:
 

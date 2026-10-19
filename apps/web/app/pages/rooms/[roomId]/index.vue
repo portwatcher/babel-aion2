@@ -18,6 +18,10 @@ const {
   muted,
   playAudio,
   toggleMute,
+  microphone,
+  microphoneMuted,
+  toggleMicrophone,
+  reconnectAudio,
   leave,
   changeLanguage,
 } = useRoomSession()
@@ -34,12 +38,16 @@ const {
         :audio-state="audioState"
         :audio-blocked="audioBlocked"
         :muted="muted"
+        :microphone="microphone"
+        :microphone-muted="microphoneMuted"
         :busy="submitting"
         :changing-language="changingLanguage"
         @leave="leave"
         @language="changeLanguage"
         @play-audio="playAudio"
         @toggle-mute="toggleMute"
+        @toggle-microphone="toggleMicrophone"
+        @reconnect-audio="reconnectAudio"
       />
       <PlayerList :players="players" :current="playersCurrent" />
     </div>

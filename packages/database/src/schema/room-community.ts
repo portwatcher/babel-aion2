@@ -29,8 +29,9 @@ export const communityRoom = pgTable('community_room', {
     .primaryKey()
     .references(() => room.id, { onDelete: 'cascade' }),
   number: integer('number').notNull().generatedAlwaysAsIdentity().unique(),
-  guildId: text('guild_id').notNull(),
-  creatorId: text('creator_id').notNull(),
+  // Null for player-source rooms, which have no Discord installation.
+  guildId: text('guild_id'),
+  creatorId: text('creator_id'),
   server: text('server').notNull(),
   allowedIds: jsonb('allowed_ids').$type<string[]>().notNull().default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

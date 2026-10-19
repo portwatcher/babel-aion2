@@ -42,6 +42,9 @@ export const mediaOfferSchema = z.object({
     policy: 'all',
     renewAfterMs: null,
   }),
+  // Present only for a player-source room host: the transceiver that carries
+  // the host's microphone to the worker. Other listeners only receive.
+  uplinkMid: z.string().min(1).max(32).nullable().default(null),
   description: z.object({
     type: z.literal('offer'),
     sdp: z

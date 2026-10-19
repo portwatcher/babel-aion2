@@ -127,6 +127,13 @@
       "when": 1792406182799,
       "tag": "0017_sour_joystick",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792411294753,
+      "tag": "0018_player_audio_source",
+      "breakpoints": true
     }
   ]
 }

@@ -159,10 +159,12 @@ export async function startRoom(
     if (!voiceSourceConfigured(stored)) {
       throw new RoomConfigurationError('INVALID_CONFIGURATION')
     }
-    if (!cipher || !stored.encryptedDiscordCredential) {
-      throw new CredentialProtectionError()
+    if (stored.audioSource === 'DISCORD') {
+      if (!cipher || !stored.encryptedDiscordCredential) {
+        throw new CredentialProtectionError()
+      }
+      cipher.decrypt(stored.encryptedDiscordCredential, `room:${roomId}:discord`)
     }
-    cipher.decrypt(stored.encryptedDiscordCredential, `room:${roomId}:discord`)
     if (!stored.stopped) {
       return publicSettings(stored)
     }
