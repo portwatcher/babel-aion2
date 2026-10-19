@@ -3,6 +3,15 @@ import { languageCodeSchema } from './languages.ts'
 import { listenerReferenceSchema } from './listeners.ts'
 import { providerTestCodeSchema } from './providers.ts'
 
+export const subtitleLatencySchema = z
+  .object({
+    traceparent: z.string().regex(/^00-[0-9a-f]{32}-[0-9a-f]{16}-0[01]$/u),
+    speechStartedAt: z.number().int().positive(),
+    // `overlapped` fragments may be a previous turn's tail; dashboards exclude them.
+    attribution: z.enum(['clean', 'overlapped']),
+  })
+  .strict()
+
 export const subtitleSchema = z.object({
   roomId: z.uuid(),
   sourceGeneration: z.number().int().nonnegative(),
@@ -26,6 +35,9 @@ export const subtitleSchema = z.object({
   serverSentAt: z.iso.datetime({ offset: true }),
   discontinuity: z.boolean(),
   failure: providerTestCodeSchema.exclude(['PASS']).nullable(),
+  // Private worker-to-web trace context for the first translation of a speech
+  // turn. The web relay removes it before anything reaches a browser.
+  latency: subtitleLatencySchema.optional(),
 })
 
 export const subtitleMessageSchema = z.discriminatedUnion('type', [
@@ -52,6 +64,7 @@ export const subtitleSubscriptionSchema = z
   })
   .strict()
 
+export type SubtitleLatency = z.infer<typeof subtitleLatencySchema>
 export type Subtitle = z.infer<typeof subtitleSchema>
 export type SubtitleMessage = z.infer<typeof subtitleMessageSchema>
 export type SubtitleSubscription = z.infer<typeof subtitleSubscriptionSchema>

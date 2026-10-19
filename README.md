@@ -183,6 +183,7 @@ budget, including supervisors and rolling updates. See
 | `packages/contracts`              | Browser-safe nickname, language, room, and subtitle contracts                                  |
 | `packages/providers`              | Server-only OpenAI streaming recognition/translation, probes and samples                       |
 | `packages/processes`              | Shared child-process supervision, private bootstrap and confirmed exit reconciliation          |
+| `packages/telemetry`              | Server-only OpenTelemetry setup and speech-to-subtitle latency traces and metrics              |
 | `.agents/skills/better-interface` | The requested interface review skill                                                           |
 | `scripts`                         | Source size checks, worktree inventory, built HTTP smoke checks                                |
 
@@ -234,6 +235,7 @@ See [AGENTS.md](AGENTS.md) for worktree, cleanup, security, and interface rules.
 - [Output-language configuration and validation](docs/output-languages.md)
 - [Game terms and sample terminology context](docs/game-terms.md)
 - [Shared streaming subtitle processing](docs/streaming-subtitles.md)
+- [Speech-to-subtitle latency tracing](docs/latency-tracing.md)
 - [Player subtitle window and browser limits](docs/picture-in-picture.md)
 - [Media admission, configuration and recovery limits](docs/media-admission.md)
 - [STUN/TURN configuration, temporary credentials and network verification](docs/media-network.md)

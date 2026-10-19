@@ -1,5 +1,16 @@
 # Validation
 
+## Speech-to-subtitle latency tracing · 2026-10-19
+
+| Check                         | Status                    | Evidence                                                                                                                                                                       |
+| ----------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Source and built runtime      | PASS                      | `npm run ci:local` passes, including new speech-turn, probe, relay and telemetry tests.                                                                                        |
+| Trace chain                   | PASS                      | In-memory exporters show turn → translation spans in the worker and relay → transit/render spans continuing the same trace ID from a worker `traceparent`.                     |
+| Browser privacy boundary      | PASS                      | A loopback worker stream with trace context reaches the relay; the browser-bound event contains no `traceparent` or speech timestamp, only the server keeps it.                |
+| Built worker startup          | PASS                      | The first CI run caught the ESM worker bundle failing on OpenTelemetry's CommonJS `require`; with a `createRequire` banner it reports ready, with or without an OTLP endpoint. |
+| Unreachable collector         | PASS                      | A collector that accepts and never answers does not hold `stopTelemetry` beyond its 300 ms bound.                                                                              |
+| Production traces and metrics | WAITING FOR CONFIGURATION | Requires the infra OTLP environment and collector egress rollout; then real Discord speech in Grafana.                                                                         |
+
 ## Interface copy and responsive layout cleanup · 2026-10-19
 
 Scope: every player page (room list, room entry, joined room, map, room

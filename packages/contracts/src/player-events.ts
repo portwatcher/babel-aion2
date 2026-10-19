@@ -18,6 +18,15 @@ export const playerMessageSchema = z.discriminatedUnion('type', [
     })
     .strict(),
   z.object({ type: z.literal('pong'), nonce: z.uuid() }).strict(),
+  // Browser render timing for a server-issued latency probe; no clock values.
+  z
+    .object({
+      type: z.literal('subtitle-displayed'),
+      probe: z.uuid(),
+      renderDelayMs: z.number().nonnegative().max(60_000),
+      visible: z.boolean(),
+    })
+    .strict(),
 ])
 
 export const playerEventSchema = z.discriminatedUnion('type', [
@@ -26,6 +35,7 @@ export const playerEventSchema = z.discriminatedUnion('type', [
     subscriptionVersion: z.number().int().nonnegative(),
     outputLanguage: languageCodeSchema,
     event: subtitleMessageSchema,
+    probe: z.uuid().optional(),
   }),
   z.object({ type: z.literal('session'), session: listenerSnapshotSchema }),
   z.object({ type: z.literal('players'), players: z.array(publicListenerSchema) }),

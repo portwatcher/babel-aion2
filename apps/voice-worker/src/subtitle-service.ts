@@ -12,11 +12,13 @@ import {
   subtitleDeliveryCurrent,
   type SubtitlePathStamp,
 } from '@babel/database/subtitles'
+import { babelTracer, parentContext, traceparent } from '@babel/telemetry'
 import { RoomSubtitles } from './room-subtitles.ts'
 import type { RunningSubtitlePath, SubtitleConsumer } from './speaker-subtitles.ts'
 
 interface Delivery {
   message: SubtitleMessage
+  queuedAt: number
   stamp?: SubtitlePathStamp
   current?: () => boolean
 }
@@ -115,7 +117,7 @@ export class SubtitleService {
       closed: false,
       state: '',
       deliver: (message, stamp, current) =>
-        this.enqueue(consumer, { message, stamp, current }),
+        this.enqueue(consumer, { message, stamp, current, queuedAt: Date.now() }),
     }
     this.consumers.set(consumer.id, consumer)
     this.reconcileRooms()
@@ -158,12 +160,23 @@ export class SubtitleService {
           return true
         }
         const previous = pending.message.value
-        return (
+        const kept =
           previous.speakerId !== incoming.speakerId ||
           previous.streamGeneration !== incoming.streamGeneration ||
           previous.configurationVersion !== incoming.configurationVersion ||
           previous.sequence > incoming.sequence
-        )
+        if (!kept && previous.latency && !incoming.latency) {
+          // The replacement is what the listener sees first; keep measuring it.
+          event = {
+            ...event,
+            queuedAt: pending.queuedAt,
+            message: {
+              type: 'subtitle',
+              value: { ...incoming, latency: previous.latency },
+            },
+          }
+        }
+        return kept
       })
     }
     if (consumer.queue.length >= 16) {
@@ -213,11 +226,38 @@ export class SubtitleService {
       if (consumer.closed || event.current?.() === false) {
         continue
       }
-      if (!consumer.sink.send(event.message)) {
+      if (!this.send(consumer, event)) {
         this.close(consumer)
         return
       }
     }
+  }
+
+  /** Queue wait and per-event authorization are part of speech-to-screen time. */
+  private send(consumer: Consumer, event: Delivery) {
+    const message = event.message
+    if (message.type !== 'subtitle' || !message.value.latency) {
+      return consumer.sink.send(message)
+    }
+    const latency = message.value.latency
+    const span = babelTracer().startSpan(
+      'babel.subtitle.worker_delivery',
+      {
+        startTime: event.queuedAt,
+        attributes: { 'babel.output_language': message.value.outputLanguage },
+      },
+      parentContext(latency.traceparent),
+    )
+    const next = traceparent(span)
+    const sent = consumer.sink.send({
+      ...message,
+      value: {
+        ...message.value,
+        latency: next ? { ...latency, traceparent: next } : latency,
+      },
+    })
+    span.end()
+    return sent
   }
 
   private close(consumer: Consumer) {
