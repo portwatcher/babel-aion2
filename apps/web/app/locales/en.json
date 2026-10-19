@@ -63,8 +63,8 @@
   "subtitleWaiting": "Waiting for commander subtitles…",
   "currentSubtitles": "Current commander subtitles",
   "commanderSubtitles": "Commander subtitles",
-  "subtitleFinal": "Stable subtitle",
-  "subtitleInterim": "Interim subtitle",
+  "subtitleFinal": "Completed captions",
+  "subtitleInterim": "Live captions",
   "translationUnavailable": "Translation unavailable",
   "translating": "Translating…",
   "sourceFinal": "Original text",
@@ -224,5 +224,7 @@
   "guildInUse": "This Discord server already has a room. Join the existing room.",
   "installationExpired": "Installation expired. Install again.",
   "botPermissionsMissing": "The bot lacks permission for this voice channel. Check channel permission overrides.",
-  "credentialProtectionUnavailable": "Credential protection is temporarily unavailable. Try again later."
+  "credentialProtectionUnavailable": "Credential protection is temporarily unavailable. Try again later.",
+  "sourceIndependent": "Independent original captions",
+  "translationMaySkipSource": "Live translation can skip speech already in the output language. Independent original captions are shown here."
 }

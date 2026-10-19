@@ -1,6 +1,6 @@
 # GOAL: BABEL
 
-Document version: 3.1
+Document version: 3.2
 Date: 2026-10-19
 Product: Babel · AION2 深渊战
 Game: AION2, Steam Global, Asia
@@ -415,40 +415,26 @@ Show a fault for the selected language.
 
 ## 10. Provider settings and credentials
 
-Let the administrator manage different provider configurations.
+Use only OpenAI for speech recognition and translation.
+The administrator enters one OpenAI API Key, with no endpoint, region, model,
+provider type or second credential to configure.
+Use `gpt-live-transcribe` with minimal transcription delay for original captions.
+Use `gpt-realtime-translate` for direct speech translation to each target language.
+Keep model names and official destinations in server code.
 
-Make an adapter that operates for every provider type shown as available.
-Do not show unfinished adapters as available.
-Do not assume that all providers use the same API.
+Let the administrator replace the encrypted key and run a connection test that
+configures both actual model sessions. Show invalid key, unavailable model,
+permission, rate limit and exhausted quota as safe, specific errors.
+Keep versioned encrypted history and tested restoration at the server boundary.
+One saved configuration can serve both recognition and translation references.
 
-If the adapter needs them, put these fields in the configuration form:
-
-- Configuration name.
-- Provider type.
-- Function: speech recognition, speech translation, or text translation.
-- API key or other provider credential.
-- API endpoint.
-- Region.
-- Model.
-- Enabled state.
-- Request limits.
-- Last connection test result.
-- Configuration version.
-
-Let the administrator add a configuration.
-Let the administrator change or remove a configuration.
-Let the administrator replace its credentials.
-Let the administrator start a connection test.
-
-Use a real provider request for that connection test.
-Show an invalid key, unavailable model, or exhausted quota as a specific error.
-
-Make a complete speech-to-subtitle path.
-Let the administrator select separate providers for recognition and translation.
-Let the administrator select different translation configurations for different output languages.
-
-Soniox is an initial candidate, not a fixed product requirement.
-Select the actual providers after you compare their current APIs and measured results.
+Translation currently supports 13 target language families: es, pt, fr, ja, ru,
+zh, de, ko, hi, id, vi, it and en. Keep Chinese scripts distinct using local
+script normalization, and validate each chosen output path before enabling it.
+The translation API does not support custom prompts or glossaries. Use catalog
+terms only as supported recognition hints; evaluate target terminology manually.
+Already-target-language speech can produce no translation. Keep original captions
+and original audio available without silently relabeling them as translated text.
 
 ### Secret storage
 
@@ -516,7 +502,8 @@ In all-channel mode, select every speaking channel member automatically, excludi
 the receiving bot itself, and update selection as members join or leave.
 Decode each speaker's Opus data independently.
 Send the decoded audio to the media path.
-Send another copy to the recognition path.
+Send the same decoded frame concurrently to original-caption recognition and
+each active direct speech translation path.
 
 Do not mix speakers before speech recognition.
 Use the Discord user ID as the stable speaker identity and display the member's
@@ -526,9 +513,11 @@ that member's microphone, game audio and music from Discord identity alone.
 Screen-share/Go Live audio is a separate compatibility check, not an assumed part
 of ordinary voice reception.
 
-If the provider has this function, use one shared transcript for each commander.
-Translate that transcript once for each active output language.
-Send the same result to all players who select that language.
+Use one shared original-caption recognition stream for each commander.
+Translation sessions consume incoming audio directly in parallel with recognition.
+Push each translated fragment immediately and display it on the page and PiP.
+Do not wait for a complete sentence, original transcript or other output language.
+Send the same target stream to all players who select that language.
 
 Do not create a recognition or translation job for each player.
 
@@ -1023,10 +1012,10 @@ https://docs.livekit.io/transport/media/publish/
 https://docs.livekit.io/intro/basics/rooms-participants-tracks/participants/
 https://docs.livekit.io/transport/self-hosting/ports-firewall/
 
-Soniox:
-https://soniox.com/docs/translation/stt-translation/
-https://soniox.com/docs/stt/concepts/context/
-https://soniox.com/docs/stt/rt/limits-and-quotas/
+OpenAI:
+https://developers.openai.com/api/docs/guides/realtime-transcription
+https://developers.openai.com/api/docs/guides/realtime-translation
+https://developers.openai.com/cookbook/examples/voice_solutions/realtime_translation_guide
 
 Optional character source:
 https://aion2index.com/

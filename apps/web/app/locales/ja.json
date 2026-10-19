@@ -63,8 +63,8 @@
   "subtitleWaiting": "指揮字幕を待っています…",
   "currentSubtitles": "現在の指揮字幕",
   "commanderSubtitles": "指揮字幕",
-  "subtitleFinal": "確定字幕",
-  "subtitleInterim": "暫定字幕",
+  "subtitleFinal": "完了した字幕",
+  "subtitleInterim": "リアルタイム字幕",
   "translationUnavailable": "翻訳を利用できません",
   "translating": "翻訳中…",
   "sourceFinal": "原文",
@@ -224,5 +224,7 @@
   "guildInUse": "この Discord サーバーには既存のルームがあります。そちらに入室してください。",
   "installationExpired": "インストールの期限が切れました。再度インストールしてください。",
   "botPermissionsMissing": "Bot にこのボイスチャンネルの権限がありません。チャンネルの権限設定を確認してください。",
-  "credentialProtectionUnavailable": "認証情報の保護を一時的に利用できません。後でお試しください。"
+  "credentialProtectionUnavailable": "認証情報の保護を一時的に利用できません。後でお試しください。",
+  "sourceIndependent": "独立した原文認識",
+  "translationMaySkipSource": "出力言語と同じ言語の音声は翻訳されない場合があります。ここには独立して認識した原文を表示します。"
 }

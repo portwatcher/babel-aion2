@@ -15,16 +15,10 @@ const props = defineProps<{
 const emit = defineEmits<{ save: [code: string, input: LanguageSave]; cancel: [] }>()
 const code = ref(props.current?.code ?? '')
 const name = ref(props.current?.name ?? '')
-const recognitionId = ref(props.current?.recognitionConfigurationId ?? '')
-const translationId = ref(props.current?.translationConfigurationId ?? '')
+const recognitionId = computed(() => props.providers[0]?.id ?? '')
+const translationId = recognitionId
 const includeTerms = ref(props.current?.includeTerms ?? true)
 const error = ref('')
-const recognitionOptions = computed(() =>
-  props.providers.filter((row) => row.settings.type === 'soniox'),
-)
-const translationOptions = computed(() =>
-  props.providers.filter((row) => row.settings.type === 'deepl'),
-)
 onMounted(() =>
   document.getElementById(props.current ? 'output-name' : 'output-code')?.focus(),
 )
@@ -50,7 +44,7 @@ function save() {
   })
   if (!languageCodeSchema.safeParse(canonical).success || !input.success) {
     error.value =
-      'Check the language code and display name, and select recognition and translation configurations.'
+      'Check the language code and display name, and save an OpenAI API Key first.'
     return
   }
   emit('save', canonical, input.data)
@@ -70,12 +64,13 @@ function save() {
           v-model="code"
           maxlength="35"
           :disabled="busy || !!current"
-          placeholder="e.g. zh-Hans, ja, ko"
+          placeholder="For example: zh-Hans, ja, ko"
           required
         />
         <small class="muted"
-          >Use zh-Hans for Simplified Chinese and zh-Hant for Traditional Chinese. The
-          code cannot change after saving.</small
+          >Supports Chinese, Japanese, Korean, English, Spanish, Portuguese, French,
+          Russian, German, Hindi, Indonesian, Vietnamese and Italian. Use zh-Hans and
+          zh-Hant for separate Chinese scripts. Codes cannot change after saving.</small
         >
       </div>
       <div class="field">
@@ -85,32 +80,8 @@ function save() {
           v-model="name"
           maxlength="80"
           :disabled="busy"
-          placeholder="e.g. Simplified Chinese"
+          placeholder="For example: Simplified Chinese"
           required
-        />
-      </div>
-      <div class="field">
-        <label for="output-recognition">Speech recognition provider</label>
-        <Select
-          input-id="output-recognition"
-          v-model="recognitionId"
-          :options="recognitionOptions"
-          option-label="name"
-          option-value="id"
-          :disabled="busy || current?.enabled"
-          placeholder="Select Soniox configuration"
-        />
-      </div>
-      <div class="field">
-        <label for="output-translation">Text translation provider</label>
-        <Select
-          input-id="output-translation"
-          v-model="translationId"
-          :options="translationOptions"
-          option-label="name"
-          option-value="id"
-          :disabled="busy || current?.enabled"
-          placeholder="Select DeepL configuration"
         />
       </div>
     </div>
@@ -124,8 +95,9 @@ function save() {
       <label for="output-terms">Use enabled game terminology hints</label>
     </div>
     <small class="muted"
-      >Validate the saved path with authorized audio. When terminology hints are
-      enabled, catalog content is sent to recognition and translation providers.</small
+      >Validate the saved path with authorized audio. Terminology hints apply only to
+      original-caption recognition; live translation does not support custom
+      glossaries.</small
     >
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <div class="management-actions">
@@ -136,7 +108,7 @@ function save() {
         :disabled="busy"
       />
       <Button
-        label="Cancel language editing"
+        label="Cancel language edit"
         severity="secondary"
         :disabled="busy"
         @click="emit('cancel')"

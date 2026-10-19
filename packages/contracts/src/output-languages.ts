@@ -18,9 +18,6 @@ export const languageSaveSchema = z
     includeTerms: z.boolean(),
   })
   .strict()
-  .refine(
-    (value) => value.recognitionConfigurationId !== value.translationConfigurationId,
-  )
 export const languageVersionSchema = z
   .object({ expectedVersion: version.positive() })
   .strict()

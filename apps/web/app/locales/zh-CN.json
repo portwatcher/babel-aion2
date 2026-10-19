@@ -63,8 +63,8 @@
   "subtitleWaiting": "等待指挥字幕…",
   "currentSubtitles": "当前指挥字幕",
   "commanderSubtitles": "指挥字幕",
-  "subtitleFinal": "稳定字幕",
-  "subtitleInterim": "临时字幕",
+  "subtitleFinal": "已完成字幕",
+  "subtitleInterim": "实时字幕",
   "translationUnavailable": "翻译暂不可用",
   "translating": "正在翻译…",
   "sourceFinal": "原文",
@@ -224,5 +224,7 @@
   "guildInUse": "此 Discord 服务器已有房间，请加入现有房间",
   "installationExpired": "安装已过期，请重新安装",
   "botPermissionsMissing": "Bot 没有此语音频道的足够权限，请检查频道覆盖权限",
-  "credentialProtectionUnavailable": "凭据保护暂时不可用"
+  "credentialProtectionUnavailable": "凭据保护暂时不可用",
+  "sourceIndependent": "独立识别的原文",
+  "translationMaySkipSource": "实时翻译可能跳过与输出语言相同的语音，此处显示独立识别的原文。"
 }

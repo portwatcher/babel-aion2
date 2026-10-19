@@ -6,36 +6,27 @@ import {
   type ProviderSummary,
 } from '@babel/contracts'
 import { providerFailure, providerTestLabel } from '~/utils/provider-feedback'
-
 defineProps<{ terminologyVersion: number | null }>()
 const emit = defineEmits<{ change: [providers: ProviderSummary[]] }>()
-
 const providers = shallowRef<ProviderSummary[]>([])
+const current = computed(() => providers.value[0] ?? null)
 const protectionReady = ref(false)
 const busy = ref(false)
 const loaded = ref(false)
+const sampleBusy = ref(false)
 const error = ref('')
 const notice = ref('')
-const editing = ref(false)
-const selected = shallowRef<ProviderSummary | null>(null)
-const removing = shallowRef<ProviderSummary | null>(null)
-const restoreVersion = ref<number | null>(null)
-const candidateId = ref('')
 let disposed = false
-
 async function load() {
   busy.value = true
   error.value = ''
   try {
-    const response = providerListSchema.parse(await $fetch('/api/management/providers'))
+    const value = providerListSchema.parse(await $fetch('/api/management/providers'))
     if (!disposed) {
-      providers.value = response.configurations
-      emit('change', providers.value)
-      protectionReady.value = response.credentialProtectionReady
+      providers.value = value.configurations
+      protectionReady.value = value.credentialProtectionReady
       loaded.value = true
-      editing.value = false
-      selected.value = null
-      removing.value = null
+      emit('change', providers.value)
     }
   } catch (failure) {
     if (!disposed) {
@@ -45,36 +36,19 @@ async function load() {
     busy.value = false
   }
 }
-function edit(provider: ProviderSummary | null) {
-  selected.value = provider
-  candidateId.value = provider?.id ?? crypto.randomUUID()
-  restoreVersion.value = null
-  editing.value = true
-  notice.value = ''
-  error.value = ''
-}
-function accept(provider: ProviderSummary) {
-  providers.value = [
-    ...providers.value.filter((row) => row.id !== provider.id),
-    provider,
-  ]
-  emit('change', providers.value)
-  if (editing.value && candidateId.value === provider.id) {
-    selected.value = provider
-  }
-}
-async function operation(action: () => Promise<unknown>, success: string) {
-  if (busy.value) {
+async function operation(action: () => Promise<unknown>, message: string) {
+  if (busy.value || sampleBusy.value) {
     return
   }
   busy.value = true
-  notice.value = ''
   error.value = ''
+  notice.value = ''
   try {
-    const provider = providerSummarySchema.parse(await action())
+    const value = providerSummarySchema.parse(await action())
     if (!disposed) {
-      accept(provider)
-      notice.value = success
+      providers.value = [value]
+      emit('change', providers.value)
+      notice.value = message
     }
   } catch (failure) {
     if (!disposed) {
@@ -85,72 +59,29 @@ async function operation(action: () => Promise<unknown>, success: string) {
   }
 }
 async function save(input: ProviderSave) {
+  const id = current.value?.id ?? '00000000-0000-4000-8000-000000000002'
   await operation(
     () =>
-      $fetch<unknown, string>(`/api/management/providers/${candidateId.value}`, {
+      $fetch<unknown, string>('/api/management/providers/' + id, {
         method: 'PUT',
         body: input,
       }),
-    'Configuration saved. Subtitle delivery is not enabled yet.',
+    'API Key saved encrypted.',
   )
 }
-async function test(provider: ProviderSummary) {
-  await operation(
-    () =>
-      $fetch<unknown, string>(`/api/management/providers/${provider.id}/test`, {
-        method: 'POST',
-        body: { expectedVersion: provider.version },
-      }),
-    'Connection test complete. Check the result for this configuration.',
-  )
-}
-async function restore() {
-  const provider = selected.value
-  if (!provider || !restoreVersion.value) {
+async function test() {
+  const value = current.value
+  if (!value) {
     return
   }
   await operation(
     () =>
-      $fetch<unknown, string>(`/api/management/providers/${provider.id}/restore`, {
+      $fetch<unknown, string>('/api/management/providers/' + value.id + '/test', {
         method: 'POST',
-        body: {
-          expectedVersion: provider.version,
-          restoreVersion: restoreVersion.value,
-        },
+        body: { expectedVersion: value.version },
       }),
-    'Historical settings passed the connection test and were saved as a new version.',
+    'Streaming recognition and translation connection test completed.',
   )
-  restoreVersion.value = null
-}
-async function remove() {
-  if (!removing.value || busy.value) {
-    return
-  }
-  const provider = removing.value
-  busy.value = true
-  error.value = ''
-  try {
-    await $fetch<unknown, string>(`/api/management/providers/${provider.id}`, {
-      method: 'DELETE',
-      body: { expectedVersion: provider.version },
-    })
-    if (!disposed) {
-      providers.value = providers.value.filter((row) => row.id !== provider.id)
-      emit('change', providers.value)
-      removing.value = null
-      if (selected.value?.id === provider.id) {
-        editing.value = false
-        selected.value = null
-      }
-      notice.value = 'Configuration and credential history deleted.'
-    }
-  } catch (failure) {
-    if (!disposed) {
-      error.value = providerFailure(failure)
-    }
-  } finally {
-    busy.value = false
-  }
 }
 onMounted(load)
 onBeforeUnmount(() => {
@@ -165,148 +96,52 @@ onBeforeUnmount(() => {
     :aria-busy="busy"
   >
     <div class="section-heading">
-      <h2 id="providers-title">Subtitle provider configurations</h2>
-      <div class="management-actions">
-        <Button
-          label="Add candidate configuration"
-          :disabled="busy || !loaded || !protectionReady"
-          @click="edit(null)"
-        />
-        <Button
-          label="Reload providers"
-          severity="secondary"
-          :disabled="busy"
-          @click="load"
-        />
-      </div>
+      <h2 id="providers-title">OpenAI subtitle service</h2>
+      <Button
+        label="Reload"
+        severity="secondary"
+        :disabled="busy || sampleBusy"
+        @click="load"
+      />
     </div>
     <p class="muted">
-      Connection tests check credentials and model access. Then validate the output
-      language sample path and enable the language manually.
-    </p>
-    <p class="muted">
-      Soniox tests send one second of silence. DeepL tests translate a fixed English
-      phrase into German. Tests and connection updates may incur provider charges.
+      One API Key enables streaming recognition and multilingual live translation. No
+      model or endpoint settings are needed.
     </p>
     <p v-if="loaded && !protectionReady" class="muted">
-      Credential protection is not configured. Providers cannot be saved or tested yet.
+      Credential protection is unavailable. Saving and testing are disabled.
     </p>
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
-    <p v-if="loaded && !providers.length" class="muted">
-      No provider configurations. Production subtitle languages remain empty.
-    </p>
-    <ul v-else class="configuration-list">
-      <li v-for="provider in providers" :key="provider.id">
-        <div class="section-heading">
-          <h3>{{ provider.name }}</h3>
-          <Tag
-            :value="
-              provider.lastTest
-                ? providerTestLabel(provider.lastTest.code)
-                : 'Not tested'
-            "
-            :severity="provider.lastTest?.code === 'PASS' ? 'success' : 'secondary'"
-          />
-        </div>
-        <p class="muted">
-          {{
-            provider.settings.type === 'soniox'
-              ? 'Soniox · Recognition candidate'
-              : 'DeepL · Translation candidate'
-          }}
-          · Version {{ provider.version }}
-        </p>
-        <small v-if="provider.lastTest" class="muted"
-          >Last test {{ new Date(provider.lastTest.checkedAt).toLocaleString('en') }} ·
-          {{ provider.lastTest.durationMs }} ms; This does not validate subtitle
-          quality.</small
-        >
-        <div class="management-actions">
-          <Button
-            :aria-label="`Edit ${provider.name}`"
-            label="Edit"
-            severity="secondary"
-            :disabled="busy || !protectionReady"
-            @click="edit(provider)"
-          />
-          <Button
-            :aria-label="`Test ${provider.name}`"
-            label="Test saved configuration"
-            severity="secondary"
-            :disabled="busy || !protectionReady"
-            @click="test(provider)"
-          />
-          <Button
-            :aria-label="`Delete ${provider.name}`"
-            label="Delete"
-            severity="danger"
-            :disabled="busy"
-            @click="removing = provider"
-          />
-        </div>
-      </li>
-    </ul>
     <ProviderEditor
-      v-if="editing"
-      :key="candidateId"
-      :current="selected"
-      :busy="busy"
+      v-if="loaded && protectionReady"
+      :current="current"
+      :busy="busy || sampleBusy"
       @save="save"
-      @cancel="editing = false"
     />
-    <div v-if="editing && selected?.history.length" class="management-confirmation">
-      <label for="provider-history"
-        >Restore historical settings (latest 20 versions)</label
-      >
-      <Select
-        input-id="provider-history"
-        v-model="restoreVersion"
-        :options="
-          selected.history.map((row) => ({
-            label: `Version ${row.version} · ${row.name}`,
-            value: row.version,
-          }))
+    <div v-if="current" class="management-actions">
+      <Tag
+        :value="
+          current.lastTest ? providerTestLabel(current.lastTest.code) : 'Not tested'
         "
-        option-label="label"
-        option-value="value"
-        :disabled="busy"
-        placeholder="Select a historical version"
+        :severity="current.lastTest?.code === 'PASS' ? 'success' : 'secondary'"
       />
       <Button
-        label="Test and restore version"
+        label="Test connection"
         severity="secondary"
-        :disabled="busy || !restoreVersion"
-        @click="restore"
+        :disabled="busy || sampleBusy || !protectionReady"
+        @click="test"
       />
     </div>
+    <p class="muted">
+      Connection tests check access to both models. Use authorized audio samples to
+      verify captions. Tests may incur service charges.
+    </p>
     <ProviderSample
-      :terminology-version="terminologyVersion"
       :providers="providers"
-      :disabled="busy || !loaded || !protectionReady"
-      @busy="busy = $event"
+      :disabled="busy || !protectionReady"
+      :terminology-version="terminologyVersion"
+      @busy="sampleBusy = $event"
     />
-    <div
-      v-if="removing"
-      class="management-confirmation"
-      role="group"
-      aria-label="Confirm provider deletion"
-    >
-      <p>Delete “{{ removing.name }}” and all its credential history?</p>
-      <div class="management-actions">
-        <Button
-          label="Confirm deletion"
-          severity="danger"
-          :disabled="busy"
-          @click="remove"
-        />
-        <Button
-          label="Cancel deletion"
-          severity="secondary"
-          :disabled="busy"
-          @click="removing = null"
-        />
-      </div>
-    </div>
   </section>
 </template>

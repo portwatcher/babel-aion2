@@ -30,7 +30,7 @@ export function languageFailure(error: unknown) {
       case 'INVALID_LANGUAGE':
         return 'Check the language code, name and required configurations.'
       case 'INVALID_PATH':
-        return 'Select existing Soniox recognition and DeepL translation configurations.'
+        return 'Save a valid OpenAI API Key first.'
       case 'PATH_UNVALIDATED':
         return 'Validate the current language path with an authorized sample first.'
       case 'DELIVERY_UNAVAILABLE':

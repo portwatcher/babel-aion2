@@ -1,9 +1,8 @@
-import type { ProviderSettings, ProviderTestCode } from '@babel/contracts'
-import { translateDeepL } from './deepl.ts'
+import type { OpenAISettings, ProviderTestCode } from '@babel/contracts'
 import { ProviderFailure } from './errors.ts'
-import { probeSoniox } from './soniox.ts'
+import { openRecognition } from './openai-recognition.ts'
+import { openTranslation } from './openai-translation.ts'
 
-export { translateDeepL } from './deepl.ts'
 export { ProviderFailure } from './errors.ts'
 export { readPcmWave } from './pcm.ts'
 export { previewSubtitleSample } from './sample.ts'
@@ -14,23 +13,26 @@ export {
 export type { TranslationPath, SubtitleUpdate } from './subtitle-work.ts'
 
 export async function testProviderConnection(
-  settings: ProviderSettings,
+  settings: OpenAISettings,
   credential: string,
 ) {
   const started = performance.now()
   let code: ProviderTestCode = 'PASS'
+  const recognition = openRecognition({ settings, credential, onTranscript() {} })
+  const translation = openTranslation({
+    settings,
+    credential,
+    outputLanguage: 'ja',
+    delta() {},
+  })
   try {
-    if (settings.type === 'soniox') {
-      await probeSoniox(settings, credential)
-    } else {
-      await translateDeepL(settings, credential, {
-        text: 'Wait here.',
-        sourceLanguage: 'en',
-        outputLanguage: 'de',
-      })
-    }
+    // Verify access to both actual models, not merely that an API key exists.
+    await Promise.all([recognition.ready, translation.ready])
   } catch (error) {
     code = error instanceof ProviderFailure ? error.code : 'UNAVAILABLE'
+  } finally {
+    recognition.close()
+    translation.close()
   }
   return {
     code,

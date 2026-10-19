@@ -37,8 +37,17 @@ function command(
 
 test('current commands follow speech order; corrections replace text and delayed translations cannot revive earlier orders', () => {
   const view = new SubtitleView()
-  const first = command('one', 1)
-  view.accept({ type: 'subtitle', value: first })
+  const first = command('one', 1, {
+    originalText: '',
+    sourceIsFinal: false,
+    translationIsFinal: false,
+    sourceAlignment: 'independent',
+  })
+  assert.equal(
+    view.accept({ type: 'subtitle', value: first }).items[0]?.translatedText,
+    '攻撃しないで。',
+    'translated text is visible before independent recognition arrives',
+  )
   const next = command('one', 2, {
     originalText: 'Retreat.',
     translatedText: '撤退して。',

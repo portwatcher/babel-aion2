@@ -8,7 +8,7 @@ import {
 interface Speaker {
   name: string
   streams: Map<string, SpeakerSubtitles>
-  retries: Map<string, number>
+  retries: Map<string, { at: number; failedAt: number; attempt: number }>
 }
 
 export class RoomSubtitles {
@@ -57,7 +57,7 @@ export class RoomSubtitles {
     for (const [group, path] of groups) {
       if (
         speaker.streams.has(group) ||
-        (speaker.retries.get(group) ?? 0) > Date.now() ||
+        (speaker.retries.get(group)?.at ?? 0) > Date.now() ||
         !this.allowed()
       ) {
         continue
@@ -78,14 +78,29 @@ export class RoomSubtitles {
               return
             }
             speaker.streams.delete(group)
-            speaker.retries.set(group, Date.now() + (code ? 5_000 : 0))
+            const previous = speaker.retries.get(group)
+            const now = Date.now()
+            const attempt =
+              previous && now - previous.failedAt < 30_000
+                ? Math.min(5, previous.attempt + 1)
+                : 0
+            const delay = !code
+              ? 0
+              : ['UNAVAILABLE', 'TIMEOUT'].includes(code)
+                ? Math.min(5000, 250 * 2 ** attempt)
+                : 30_000
+            speaker.retries.set(group, { at: now + delay, failedAt: now, attempt })
             this.failure(id, generation, group, code)
           },
         )
         speaker.streams.set(group, stream)
         stream.reconcile(this.consumers.values(), this.paths)
       } catch {
-        speaker.retries.set(group, Date.now() + 5_000)
+        speaker.retries.set(group, {
+          at: Date.now() + 30_000,
+          failedAt: Date.now(),
+          attempt: 0,
+        })
         this.failure(id, generation, group, 'INVALID_CONFIGURATION')
       }
     }

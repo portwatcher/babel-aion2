@@ -1,8 +1,7 @@
 import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm'
 import {
   providerSettingsSchema,
-  type DeepLSettings,
-  type SonioxSettings,
+  type OpenAISettings,
   type SubtitleSubscription,
   type TerminologySnapshot,
 } from '@babel/contracts'
@@ -29,8 +28,8 @@ export interface SubtitlePathStamp {
 }
 export interface LiveSubtitlePath {
   stamp: SubtitlePathStamp
-  recognition: { settings: SonioxSettings; credential: string }
-  translation: { settings: DeepLSettings; credential: string }
+  recognition: { settings: OpenAISettings; credential: string }
+  translation: { settings: OpenAISettings; credential: string }
   terminology: TerminologySnapshot | null
 }
 
@@ -63,8 +62,8 @@ export async function readSubtitlePaths(db: Database, cipher: CredentialCipher) 
       !translation ||
       !r.success ||
       !t.success ||
-      r.data.type !== 'soniox' ||
-      t.data.type !== 'deepl'
+      r.data.type !== 'openai' ||
+      t.data.type !== 'openai'
     ) {
       continue
     }
@@ -102,8 +101,8 @@ export async function readSubtitlePaths(db: Database, cipher: CredentialCipher) 
   return paths
 }
 
-export async function readSubtitleListener(db: Database, input: SubtitleSubscription) {
-  const [row] = await db
+function listenerQuery(db: Database, input: SubtitleSubscription) {
+  return db
     .select({ listener: listenerSession })
     .from(playerConnection)
     .innerJoin(listenerSession, eq(listenerSession.id, playerConnection.sessionId))
@@ -125,18 +124,15 @@ export async function readSubtitleListener(db: Database, input: SubtitleSubscrip
         isNotNull(outputLanguage.pathValidatedAt),
       ),
     )
+}
+
+export async function readSubtitleListener(db: Database, input: SubtitleSubscription) {
+  const [row] = await listenerQuery(db, input)
   return row ? snapshot(row.listener) : null
 }
 
-export async function subtitlePathCurrent(
-  db: Database,
-  roomId: string,
-  generation: number,
-  stamp: SubtitlePathStamp,
-) {
-  const result = await db.execute<{ current: boolean }>(sql`
-    select exists (
-      select 1 from room r
+function pathQuery(roomId: string, generation: number, stamp: SubtitlePathStamp) {
+  return sql`select 1 from room r
       join output_language l on l.code = ${stamp.code}
       join provider_configuration a on a.id = l.recognition_configuration_id
       join provider_configuration b on b.id = l.translation_configuration_id
@@ -147,6 +143,19 @@ export async function subtitlePathCurrent(
         and b.id = ${stamp.translationId} and b.version = ${stamp.translationVersion}
         and ((not l.include_terms and ${stamp.terminologyVersion}::integer is null)
           or (l.include_terms and t.version = ${stamp.terminologyVersion}))
-    ) as current`)
-  return result.rows[0]?.current === true
+  `
+}
+
+/** Validate both revocation fences in one database snapshot and one round trip. */
+export async function subtitleDeliveryCurrent(
+  db: Database,
+  input: SubtitleSubscription,
+  roomId: string,
+  generation: number,
+  stamp: SubtitlePathStamp,
+) {
+  const result = await db.execute<{ listener: boolean; path: boolean }>(sql`
+    select exists (${listenerQuery(db, input)}) as listener,
+           exists (${pathQuery(roomId, generation, stamp)}) as path`)
+  return result.rows[0] ?? { listener: false, path: false }
 }

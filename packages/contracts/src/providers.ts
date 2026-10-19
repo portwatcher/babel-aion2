@@ -13,34 +13,18 @@ export const providerCredentialSchema = z
   .min(1)
   .max(4096)
   .regex(/^[\x21-\x7e]+$/)
-export const sonioxSettingsSchema = z
+export const openaiSettingsSchema = z
   .object({
-    type: z.literal('soniox'),
-    model: z.string().regex(/^[a-z][a-z0-9-]{1,79}$/),
-    timeoutMs,
+    type: z.literal('openai'),
+    timeoutMs: timeoutMs.default(15_000),
   })
   .strict()
-export const deeplSettingsSchema = z
-  .object({
-    type: z.literal('deepl'),
-    endpoint: z.enum(['https://api.deepl.com', 'https://api-free.deepl.com']),
-    model: z.enum([
-      'quality_optimized',
-      'latency_optimized',
-      'prefer_quality_optimized',
-    ]),
-    timeoutMs,
-  })
-  .strict()
-export const providerSettingsSchema = z.discriminatedUnion('type', [
-  sonioxSettingsSchema,
-  deeplSettingsSchema,
-])
+export const providerSettingsSchema = openaiSettingsSchema
 export const providerSaveSchema = z
   .object({
     expectedVersion: version,
-    name,
-    settings: providerSettingsSchema,
+    name: name.default('OpenAI'),
+    settings: providerSettingsSchema.default({ type: 'openai', timeoutMs: 15_000 }),
     credential: providerCredentialSchema.optional(),
   })
   .strict()
@@ -92,8 +76,7 @@ export const providerListSchema = z.object({
   credentialProtectionReady: z.boolean(),
 })
 export type ProviderSettings = z.infer<typeof providerSettingsSchema>
-export type SonioxSettings = z.infer<typeof sonioxSettingsSchema>
-export type DeepLSettings = z.infer<typeof deeplSettingsSchema>
+export type OpenAISettings = z.infer<typeof openaiSettingsSchema>
 export type ProviderSave = z.infer<typeof providerSaveSchema>
 export type ProviderSummary = z.infer<typeof providerSummarySchema>
 export type ProviderTestCode = z.infer<typeof providerTestCodeSchema>

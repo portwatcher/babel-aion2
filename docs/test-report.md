@@ -95,19 +95,49 @@ PASS applies only to that named check, not automatically to production.
 | Production recovery deployment               | PASS                      | Healthy private controller, scoped permissions, Pod-bound runtime owners and finalizers are deployed. Settings and listener generation survive; Discord reconnects automatically after about two minutes of retries             |
 | Single-member audible playback               | PASS                      | After the relay correction and browser reconnection, the human confirmed hearing their own Discord voice through the production Babel webpage                                                                                   |
 | Multiple-member behavior                     | NOT RUN                   | Simultaneous speakers, production source separation and production member leave/re-entry remain outstanding                                                                                                                     |
-| Live subtitle quality                        | WAITING FOR CONFIGURATION | Soniox/DeepL settings and validation are implemented. Authorized credentials and representative commands are needed to validate each chosen output language                                                                     |
+| Live subtitle quality                        | WAITING FOR CONFIGURATION | OpenAI streaming adapters are implemented; representative multilingual battle commands are needed to validate each chosen output language                                                                                       |
 | Native window and game use                   | NOT RUN                   | Real Chrome subtitle-window opening and replacement-driven closure passed with subtitles disabled. Native desktop inspection failed; background audible playback and actual AION2 display mode remain unverified                |
 | Deployed latency and capacity                | NOT RUN                   | Production transport now connects, but actual source/playback timing, load and player networks including mainland China remain unmeasured; connection success is not end-to-end latency evidence                                |
 | Production disaster recovery                 | NOT RUN                   | Production-snapshot restoration and isolated published-image rollback passed. Durable backup retention, old-service fencing, production failover and live deployment rollback remain outstanding                                |
 
-Empty production provider and language lists are intentional and do not block
+An empty production language list and disabled subtitle configuration are intentional and do not block
 the web release or original-audio deployment. Optional character enrichment is
 disabled under the source policy recorded below; nickname entry remains available.
 
-Latest source checks: `npm run ci:local` is PASS with 229 first-party sources,
-maximum 495 lines, formatting, strict types, 18 tests, builds and built HTTP
-smoke. `test:db` passes 11 real PostgreSQL tests, and both child-process recovery
-checks pass. `design.md` and `GOAL.md` remain identical.
+Latest OpenAI source checks: `npm run ci:local` is PASS with first-party source
+bounds (maximum 495 lines), formatting, strict types, 17 tests, builds and built
+HTTP smoke. `test:db` passes 13 real PostgreSQL tests. Earlier child-process
+recovery evidence is recorded separately. `design.md` and `GOAL.md` remain identical.
+
+## OpenAI continuous subtitles — 2026-10-19
+
+The current refactor replaces the retired provider adapters with
+`gpt-live-transcribe` (`delay: minimal`) and `gpt-realtime-translate`. One encrypted
+OpenAI API Key serves both purposes. Direct-audio translation runs concurrently
+with recognition and publishes every transcript fragment immediately. Chinese
+script formatting is local. Recognition hints are supported; custom translation
+glossaries are not. Independent streams have no fabricated utterance alignment.
+
+| Check                                     | Status  | Evidence                                                                                                                                                                                                                                            |
+| ----------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                  | PASS    | `npm run ci:local`: source bounds, formatting, strict types, 17 tests, web/migration/worker/recovery builds and built HTTP smoke                                                                                                                    |
+| Database and retiring providers           | PASS    | `npm run test:db`: 13 tests on disposable PostgreSQL, including revoking retired paths/proofs, removing their encrypted history and preserving the OpenAI configuration                                                                             |
+| Provider management                       | PASS    | Built HTTP + PostgreSQL: encryption, protected reads, replacement/restore preservation, cross-process leases, stale results and audit redaction                                                                                                     |
+| Sample and language administration        | PASS    | Built HTTP + PostgreSQL: upload bounds, real paced PCM, source hints only, one key referenced by both roles, independent windows, quota/silence, snapshot changes, proof persistence and fail-closed activation                                     |
+| Continuous transport                      | PASS    | Actual local provider WS → worker private HTTP → built player WS, with an actual WebRTC receiver: shared targets, incremental fragments, no replayed prefixes, source replacement, target faults, language changes and physical nickname revocation |
+| Handshake and recovery isolation          | PASS    | Real loopback WS: a held target handshake does not stop another target or source frames; only 100 ms is retained; transient target reconnect preserves shared recognition; older source completion cannot overwrite newer text                      |
+| Real model access and incremental output  | PASS    | Server-side live API probe decrypted the authorized stored key in memory. A 5,644 ms synthetic English clip produced Japanese/Korean/Chinese before audio ended; all targets drained through `session.closed`                                       |
+| Observed first text                       | PASS    | One live sample after prepared handshakes: original 772 ms; Japanese 1,092 ms; Korean 3,327 ms; Chinese 2,324 ms. Cold preparation 1,080 ms. This is not a latency percentile or a quality benchmark                                                |
+| Browser provider setup                    | PASS    | Actual built administrator page renders one blank saved-key replacement field, no model/endpoint/provider selectors, and explicit recognition-only terminology guidance; interface localization and English administration are preserved            |
+| Representative multilingual battle speech | NOT RUN | No accuracy evaluation on authorized real commands, overlapping speakers or terminology; same-target-language omissions need explicit evaluation                                                                                                    |
+| Discord-to-screen latency and capacity    | NOT RUN | The live probe begins at paced PCM input, and the local integration ends at player WS reception; production capture, network and browser rendering are not measured together                                                                        |
+
+The supplied key was saved encrypted in runtime database storage and read back
+successfully without exposing it. No production output language was enabled.
+The source implementation and migration are verified separately from deployment.
+Earlier provider-specific results below are historical and do not validate this
+refactor. See [streaming limits](streaming-subtitles.md) and
+[provider configuration](providers-and-languages.md).
 
 ## Production recovery-controller rollout — 2026-10-19
 
@@ -795,103 +825,13 @@ not measured battle latency or supported-player capacity. The shared engine's
 subscriber callbacks are server-internal; these tests do not replace player
 WebSocket authorization or media-revocation tests. See [streaming subtitles](streaming-subtitles.md).
 
-## Editable terminology and sample context — 2026-10-18 (historical)
+## Retired provider implementation checks — historical
 
-Administrators can now create, edit, disable, delete and search versioned game
-terms. Authorized sample comparisons can send enabled terms through Soniox and
-DeepL's documented context fields, preserving the source and translated text as
-returned. Context hints are not evidence that a provider used the intended term.
-The catalog starts empty and no production provider or language is enabled.
-
-| Check                                                  | Status                    | Evidence                                                                                                                                                                                                   |
-| ------------------------------------------------------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Local CI                                               | PASS                      | `npm run ci:local`; 128 first-party source files, largest 494 lines, strict types, eight tests, web/migration/worker builds and unconfigured HTTP boundaries                                               |
-| Migration 0005                                         | PASS                      | Applied to disposable PostgreSQL 16; adds term tables and the empty catalog revision without seeded vocabulary                                                                                             |
-| Authenticated terminology HTTP                         | PASS                      | `npm run test:terms:db`; verified Access plus persisted session and same origin; invalid fields, control characters and oversized/chunked bodies rejected                                                  |
-| Persistent terms and concurrent edits                  | PASS                      | Two built processes share one catalog; source/alias collisions, concurrent creation and stale updates reject; restart preserves entries; delete/recreate cannot reuse an obsolete version                  |
-| Search and pagination                                  | PASS                      | 52 synthetic entries exercise 50-entry pages, literal percent-sign search and stale catalog-page rejection                                                                                                 |
-| Provider context and output-language separation        | PASS                      | `npm run test:samples:db`; loopback Soniox receives source terms without target expressions; DeepL receives only the selected target expression; disabled terms and comparisons without terms are excluded |
-| Sample revision and context limits                     | PASS                      | A catalog edit while translation is in flight rejects the old result with 409; excessive context rejects before provider requests; audits contain revisions without term, audio or transcript text         |
-| Unknown-language validation regressions                | PASS                      | Tests first reproduced acceptance of `und` as a term/output language; shared validation now rejects it, including sample requests before provider work                                                     |
-| Existing application regressions                       | PASS                      | `test:db` (seven tests), `test:http:db`, `test:ws:db`, `test:management:db` and `test:providers:db` on disposable PostgreSQL 16                                                                            |
-| Browser terminology workflow                           | PASS                      | Chrome with local signed identity: create three output expressions, reload in another tab, edit and disable; an older tab's save is refused and explicit reload shows the accepted revision                |
-| Literal text and narrow layout                         | PASS                      | Angle brackets render as text; populated term editor and all language fields fit a 320 px viewport with document width 320 px; captured console has no warning/error entries                               |
-| Live recognition, translation and terminology accuracy | NOT RUN                   | No real provider credentials or authorized battle samples; synthetic responses do not establish quality, latency or provider suitability                                                                   |
-| Discord reception and original audio                   | WAITING FOR CONFIGURATION | Dedicated bot exists; saved token location and guild/channel/commander IDs remain pending                                                                                                                  |
-| Shared live subtitles, PiP and full acceptance         | NOT RUN                   | No deployment by this task; media and live subtitle integration remain incomplete                                                                                                                          |
-
-Browser screenshots are retained under ignored local task artifacts. Vocabulary
-and provider responses are explicitly synthetic test fixtures. These checks do
-not constitute a complete accessibility audit or game compatibility assessment.
-The source specification files remain byte-identical. See [game terminology](game-terms.md)
-for the exact context-matching rules and processing bounds.
-
-Readiness regression: **PASS** on a built server and disposable PostgreSQL.
-Temporarily removing access to the terminology table, then to the initialized
-catalog row, each returned 503; restoring each returned 200. Local CI and the
-existing database-backed HTTP suite passed again after extending the probe.
-
-## Recognition adapter and audio-sample comparison — 2026-10-18 (historical)
-
-This stage adds Soniox recognition with token revisions and utterance endpoints,
-plus an administrator-only authorized WAV comparison using saved Soniox and
-DeepL candidates. It does not enable production providers/languages or player
-subtitles. No live credential or authorized speech sample was supplied, and this
-implementation task has not deployed these changes.
-
-| Check                                                | Status                    | Evidence                                                                                                                                                                                                                            |
-| ---------------------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Local CI                                             | PASS                      | `npm run ci:local`; 115 first-party source files, largest 430 lines, strict types, eight tests, web/migration/worker builds and unconfigured HTTP boundaries                                                                        |
-| Soniox wire format regression                        | PASS                      | The protocol test first failed with actual `s16le` versus documented `pcm_s16le`; the shared recognizer now sends the correct format and passes the same test                                                                       |
-| Authorized sample HTTP and input limits              | PASS                      | `npm run test:samples:db`; signed Access plus persisted session and same origin; truncated/stereo/overlong WAV rejected before network use; JSON above 1,400,000 bytes returns 413                                                  |
-| PCM timing and transcript revisions                  | PASS                      | A generated tone/paused sample reaches a real loopback WebSocket byte-for-byte, including silence; a protocol fixture revises “Attack” to “Do not attack,” finalizes two utterances, and known versus missing times remain distinct |
-| Separate translation and safe outcomes               | PASS                      | Stable utterances produce one DeepL request each with the selected output script; no-speech makes no translation request; quota failures retain original text with a safe classification                                            |
-| Pair leases, stale evidence and audit privacy        | PASS                      | Two built servers verify both configurations are locked during sample processing; replacing one after lease expiry makes the old result return 409; audits omit audio, text and credentials                                         |
-| Existing regression checks                           | PASS                      | `test:db` (seven tests), `test:http:db`, `test:ws:db`, `test:management:db`, and `test:providers:db` against disposable PostgreSQL 16                                                                                               |
-| Browser sample form and responsive layout            | PASS                      | Chrome: saved candidates selectable, output-language input editable, submission disabled without a file; viewport and document width both 320 px, no captured browser errors/warnings                                               |
-| Browser file selection and complete sample UI result | NOT RUN                   | The Chrome extension lacks file-URL access; automated file selection was rejected before upload. The real HTTP upload/processing path passed separately; no browser-result success is claimed                                       |
-| Live provider access, quality and latency            | NOT RUN                   | Local fixture text is deterministic test data. No actual Soniox/DeepL access or recognition/translation quality has been established                                                                                                |
-| Discord source and original audio                    | WAITING FOR CONFIGURATION | Dedicated bot exists; token storage location and guild/channel/commander IDs remain pending                                                                                                                                         |
-| Full design acceptance and release                   | NOT RUN                   | Shared live jobs, language administration, media revocation, player subtitles and PiP remain unfinished; no deployment                                                                                                              |
-
-The sample HTTP test also first reproduced rejection of Soniox's documented
-`translation_status: none` source tokens as `INVALID_RESPONSE`. The parser now
-accepts both documented source-token statuses (`none` and `original`) while
-rejecting translated tokens on this recognition-only stream.
-
-No production test flags, alternate provider destinations or identity bypasses
-were introduced. Browser screenshots are ignored local artifacts. The sample
-does not store recordings or transcript text and does not overwrite a saved
-configuration's connection-test result. `design.md` and `GOAL.md` remain identical.
-
-## Provider candidates and configuration history — 2026-10-18 (historical)
-
-Current branch additions include encrypted provider candidates, real connection
-request implementations, configuration history, tested replacement/restore, and
-an administrator editor. They have not been deployed. The full design.md goal
-remains incomplete: Discord audio, media revocation, the complete subtitle path,
-language administration and PiP still require implementation and live evidence.
-
-| Check                                       | Status                    | Evidence                                                                                                                                                                                                                          |
-| ------------------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Local CI                                    | PASS                      | `npm run ci:local`; 106 first-party source files, largest 397 lines; strict types, eight tests, web/migration/worker builds and unconfigured HTTP boundaries                                                                      |
-| Provider wire contracts                     | PASS                      | `npm test`; real loopback HTTP/WS fixtures verify DeepL method/auth/language scripts, response limits, errors, deadlines and redirect refusal; Soniox frames, silence duration, final acknowledgement and safe failures           |
-| Provider management and PostgreSQL          | PASS                      | `npm run test:providers:db`; signed Access plus persisted session, same-origin guards, encrypted current/history values, failed candidate/restore preservation, referenced deletion refusal and no key/ciphertext in reads/audits |
-| Concurrent tests and stale completion       | PASS                      | Two built Node servers share one lease; concurrent tests/mutations reject; an expired lease permits a newer save, and the older response cannot overwrite it                                                                      |
-| Provider persistence and restoration        | PASS                      | New process reads accepted settings/history; restoring version 1 produces a newer version, failed restoration keeps the current one, and cross-configuration ciphertext is rejected                                               |
-| Existing application regression checks      | PASS                      | `test:db` (seven tests), `test:http:db`, `test:ws:db`, and `test:management:db` on disposable PostgreSQL 16                                                                                                                       |
-| Migration 0004                              | PASS                      | Applied additive provider history/lease columns; readiness and built management tests use the migrated database                                                                                                                   |
-| Browser configuration workflow              | PASS                      | Chrome with local signed identity and local provider fixtures: create, test, invalid-key feedback without replacement, edit, restore as a new version, reload, and empty password field                                           |
-| Narrow browser layout                       | PASS                      | Populated provider editor at 320 px has document width 320 px; fields and buttons remain visible                                                                                                                                  |
-| Real provider access, quality and selection | NOT RUN                   | No provider credentials or authorized speech sample; local responses do not establish live access, translation quality, latency or provider suitability                                                                           |
-| Discord reception and original audio        | WAITING FOR CONFIGURATION | Developer portal confirms the dedicated bot exists; token storage path and guild/channel/commander IDs remain pending                                                                                                             |
-| Production release and full acceptance      | NOT RUN                   | No deployment by this implementation task; production languages/providers remain unavailable                                                                                                                                      |
-
-Browser proof is retained in ignored local artifacts. Tests use generated/fake
-credentials and disposable local services. Test-only routing preloads are absent
-from production code; no alternate endpoint or identity bypass was added. DeepL
-400 errors remain a safe rejected-settings category until specific live error
-contracts are validated. Soniox's documented model error has its own category.
+The previous provider-specific adapter and terminology-context test sections
+were superseded by the OpenAI streaming refactor on 2026-10-19. Their historical
+results do not establish the behavior or quality of the current adapters.
+Current evidence is recorded separately in the OpenAI section above. Generic
+term-catalog persistence, authentication and revocation checks remain applicable.
 
 ## Room administration and credential protection — 2026-10-18 (historical)
 

@@ -255,8 +255,7 @@ export function createProviderService(
         const values = {
           name: data.name,
           providerType: data.settings.type,
-          purpose:
-            data.settings.type === 'soniox' ? 'speech_recognition' : 'text_translation',
+          purpose: 'speech_translation',
           publicSettings: data.settings,
           encryptedCredential,
           version,
@@ -359,11 +358,21 @@ export function createProviderService(
     const leased: Array<{ id: string; version: number; leaseId: string }> = []
     const providers: ProtectedProvider[] = []
     try {
+      const versions = new Map<string, number>()
+      for (const reference of references) {
+        if (
+          versions.has(reference.id) &&
+          versions.get(reference.id) !== reference.version
+        ) {
+          throw new ProviderConfigurationError('VERSION_CONFLICT')
+        }
+        versions.set(reference.id, reference.version)
+      }
       // A sample holds the same test slots as ordinary connection tests. The
       // 30-second sample deadline fits inside their 35-second database lease.
-      for (const reference of [...references].sort((a, b) =>
-        a.id.localeCompare(b.id),
-      )) {
+      for (const reference of [
+        ...new Map(references.map((reference) => [reference.id, reference])).values(),
+      ].sort((a, b) => a.id.localeCompare(b.id))) {
         const row = expected(await stored(reference.id), reference.version)
         const credential = protection().decrypt(
           row.encryptedCredential,
@@ -377,8 +386,8 @@ export function createProviderService(
         })
       }
       if (
-        providers.length !== 2 ||
-        new Set(providers.map((value) => value.settings.type)).size !== 2
+        !providers.length ||
+        providers.some((value) => value.settings.type !== 'openai')
       ) {
         throw new ProviderConfigurationError('INVALID_CONFIGURATION')
       }

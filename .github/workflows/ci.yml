@@ -66,6 +66,10 @@ jobs:
           node packages/database/dist/migrate.mjs
           npm run test:db
           npm run test:management:db
+          npm run test:providers:db
+          npm run test:samples:db
+          npm run test:languages:db
+          npm run test:subtitles:db
           npm run test:community:db
 
       - name: Select only the current main commit for release

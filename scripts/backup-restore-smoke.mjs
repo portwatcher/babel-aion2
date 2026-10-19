@@ -45,7 +45,7 @@ test('custom-format backups restore application settings, credentials and termin
   network = await createProviderFixture()
   const botCredential = `local-restore-${randomBytes(24).toString('hex')}`
   const recognitionKey = network.credential('speech')
-  const translationKey = network.credential()
+  const translationKey = network.credential('speech')
   const recognitionId = randomUUID(),
     translationId = randomUUID()
   let auth
@@ -198,7 +198,7 @@ test('custom-format backups restore application settings, credentials and termin
       recognitionId,
       {
         name: '恢复识别候选',
-        settings: { type: 'soniox', model: 'stt-rt-v5', timeoutMs: 5_000 },
+        settings: { type: 'openai', timeoutMs: 5_000 },
         credential: recognitionKey,
       },
     ],
@@ -207,9 +207,7 @@ test('custom-format backups restore application settings, credentials and termin
       {
         name: '恢复翻译候选',
         settings: {
-          type: 'deepl',
-          endpoint: 'https://api-free.deepl.com',
-          model: 'prefer_quality_optimized',
+          type: 'openai',
           timeoutMs: 5_000,
         },
         credential: translationKey,

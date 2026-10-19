@@ -2,8 +2,7 @@ import {
   sampleSegmentSchema,
   type ProviderSampleResult,
   type SampleSegment,
-  type SonioxSettings,
-  type DeepLSettings,
+  type OpenAISettings,
   type TerminologySnapshot,
 } from '@babel/contracts'
 import { ProviderFailure } from './errors.ts'
@@ -11,8 +10,8 @@ import { sendPcmAudio, type PcmAudio } from './pcm.ts'
 import { openSharedSubtitleStream } from './subtitle-stream.ts'
 
 export async function previewSubtitleSample(input: {
-  recognition: { settings: SonioxSettings; credential: string; version: number }
-  translation: { settings: DeepLSettings; credential: string; version: number }
+  recognition: { settings: OpenAISettings; credential: string; version: number }
+  translation: { settings: OpenAISettings; credential: string; version: number }
   outputLanguage: string
   audio: PcmAudio
   terminology: TerminologySnapshot | null
@@ -37,16 +36,21 @@ export async function previewSubtitleSample(input: {
           version: input.translation.version,
         },
         (event) => {
+          if (event.type === 'failure') {
+            code = event.code
+          }
           if (event.type !== 'subtitle') {
             return
           }
           const segment = sampleSegmentSchema.parse(event.value)
           if (!segments.has(segment.utteranceId) && segments.size >= 32) {
-            throw new ProviderFailure('INVALID_RESPONSE')
+            code = 'INVALID_RESPONSE'
+            return
           }
           segments.set(segment.utteranceId, segment)
         },
       )
+      await stream.prepare()
       await sendPcmAudio(stream, input.audio, deadline)
     } finally {
       stream.close()
@@ -54,8 +58,16 @@ export async function previewSubtitleSample(input: {
     const finalized = [...segments.values()].filter(
       (segment) => segment.isFinal && segment.text.trim(),
     )
-    if (!finalized.length) {
-      code = 'NO_SPEECH'
+    if (code === 'PASS') {
+      if (!finalized.length) {
+        code = 'NO_SPEECH'
+      } else if (
+        ![...segments.values()].some(
+          (segment) => segment.translationIsFinal && segment.translatedText.trim(),
+        )
+      ) {
+        code = 'INVALID_RESPONSE'
+      }
     }
     for (const segment of segments.values()) {
       if (segment.failure) {

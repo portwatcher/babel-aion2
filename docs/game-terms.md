@@ -46,24 +46,16 @@ the private catalog.
 ## Applying terms to an audio sample
 
 **使用已启用的游戏术语提示** is checked by default in the sample form. Uncheck it
-to compare the same sample without terminology. Enabling it sends catalog content
-to the selected recognition and translation services along with the sample.
-Connection-only probes do not use this catalog.
+to compare the same sample without terminology. Enabled terms go only to the
+OpenAI original-caption recognizer as supported `prompt`, `keywords` and language
+hints. The recognition context is independent of the output language.
+Connection-only probes do not send this catalog.
 
-The sample reads a consistent snapshot of all enabled entries. Soniox receives
-source terms and alternatives in its `context.terms` field, plus language,
-category and short context in structured background text. The recognition context
-is independent of the selected output language. This uses the documented
-[Soniox context fields](https://soniox.com/docs/stt/concepts/context).
-
-DeepL receives relevant source-language entries and their expression for the
-exact output language code in its `context` field. Source region variants can
-share a language; conflicting explicit scripts are excluded. Unknown source
-language produces no translation terminology context. Missing target expressions
-are not replaced with another output language's expression. Source text is sent
-unchanged, and provider text is displayed unchanged. DeepL documents `context`
-as additional information that can influence translation; inspect the actual
-result for accuracy. See [the translation request reference](https://developers.deepl.com/api-reference/translate/request-translation).
+`gpt-realtime-translate` consumes the same audio directly and does not support
+custom prompts, glossaries or pronunciation guides. Target expressions remain
+saved for manual evaluation; no unsupported translation context is sent. A
+recognition hint cannot enforce how the separate translator renders a game term.
+See [OpenAI's translation guide](https://developers.openai.com/cookbook/examples/voice_solutions/realtime_translation_guide).
 
 Generated context has a conservative 6,000-byte UTF-8 budget per provider request.
 More than 2,000 enabled entries also rejects the sample before provider work.
@@ -99,4 +91,4 @@ Their vocabulary and provider output are synthetic fixtures.
 Live terminology accuracy remains **NOT RUN** until authorized battle samples
 are compared with reliable references for each output language. Check negation,
 direction, target, team, quantity, countdown, actions and corrections separately.
-The live shared subtitle pipeline and language administration are still unfinished.
+The shared live pipeline and language administration are implemented; representative battle terminology still requires validation.

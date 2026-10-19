@@ -63,8 +63,8 @@
   "subtitleWaiting": "지휘 자막을 기다리는 중…",
   "currentSubtitles": "현재 지휘 자막",
   "commanderSubtitles": "지휘 자막",
-  "subtitleFinal": "확정 자막",
-  "subtitleInterim": "임시 자막",
+  "subtitleFinal": "완료된 자막",
+  "subtitleInterim": "실시간 자막",
   "translationUnavailable": "번역을 사용할 수 없습니다",
   "translating": "번역하는 중…",
   "sourceFinal": "원문",
@@ -224,5 +224,7 @@
   "guildInUse": "이 Discord 서버에는 이미 방이 있습니다. 기존 방에 입장하세요.",
   "installationExpired": "설치가 만료되었습니다. 다시 설치하세요.",
   "botPermissionsMissing": "봇에 이 음성 채널의 권한이 부족합니다. 채널 권한 덮어쓰기를 확인하세요.",
-  "credentialProtectionUnavailable": "자격 증명 보호를 일시적으로 사용할 수 없습니다. 나중에 다시 시도하세요."
+  "credentialProtectionUnavailable": "자격 증명 보호를 일시적으로 사용할 수 없습니다. 나중에 다시 시도하세요.",
+  "sourceIndependent": "별도로 인식한 원문",
+  "translationMaySkipSource": "출력 언어와 같은 언어의 음성은 번역이 생략될 수 있습니다. 여기에는 별도로 인식한 원문이 표시됩니다."
 }

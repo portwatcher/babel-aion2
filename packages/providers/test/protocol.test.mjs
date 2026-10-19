@@ -1,117 +1,62 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { testProviderConnection, translateDeepL } from '../src/index.ts'
+import { testProviderConnection } from '../src/index.ts'
 import { createProviderFixture } from '../../../scripts/fixtures/provider-server.mjs'
 import { routeProviderNetwork } from '../../../scripts/fixtures/provider-network.mjs'
 
-test('provider protocols preserve language scripts, bound failures and complete framed silence', async () => {
+test('OpenAI probes authenticate over real WebSockets and verify both configured model sessions', async (t) => {
   const fixture = await createProviderFixture()
   const restore = routeProviderNetwork(fixture.origin)
-  const deepl = {
-    type: 'deepl',
-    endpoint: 'https://api-free.deepl.com',
-    model: 'prefer_quality_optimized',
-    timeoutMs: 1_000,
-  }
-  const soniox = { type: 'soniox', model: 'stt-rt-v5', timeoutMs: 3_000 }
-  try {
-    for (const [outputLanguage, expected, sourceLanguage] of [
-      ['zh-CN', 'ZH-HANS', 'zh-Hans'],
-      ['zh-TW', 'ZH-HANT', 'zh-Hans'],
-      ['ja-JP', 'JA', 'zh-Hans'],
-      ['ko-KR', 'KO', 'zh-Hans'],
-      ['ja', 'JA', 'und'],
-    ]) {
-      const translated = await translateDeepL(deepl, fixture.credential(), {
-        text: '指令',
-        sourceLanguage,
-        outputLanguage,
-        context: 'context',
-      })
-      assert.equal(translated, `fixture:${expected}`)
-      const request = fixture.observations.at(-1)
-      assert.equal(request.method, 'POST')
-      assert.deepEqual(request.body, {
-        text: ['指令'],
-        ...(sourceLanguage === 'und' ? {} : { source_lang: 'ZH' }),
-        target_lang: expected,
-        model_type: 'prefer_quality_optimized',
-        context: 'context',
-      })
-    }
-    for (const [mode, code] of [
-      ['invalid', 'INVALID_CREDENTIAL'],
-      ['quota', 'QUOTA_EXHAUSTED'],
-      ['rate', 'RATE_LIMITED'],
-      ['model', 'INVALID_CONFIGURATION'],
-      ['malformed', 'INVALID_RESPONSE'],
-      ['large', 'INVALID_RESPONSE'],
-      ['timeout', 'TIMEOUT'],
-      ['redirect', 'UNAVAILABLE'],
-    ]) {
-      const key = fixture.credential(mode)
-      const result = await testProviderConnection(deepl, key)
-      assert.equal(result.code, code, mode)
-      assert.equal(JSON.stringify(result).includes(key), false)
-    }
-    assert.equal(
-      fixture.observations.some((item) => item.protocol === 'redirect'),
-      false,
-      'Never forward authorization across redirects',
-    )
-    const before = fixture.observations.length
-    assert.equal(
-      (
-        await testProviderConnection(
-          { ...deepl, endpoint: fixture.origin },
-          fixture.credential(),
-        )
-      ).code,
-      'INVALID_CONFIGURATION',
-    )
-    assert.equal(
-      fixture.observations.length,
-      before,
-      'Reject non-allowlisted endpoint before making a request',
-    )
-    assert.equal(
-      (await testProviderConnection(soniox, fixture.credential())).code,
-      'PASS',
-    )
-    const request = fixture.observations.at(-1)
-    assert.equal(request.auth, 'soniox-api-key')
-    assert.deepEqual(request.configuration, {
-      model: 'stt-rt-v5',
-      audio_format: 'pcm_s16le',
-      sample_rate: 48_000,
-      num_channels: 1,
-      enable_endpoint_detection: true,
-      enable_language_identification: true,
-    })
-    assert.equal(request.frames.length, 50)
-    assert.ok(request.frames.every((frame) => frame.bytes === 1920 && frame.silence))
-    assert.equal(request.end, true, 'Empty text must terminate the audio stream')
-    for (const [mode, code] of [
-      ['invalid', 'INVALID_CREDENTIAL'],
-      ['model', 'MODEL_UNAVAILABLE'],
-      ['quota', 'QUOTA_EXHAUSTED'],
-      ['malformed', 'INVALID_RESPONSE'],
-      ['early', 'INVALID_RESPONSE'],
-      ['timeout', 'TIMEOUT'],
-    ]) {
-      assert.equal(
-        (
-          await testProviderConnection(
-            { ...soniox, timeoutMs: 1_500 },
-            fixture.credential(mode),
-          )
-        ).code,
-        code,
-        mode,
-      )
-    }
-  } finally {
+  t.after(async () => {
     restore()
     await fixture.close()
+  })
+  const settings = { type: 'openai', timeoutMs: 1000 }
+  const key = fixture.credential()
+  assert.equal((await testProviderConnection(settings, key)).code, 'PASS')
+  const [recognition, translation] = fixture.observations
+  assert.equal(recognition.auth, 'Bearer ' + key)
+  assert.equal(translation.auth, 'Bearer ' + key)
+  assert.equal(recognition.url, '/v1/realtime?intent=transcription')
+  assert.equal(
+    translation.url,
+    '/v1/realtime/translations?model=gpt-realtime-translate',
+  )
+  assert.deepEqual(recognition.configuration, {
+    type: 'transcription',
+    audio: {
+      input: {
+        format: { type: 'audio/pcm', rate: 24000 },
+        transcription: { model: 'gpt-live-transcribe', delay: 'minimal' },
+        turn_detection: null,
+      },
+    },
+  })
+  assert.deepEqual(translation.configuration, { audio: { output: { language: 'ja' } } })
+  for (const [mode, code] of [
+    ['invalid', 'INVALID_CREDENTIAL'],
+    ['model', 'MODEL_UNAVAILABLE'],
+    ['quota', 'QUOTA_EXHAUSTED'],
+    ['rate', 'RATE_LIMITED'],
+    ['permission', 'PERMISSION_DENIED'],
+    ['malformed', 'INVALID_RESPONSE'],
+    ['early', 'INVALID_RESPONSE'],
+    ['timeout', 'TIMEOUT'],
+  ]) {
+    assert.equal(
+      (await testProviderConnection(settings, fixture.credential(mode))).code,
+      code,
+      mode,
+    )
   }
+  const count = fixture.observations.length
+  await assert.rejects(
+    () => testProviderConnection({ ...settings, endpoint: fixture.origin }, key),
+    { code: 'INVALID_CONFIGURATION' },
+  )
+  assert.equal(
+    fixture.observations.length,
+    count,
+    'untrusted destinations are rejected before networking',
+  )
 })

@@ -50,14 +50,13 @@ connection and the page polls actual worker status.
 Discord scope can be either selected member IDs or all speaking members of the
 configured channel. All-channel mode requires no prefilled commander IDs;
 the worker discovers speakers by Discord user ID and shows received frame counts.
-The administrator can also save encrypted Soniox/DeepL candidate configurations,
-run connection probes, replace credentials, and test/restore historical versions.
-An authorized PCM WAV sample can be recognized through Soniox and translated
-through DeepL for an administrator-only comparison of source and translated text.
-Administrators can edit versioned game terms and compare samples with or without
-their source and output-language terminology context.
-Samples use the shared streaming processor: recognition and translation overlap,
-and obsolete revisions are cancelled before they can replace current text.
+The administrator saves only one encrypted OpenAI API Key. Fixed server adapters
+use `gpt-live-transcribe` for original captions and `gpt-realtime-translate` for
+parallel direct-audio translation. Every translated fragment is pushed immediately
+to the page and PiP; translation never waits for a completed source transcript.
+An authorized PCM WAV sample can verify a selected language path. Game terms
+can guide original-caption recognition; the realtime translation API does not
+support custom glossaries. Original and translated streams are independent.
 Administrators can prepare output-language paths, order them, choose a default,
 and save sample validation tied to the exact provider and terminology revisions.
 Activation requires current sample validation and a ready private subtitle worker.
@@ -163,7 +162,7 @@ budget, including supervisors and rolling updates. See
 | `packages/auth`                   | Cloudflare JWT verification and administrator Better Auth sessions                             |
 | `packages/database`               | Drizzle schema, migrations, listener transactions and revocation coordinator                   |
 | `packages/contracts`              | Browser-safe nickname, language, room, and subtitle contracts                                  |
-| `packages/providers`              | Server-only Soniox recognition, DeepL translation, probes and sample comparison                |
+| `packages/providers`              | Server-only OpenAI streaming recognition/translation, probes and samples                       |
 | `packages/processes`              | Shared child-process supervision, private bootstrap and confirmed exit reconciliation          |
 | `.agents/skills/better-interface` | The requested interface review skill                                                           |
 | `scripts`                         | Source size checks, worktree inventory, built HTTP smoke checks                                |

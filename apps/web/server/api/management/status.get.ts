@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
       media: media ? 'READY' : 'UNAVAILABLE',
       subtitles: subtitles ? 'READY' : 'UNAVAILABLE',
     },
-    availableProviders: subtitles ? ['soniox', 'deepl'] : [],
+    availableProviders: subtitles ? ['openai'] : [],
     configurationEditable: true,
   }
 })

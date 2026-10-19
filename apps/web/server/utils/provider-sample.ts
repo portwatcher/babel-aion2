@@ -57,8 +57,8 @@ export async function runProviderSample(
       const recognition = providers.find((value) => value.id === input.recognition.id)
       const translation = providers.find((value) => value.id === input.translation.id)
       if (
-        recognition?.settings.type !== 'soniox' ||
-        translation?.settings.type !== 'deepl'
+        recognition?.settings.type !== 'openai' ||
+        translation?.settings.type !== 'openai'
       ) {
         throw new ProviderConfigurationError('INVALID_CONFIGURATION')
       }

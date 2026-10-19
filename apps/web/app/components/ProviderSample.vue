@@ -20,8 +20,8 @@ const emit = defineEmits<{
   validated: [value: ManagedLanguage]
 }>()
 const formId = useId()
-const recognitionId = ref<string | null>(null)
-const translationId = ref<string | null>(null)
+const recognitionId = computed(() => props.providers[0]?.id ?? null)
+const translationId = recognitionId
 const outputLanguage = ref('')
 const includeTerms = ref(true)
 const effectiveRecognition = computed(
@@ -35,12 +35,6 @@ const previewUrl = ref('')
 const running = ref(false)
 const error = ref('')
 const result = shallowRef<ProviderSampleResult | null>(null)
-const recognitionOptions = computed(() =>
-  props.providers.filter((value) => value.settings.type === 'soniox'),
-)
-const translationOptions = computed(() =>
-  props.providers.filter((value) => value.settings.type === 'deepl'),
-)
 let disposed = false
 
 function selectAudio(event: Event) {
@@ -83,8 +77,7 @@ async function preview() {
     (value) => value.id === effectiveTranslation.value,
   )
   if (!recognition || !translation || !audio.value || audio.value.size > 1_000_000) {
-    error.value =
-      'Select recognition and translation configurations and an audio sample no larger than 1 MB.'
+    error.value = 'Save an API Key and select an audio sample no larger than 1 MB.'
     return
   }
   let code: string
@@ -157,46 +150,21 @@ onBeforeUnmount(() => {
   <form class="entry-form provider-editor" @submit.prevent="preview">
     <h3>{{ path ? `Validate sample path: ${path.name}` : 'Audio sample test' }}</h3>
     <p class="muted">
-      Process an authorized sample with saved recognition and translation
-      configurations, then check the original and translated text. Results stay on this
-      page and do not enable languages or reach players.
+      Use the saved OpenAI API Key to compare original and translated text from an
+      authorized sample. Test text stays on this page; it does not enable languages or
+      reach players.
     </p>
     <p v-if="path" class="muted">
       Output {{ path.code }} ·
-      {{
-        path.includeTerms ? 'Use game terminology hints' : 'No game terminology hints'
-      }}. Validation status is saved to this language configuration.
+      {{ path.includeTerms ? 'Use terminology hints' : 'No terminology hints' }}.
+      Validation status is saved with this language configuration.
     </p>
     <p class="muted">
-      Audio is sent to Soniox, and recognized text to DeepL. Recognition revisions may
-      trigger multiple translations and provider charges. Use authorized samples. The
-      server does not save audio or test text. Recognition and translation run
-      continuously during processing. Results appear when processing completes.
+      Audio is sent concurrently to OpenAI recognition and target-language translation
+      sessions and incurs service charges. Use authorized samples; the server does not
+      persist audio or test text. Recognition and translation stream during processing;
+      this finite comparison appears after completion.
     </p>
-    <div v-if="!path" class="field">
-      <label :for="`${formId}-recognition`">Recognition configuration</label>
-      <Select
-        :input-id="`${formId}-recognition`"
-        v-model="recognitionId"
-        :options="recognitionOptions"
-        option-label="name"
-        option-value="id"
-        :disabled="disabled || running"
-        placeholder="Select Soniox candidate"
-      />
-    </div>
-    <div v-if="!path" class="field">
-      <label :for="`${formId}-translation`">Translation configuration</label>
-      <Select
-        :input-id="`${formId}-translation`"
-        v-model="translationId"
-        :options="translationOptions"
-        option-label="name"
-        option-value="id"
-        :disabled="disabled || running"
-        placeholder="Select DeepL candidate"
-      />
-    </div>
     <div v-if="!path" class="field">
       <label :for="`${formId}-language`">Sample output language code</label>
       <InputText
@@ -204,7 +172,7 @@ onBeforeUnmount(() => {
         v-model="outputLanguage"
         :disabled="disabled || running"
         maxlength="35"
-        placeholder="e.g. zh-Hans, ja, ko"
+        placeholder="For example: zh-Hans, ja, ko"
         required
       />
     </div>
@@ -220,8 +188,8 @@ onBeforeUnmount(() => {
         @change="selectAudio"
       />
       <small :id="`${formId}-format`" class="muted"
-        >0.2–10 seconds, mono 16-bit PCM WAV at 16 or 48 kHz, up to 1 MB. Tests wait up
-        to 30 seconds.</small
+        >0.2–10 seconds, mono PCM16 WAV, 16 or 48 kHz, up to 1 MB. Tests time out after
+        30 seconds.</small
       >
       <audio
         v-if="previewUrl"
@@ -241,16 +209,15 @@ onBeforeUnmount(() => {
       <label :for="`${formId}-terms`">Use enabled game terminology hints</label>
     </div>
     <small v-if="!path" class="muted"
-      >When enabled, catalog content is also sent to recognition and translation
-      providers. Disable to compare results.<a href="#terms-title"
-        >Manage terminology</a
-      ></small
+      >Hints apply only to recognition. Live translation does not support custom
+      glossaries. Disable hints to compare results.
+      <a href="#terms-title">Manage terminology</a></small
     >
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <div class="management-actions">
       <Button
         type="submit"
-        label="Recognize and translate sample"
+        label="Transcribe and translate sample"
         :loading="running"
         :disabled="disabled || !effectiveRecognition || !effectiveTranslation || !audio"
       />
@@ -261,44 +228,53 @@ onBeforeUnmount(() => {
           result.code === 'PASS'
             ? 'Sample processed. Check recognition and translation accuracy.'
             : result.code === 'NO_SPEECH'
-              ? 'No stable speech available for translation. Check the sample.'
+              ? 'No completed source speech was recognized. Check the sample.'
               : providerTestLabel(result.code)
         }}
       </p>
       <small class="muted"
-        >Output {{ result.outputLanguage }} · Recognition version
-        {{ result.recognitionVersion }} · Translation version
-        {{ result.translationVersion }} · Request duration {{ result.elapsedMs }} ms
-        (does not measure live subtitle latency)</small
+        >Output {{ result.outputLanguage }} · recognition version
+        {{ result.recognitionVersion }} · translation version
+        {{ result.translationVersion }} · request duration {{ result.elapsedMs }} ms
+        (not live subtitle latency)</small
       >
       <p v-if="result.terminology" class="muted">
-        Catalog version {{ result.terminology.version }} · Recognition hints
-        {{ result.terminology.recognitionTermCount }} terms
+        Terminology version {{ result.terminology.version }} · recognition hints
+        {{ result.terminology.recognitionTermCount }} entries
       </p>
-      <p v-else class="muted">Terminology hints were not used for this test.</p>
+      <p v-else class="muted">No terminology hints used.</p>
       <ol class="sample-segments">
         <li v-for="segment in result.segments" :key="segment.utteranceId">
           <p class="muted">
-            {{ segment.isFinal ? 'Stable original text' : 'Interim original text' }} ·
-            {{ segment.language === 'und' ? 'Language undetected' : segment.language }}
+            {{
+              segment.sourceAlignment === 'independent'
+                ? 'Independent source stream'
+                : 'Source text'
+            }}
+            · {{ segment.isFinal ? 'Recognition complete' : 'Recognizing' }} ·
+            {{
+              segment.language === 'und' ? 'Language undetermined' : segment.language
+            }}
           </p>
-          <p>{{ segment.text || 'Original text withdrawn' }}</p>
+          <p>{{ segment.text || 'Source text unavailable' }}</p>
           <p class="muted">
             {{
-              segment.translationIsFinal ? 'Stable translation' : 'Interim translation'
+              segment.translationIsFinal
+                ? 'Completed translation'
+                : 'Streaming translation'
             }}
           </p>
           <p>
             {{
               segment.failure
                 ? providerTestLabel(segment.failure)
-                : segment.translatedText || 'No translation yet'
+                : segment.translatedText || 'No translated text'
             }}
           </p>
           <small class="muted"
-            >Translation terminology context {{ segment.translationTermCount }} terms ·
-            Provider-reported sample time: {{ segment.audioStartMs ?? 'Unknown' }}–{{
-              segment.audioEndMs ?? 'Unknown'
+            >Translation terminology context {{ segment.translationTermCount }} entries
+            · Provider sample time: {{ segment.audioStartMs ?? 'unknown' }}–{{
+              segment.audioEndMs ?? 'unknown'
             }}
             ms</small
           >

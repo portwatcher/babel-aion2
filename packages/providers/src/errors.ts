@@ -5,21 +5,24 @@ export class ProviderFailure extends Error {
     super(code)
   }
 }
-
-export function sonioxFailure(status: number, type?: string) {
-  if (status === 401) {
+export function openaiFailure(status: number, code = '') {
+  if (status === 401 || code === 'invalid_api_key') {
     return new ProviderFailure('INVALID_CREDENTIAL')
   }
-  if (type === 'model_not_available') {
+  if (
+    code === 'model_not_found' ||
+    code === 'model_not_available' ||
+    code === 'invalid_model'
+  ) {
     return new ProviderFailure('MODEL_UNAVAILABLE')
   }
-  if (status === 402) {
+  if (code === 'insufficient_quota' || code === 'billing_hard_limit_reached') {
     return new ProviderFailure('QUOTA_EXHAUSTED')
   }
-  if (status === 403) {
+  if (status === 403 || code === 'permission_denied') {
     return new ProviderFailure('PERMISSION_DENIED')
   }
-  if (status === 429) {
+  if (status === 429 || code === 'rate_limit_exceeded') {
     return new ProviderFailure('RATE_LIMITED')
   }
   if (status === 408) {
