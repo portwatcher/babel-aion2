@@ -154,6 +154,11 @@ test('target changes fence obsolete sockets and equal timestamps do not discard 
     () => values(events).at(-1)?.translatedText === 'Do not attack.',
     'append exact fragments and deduplicate event IDs only',
   )
+  network.emit(key, delta('space', ' '), output)
+  await until(
+    () => values(events).at(-1)?.translatedText === 'Do not attack. ',
+    'a whitespace fragment does not clear a completed display window',
+  )
   s.replaceOutput(path(key, 'ja', 2))
   await until(
     () =>
@@ -175,15 +180,17 @@ test('target changes fence obsolete sockets and equal timestamps do not discard 
     code: 'INVALID_CONFIGURATION',
   })
 })
-test('a stalled handshake is isolated, transient targets reconnect and late source completions cannot replace newer speech', async (t) => {
+test('stalled source and target handshakes are isolated, targets recover and late source completions cannot replace newer speech', async (t) => {
   const network = await fixture(t)
   const sourceKey = network.credential(),
     japaneseKey = network.credential(),
     koreanKey = network.credential()
   const held = network.hold(japaneseKey, 'translation', true)
+  const heldSource = network.hold(sourceKey, 'recognition', true)
   const s = stream(network, sourceKey)
   t.after(() => {
     held.release()
+    heldSource.release()
     s.close()
   })
   const japanese = [],
@@ -206,7 +213,16 @@ test('a stalled handshake is isolated, transient targets reconnect and late sour
     (value) => value.protocol === 'recognition',
   )
   const koreanOutput = network.observations.find((value) => value.key === koreanKey)
-  assert.equal(recognition.frames.length, 10)
+  assert.equal(
+    recognition.frames.length,
+    0,
+    'translation starts before the source handshake completes',
+  )
+  heldSource.release()
+  await until(
+    () => recognition.frames.length === 5,
+    'source retains only the newest 100 ms while connecting',
+  )
   assert.equal(
     koreanOutput.frames.length,
     10,
@@ -252,6 +268,19 @@ test('a stalled handshake is isolated, transient targets reconnect and late sour
     'only newest 100 ms retained for stalled target',
   )
   assert.equal(values(korean).at(-1).text, 'Retreat.')
+  network.emit(
+    sourceKey,
+    {
+      type: 'conversation.item.input_audio_transcription.completed',
+      item_id: 'newer',
+      transcript: '',
+    },
+    recognition,
+  )
+  await until(
+    () => values(korean).at(-1)?.text === '',
+    'a retracted hypothesis clears its original text without confusing later silent items',
+  )
   network.disconnect(koreanKey)
   await until(
     () => network.observations.filter((value) => value.key === koreanKey).length === 2,

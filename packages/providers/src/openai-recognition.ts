@@ -20,6 +20,7 @@ export function openRecognition(input: {
   let completed = 0
   let order = 0
   let latest = 0
+  let publishedItem: string | undefined
   const orders = new Map<string, number>()
   const session = openOpenAISession({
     ...input,
@@ -104,7 +105,8 @@ export function openRecognition(input: {
       const rank = orders.get(event.item_id) ?? 0
       if (rank >= latest) {
         latest = rank
-        if (item.text.trim()) {
+        if (item.text.trim() || publishedItem === event.item_id) {
+          publishedItem = event.item_id
           input.onTranscript(item)
         }
       }

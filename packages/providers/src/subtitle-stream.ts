@@ -73,6 +73,8 @@ export function openSharedSubtitleStream(input: {
   let sourceEvents = 0
   let source: Transcript | undefined
   let failure: ProviderFailure | undefined
+  let recognitionReady = false
+  let sourcePending: Array<ReturnType<typeof convert>> = []
   const created = Date.now()
   function deliver(output: Output, event: SubtitleStreamEvent) {
     if (closed || outputs.get(output.path.outputLanguage) !== output) {
@@ -167,7 +169,8 @@ export function openSharedSubtitleStream(input: {
         }
         if (
           output.value.translatedText.length + fragment.length > 2048 ||
-          /[.!?。！？]\s*$/u.test(output.value.translatedText)
+          (Boolean(fragment.trim()) &&
+            /[.!?。！？]\s*$/u.test(output.value.translatedText))
         ) {
           output.value = {
             ...output.value,
@@ -239,6 +242,7 @@ export function openSharedSubtitleStream(input: {
     clearInterval(sweep)
     input.signal?.removeEventListener('abort', abort)
     recognition.close()
+    sourcePending = []
     for (const output of outputs.values()) {
       output.stream.close()
     }
@@ -277,6 +281,22 @@ export function openSharedSubtitleStream(input: {
       }
     },
   })
+  void recognition.ready
+    .then(() => {
+      if (closed) {
+        return
+      }
+      recognitionReady = true
+      for (const frame of sourcePending) {
+        recognition.append(frame.audio, frame.durationMs, frame.speech)
+      }
+      sourcePending = []
+    })
+    .catch((error: unknown) =>
+      fail(
+        error instanceof ProviderFailure ? error : new ProviderFailure('UNAVAILABLE'),
+      ),
+    )
   void recognition.finished.catch((error: unknown) =>
     fail(error instanceof ProviderFailure ? error : new ProviderFailure('UNAVAILABLE')),
   )
@@ -320,9 +340,15 @@ export function openSharedSubtitleStream(input: {
   if (input.signal?.aborted) {
     abort()
   }
-  // Audio can flow as soon as recognition is ready; a slow target handshake
-  // never blocks another target. Each connecting lane retains at most 100 ms.
-  const ready = recognition.ready
+  // Whichever session is ready first can consume current audio. Recognition
+  // and targets never wait for one another; connecting lanes retain <=100 ms.
+  const ready = Promise.resolve().then(() =>
+    Promise.any([
+      recognition.ready,
+      ...[...outputs.values()].map((output) => output.stream.ready),
+    ]),
+  )
+  void ready.catch(() => {})
   function replaceOutput(path: TranslationPath) {
     const value = checked(path)
     const previous = outputs.get(value.outputLanguage)
@@ -348,7 +374,7 @@ export function openSharedSubtitleStream(input: {
     async prepare() {
       // Finite uploaded samples wait for their selected target before playback.
       await Promise.all([
-        ready,
+        recognition.ready,
         ...[...outputs.values()].map((output) => output.stream.ready),
       ])
     },
@@ -402,7 +428,17 @@ export function openSharedSubtitleStream(input: {
       }
       const frame = convert(pcm)
       samples += pcm.byteLength / 2
-      recognition.append(frame.audio, frame.durationMs, frame.speech)
+      if (recognitionReady) {
+        recognition.append(frame.audio, frame.durationMs, frame.speech)
+      } else {
+        if (sourcePending.length >= 5) {
+          sourcePending.shift()
+          for (const output of outputs.values()) {
+            output.value.discontinuity = true
+          }
+        }
+        sourcePending.push(frame)
+      }
       for (const output of outputs.values()) {
         if (!output.failed && output.subscribers.size) {
           try {

@@ -13,9 +13,10 @@ Stereo 48 kHz Discord PCM is downmixed per member and converted once to 24 kHz
 PCM16. All targets reuse the encoded frame, including actual silence. WebSockets
 disable message compression and TCP packet coalescing. A provider send backlog
 over approximately 100 ms fails the affected connection instead of accumulating
-obsolete commands. Translation handshakes run in parallel. A connecting target
+obsolete commands. Recognition and translation handshakes run in parallel; audio starts with the first
+ready session. A connecting session
 keeps only the newest five frames (100 ms), marks discontinuity if older audio is
-lost, and never delays ready targets. The worker drops pre-ready source audio
+lost, and never delays ready targets. The worker drops pre-ready audio
 instead of replaying seconds of history after a cold connection.
 
 Every translation delta is appended exactly as received and published immediately.

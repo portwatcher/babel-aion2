@@ -146,18 +146,6 @@ function pathQuery(roomId: string, generation: number, stamp: SubtitlePathStamp)
   `
 }
 
-export async function subtitlePathCurrent(
-  db: Database,
-  roomId: string,
-  generation: number,
-  stamp: SubtitlePathStamp,
-) {
-  const result = await db.execute<{ current: boolean }>(
-    sql`select exists (${pathQuery(roomId, generation, stamp)}) as current`,
-  )
-  return result.rows[0]?.current === true
-}
-
 /** Validate both revocation fences in one database snapshot and one round trip. */
 export async function subtitleDeliveryCurrent(
   db: Database,
