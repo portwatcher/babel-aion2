@@ -71,6 +71,10 @@ Web and voice entry points share `@babel/processes`. A supervisor acknowledges
 only its own child’s confirmed OS exit. Shared owner locks fence delayed player,
 media and source registration; storage failure blocks restart until the receipt
 commits. See [process recovery](worker-recovery.md).
+Kubernetes runtimes also bind owners to Pod identity. A private recovery
+controller seals new admission and confirms scoped closure from actual terminal
+container evidence; missing/unknown hosts remain blocked. See
+[Kubernetes recovery](kubernetes-recovery.md).
 
 ## Shared code
 
@@ -134,14 +138,13 @@ See [provider configuration](providers-and-languages.md) for probe and sample li
    establish public TURN routing, native AMD64 performance, background/game behavior or capacity.
    Local Coturn UDP/TCP/TLS and credential expiry pass separate checks. See the
    [candidate evidence](media-compatibility.md).
-3. Complete recovery when the supervisor/container/host itself disappears, and
-   worker routing before scaling beyond one configured control endpoint.
-   Child-runtime crashes now recover after confirmed OS exit and durable scoped
-   cleanup, preserving listener identity. Unknown owners remain fail-closed.
-4. Complete recovery of player socket owners after supervisor/container/host loss.
-   Child-web crashes now recover through scoped exit receipts; same-listener
-   connections on other web processes survive. Legacy unknown owners remain
-   fail-closed, and live browser/background recovery still needs acceptance.
+3. Complete production confirmation of Kubernetes container recovery, independent
+   fencing for hosts whose termination remains unknown, and worker routing before
+   scaling beyond one configured control endpoint. Local whole-container crashes
+   now recover from verified kubelet receipts while preserving listener identity.
+4. Complete legacy/unknown-host player-owner reconciliation and live background
+   recovery acceptance. Local child and container crashes recover through scoped
+   receipts; other live web connections survive. Unknown owners remain fail-closed.
 5. Validate the recognition and translation candidates against
    live provider credentials and authorized speech samples. Dynamic settings,
    destination restrictions, connection probes, encrypted versions and audits

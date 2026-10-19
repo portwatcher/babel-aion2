@@ -18,6 +18,7 @@ PASS applies only to that named check, not automatically to production.
 | Production session and PiP lifecycle         | PASS                      | Real Chrome replacement, same-session refresh, playback action, administrator removal and PiP closure passed against deployed replicas; independent persisted transport receipts confirm closure                    |
 | Graceful production worker replacement       | PASS                      | Settings and listener generation survived GitOps replacement. A cross-node TURN routing regression was reproduced and corrected; the browser reconnected and the new source decoded another 29 frames               |
 | Production snapshot restoration              | PASS                      | A read-only production snapshot restored all 19 application/migration tables, schema, sequences and one encrypted Discord credential into isolated local PostgreSQL; the exact published web image passed readiness |
+| Isolated whole-container recovery            | PASS                      | Real Kubernetes SIGKILL closes scoped web/media records, unblocks nickname replacement and preserves a surviving web connection; synthetic unknown status stays blocked while another Pod can retire                |
 | Single-member audible playback               | PASS                      | After the relay correction and browser reconnection, the human confirmed hearing their own Discord voice through the production Babel webpage                                                                       |
 | Multiple-member behavior                     | NOT RUN                   | Simultaneous speakers, production source separation and production member leave/re-entry remain outstanding                                                                                                         |
 | Live subtitle quality                        | WAITING FOR CONFIGURATION | Soniox/DeepL settings and validation are implemented. Authorized credentials and representative commands are needed to validate each chosen output language                                                         |
@@ -29,11 +30,41 @@ Empty production provider and language lists are intentional and do not block
 the web release or original-audio deployment. Optional character enrichment is
 disabled under the source policy recorded below; nickname entry remains available.
 
-This status reconciliation changes documentation only. `npm run ci:local` is
-PASS: 217 first-party sources, maximum 495 lines, formatting, strict types,
-18 tests, builds and built HTTP smoke. Documentation targets resolve and the
-changed text contains no configured local secrets. `design.md` and `GOAL.md`
-remain identical.
+Latest source checks: `npm run ci:local` is PASS with 229 first-party sources,
+maximum 495 lines, formatting, strict types, 18 tests, builds and built HTTP
+smoke. `test:db` passes 11 real PostgreSQL tests, and both child-process recovery
+checks pass. `design.md` and `GOAL.md` remain identical.
+
+## Kubernetes container-loss recovery — 2026-10-19
+
+The pre-fix built application reproduced a real failure in isolated Kubernetes:
+SIGKILL stopped the actual web socket (1006), and session identity survived, but
+the old owner/transport remained unconfirmed. Unrelated admission was ACTIVE;
+same-nickname replacement remained JOINING. The existing surviving-parent tests
+could not exercise this whole-container failure.
+
+The repair binds supervised runtimes to immutable Pod identity and supplies a
+private controller with durable admission barriers and scoped, independently
+verified kubelet termination receipts. See [Kubernetes recovery](kubernetes-recovery.md).
+
+| Check                                           | Result  | Evidence                                                                                                                                                                                                                          |
+| ----------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Controller unavailable                          | PASS    | After real container SIGKILL, a restarted supervisor starts no replacement child and commits retirement intent. Same-nickname entry waits; unrelated admission remains available                                                  |
+| Web container recovery                          | PASS    | Restoring the controller persists actual terminal-container evidence, closes only that Pod's socket/owner, and makes replacement ACTIVE. A second replica's actual connection remains open                                        |
+| Unknown state and independent progress          | PASS    | With the worker kubelet suspended, an explicitly simulated Failed/137/ContainerStatusUnknown status retains its real responding WebSocket and unknown owner. Another never-started Pod seals admission and releases its finalizer |
+| Worker container recovery                       | PASS    | The normal media API allocates a real peer with ICE candidates. SIGKILL stops the worker container; verified Pod evidence closes its media/owner records, and the same session/generation obtains a fresh offer after replacement |
+| Storage and earlier recovery                    | PASS    | Eleven PostgreSQL tests include Pod admission/idempotency/late reservation and unchanged owner-lock fencing. Both real child-process web and ICE/DTLS worker recovery suites pass                                                 |
+| Isolation and cleanup                           | PASS    | Only labelled, generated-data fixtures are affected. Exact container ID/Pod UID is checked before SIGKILL. Kubelet resumes and the test namespace and forwarding processes are removed                                            |
+| Production abrupt loss and unknown host fencing | NOT RUN | This local proof does not establish production host loss, permanent node fencing or live Discord speech during an abrupt production failure                                                                                       |
+
+The local cluster runs Kubernetes 1.32.0/containerd 1.7.24 on Linux ARM64; the
+production cluster is Kubernetes 1.34.1/Linux AMD64. The guard was checked against
+the deployed-version Kubernetes termination conversion contract. The negative
+control exposed nullable unknown timestamps; parsing now retains that uncertainty
+without blocking recovery of unrelated Pods. Test transport uses a loopback-only
+NodePort so suspending kubelet does not itself cut the test socket. Startup and
+replacement wait for the actual Service route, not merely a ready Pod. No Discord
+credentials, live speech, providers or production data are used by this test.
 
 ## Production voice rollout — 2026-10-19
 

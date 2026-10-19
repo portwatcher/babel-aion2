@@ -14,7 +14,7 @@ Without database configuration the public lobby stays available; readiness and
 administrator sessions fail closed. An unconfigured worker starts no audio;
 a configured running room reconnects after a normal worker restart.
 
-Apply migrations through `0011_tough_psylocke` before this web build. Web readiness
+Apply migrations through `0012_parallel_toad` before this web build. Web readiness
 checks room configuration columns, listener lifecycle columns and player socket
 registrations, provider test/history columns, terminology tables, the initialized
 catalog revisions, output-language validation columns and administrator tables. Migration
@@ -39,6 +39,9 @@ that session fences playback and subtitles. Unconfirmed ownership cannot be
 cleared merely because its heartbeat is old. See [original audio](original-audio.md).
 Migrations 0010 and 0011 add runtime ownership and indexed nullable player owners.
 Existing unknown registrations are not assigned an invented process identity.
+Migration 0012 adds Pod admission barriers and optional runtime-to-Pod ownership.
+See [Kubernetes recovery](kubernetes-recovery.md) for verified container retirement
+and the private controller's permissions, rollout order and failure limits.
 See [process recovery](worker-recovery.md) before replacing older runtimes.
 Migration 0003 adds room settings
 without enabling a source or adding credentials. Migration 0001 preserves old rows and marks their entry fingerprints as legacy, so
@@ -53,7 +56,8 @@ Graceful shutdown closes sockets before the database pool; a physical close is
 required before the socket registration is acknowledged. Hard crashes or storage
 faults may leave open registrations: never clear these by age alone. Web and voice
 supervisors reconcile their own child’s confirmed OS exit before restarting it;
-unknown supervisor/host owners still need independent orchestration evidence.
+the Kubernetes controller also accepts verified terminal-container evidence for
+Pod-bound owners. Unknown host owners still need independent fencing evidence.
 See [process recovery](worker-recovery.md) for supported entry points, migrations
 and readiness. The optional media worker now
 closes actual peers and confirms them before replacement; configured sources
@@ -73,6 +77,7 @@ one room. Each supervisor has a separate fixed one-connection pool.
 
 For W web processes and V voice processes, plan for at most
 `W × (web pool + 1) + V × (3 × worker pool + 1)` application connections. Include
+one connection per recovery-controller process, including rollout overlap. Include
 old and new processes overlapping during rollout, then reserve additional
 connections for migrations and operations. Set both limits in private runtime
 configuration to fit the database role and server budgets. Defaults preserve the
