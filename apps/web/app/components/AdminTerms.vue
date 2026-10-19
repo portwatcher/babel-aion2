@@ -85,7 +85,8 @@ async function save(input: TermSave) {
       emit('version', term.version)
       query.value = ''
       await readPage(0)
-      notice.value = '术语已保存，后续样本测试使用新词表。实际译法仍需核对。'
+      notice.value =
+        'Term saved. Future sample tests use the updated catalog. Check actual translations separately.'
     }
   } catch (failure) {
     if (!disposed) {
@@ -109,7 +110,7 @@ async function remove() {
     })
     if (!disposed) {
       await readPage(0)
-      notice.value = '术语已删除。'
+      notice.value = 'Term deleted.'
     }
   } catch (failure) {
     if (!disposed) {
@@ -128,16 +129,16 @@ onBeforeUnmount(() => {
 <template>
   <section class="management-section" aria-labelledby="terms-title" :aria-busy="busy">
     <div class="section-heading">
-      <h2 id="terms-title">游戏术语</h2>
+      <h2 id="terms-title">Game terms</h2>
       <div class="management-actions">
         <Button
-          label="新增术语"
+          label="Add term"
           severity="secondary"
           :disabled="busy || !page"
           @click="edit(null)"
         />
         <Button
-          label="重新载入术语表"
+          label="Reload catalog"
           severity="secondary"
           :disabled="busy"
           @click="load()"
@@ -145,36 +146,45 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <p class="muted">
-      仅录入已核对的 AION2
-      国际服术语。识别与翻译使用已启用词条作为上下文提示，保存词条不代表实际译法已验证。
+      Enter only verified AION2 Global terms. Recognition and translation use enabled
+      entries as context hints. Saving a term does not validate its actual translation.
     </p>
     <form class="entry-form" @submit.prevent="load()">
       <div class="field">
-        <label for="term-search">搜索原词</label>
+        <label for="term-search">Search source term</label>
         <InputText id="term-search" v-model="query" maxlength="120" :disabled="busy" />
       </div>
-      <Button type="submit" label="搜索术语" severity="secondary" :disabled="busy" />
+      <Button
+        type="submit"
+        label="Search terms"
+        severity="secondary"
+        :disabled="busy"
+      />
     </form>
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
     <p v-if="page && !page.items.length" class="muted">
       {{
         query
-          ? '没有匹配的原词。'
-          : '尚无游戏术语。不会预填其他版本或未经核对的游戏用词。'
+          ? 'No matching source terms.'
+          : 'No game terms. Terms from other editions or unverified sources are not prefilled.'
       }}
     </p>
     <ul v-if="page?.items.length" class="configuration-list">
       <li v-for="term in page.items" :key="term.id">
         <div class="section-heading">
           <h3>{{ term.sourceTerm }}</h3>
-          <Tag :value="term.enabled ? '用于提示' : '已停用'" severity="secondary" />
+          <Tag
+            :value="term.enabled ? 'Used for hints' : 'Disabled'"
+            severity="secondary"
+          />
         </div>
         <p class="muted">
-          {{ term.sourceLanguage }} · {{ term.category }} · 词条版本 {{ term.version }}
+          {{ term.sourceLanguage }} · {{ term.category }} · Term version
+          {{ term.version }}
         </p>
         <p v-if="term.alternatives.length" class="term-content">
-          别称：{{ term.alternatives.join('、') }}
+          Aliases: {{ term.alternatives.join(', ') }}
         </p>
         <dl class="term-translations">
           <div v-for="expression in term.expressions" :key="expression.language">
@@ -185,15 +195,15 @@ onBeforeUnmount(() => {
         <p v-if="term.context" class="muted term-content">{{ term.context }}</p>
         <div class="management-actions">
           <Button
-            label="编辑"
-            :aria-label="`编辑术语 ${term.sourceTerm}`"
+            label="Edit"
+            :aria-label="`Edit term ${term.sourceTerm}`"
             severity="secondary"
             :disabled="busy"
             @click="edit(term)"
           />
           <Button
-            label="删除"
-            :aria-label="`删除术语 ${term.sourceTerm}`"
+            label="Delete"
+            :aria-label="`Delete term ${term.sourceTerm}`"
             severity="danger"
             :disabled="busy"
             @click="removing = term"
@@ -203,18 +213,18 @@ onBeforeUnmount(() => {
     </ul>
     <div v-if="page" class="section-heading">
       <small class="muted"
-        >词表版本 {{ page.version }} · 第
-        {{ Math.floor(page.offset / 50) + 1 }} 页</small
+        >Catalog version {{ page.version }} · Page
+        {{ Math.floor(page.offset / 50) + 1 }}</small
       >
       <div class="management-actions">
         <Button
-          label="上一页术语"
+          label="Previous terms page"
           severity="secondary"
           :disabled="busy || !page.offset"
           @click="load(Math.max(0, page.offset - 50))"
         />
         <Button
-          label="下一页术语"
+          label="Next terms page"
           severity="secondary"
           :disabled="busy || page.nextOffset === null"
           @click="load(page.nextOffset ?? 0)"
@@ -233,22 +243,21 @@ onBeforeUnmount(() => {
       v-if="removing"
       class="management-confirmation"
       role="group"
-      aria-label="确认删除术语"
+      aria-label="Confirm term deletion"
     >
       <p>
-        删除术语「{{
-          removing.sourceTerm
-        }}」及其各语言表达？如需保留内容，可在编辑中停用。
+        Delete term “{{ removing.sourceTerm }}” and its expressions? To keep the
+        content, disable the entry instead.
       </p>
       <div class="management-actions">
         <Button
-          label="确认删除术语"
+          label="Confirm term deletion"
           severity="danger"
           :disabled="busy"
           @click="remove"
         />
         <Button
-          label="取消删除术语"
+          label="Cancel term deletion"
           severity="secondary"
           :disabled="busy"
           @click="removing = null"

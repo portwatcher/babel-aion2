@@ -2,6 +2,7 @@
 import type { ListenerSnapshot } from '@babel/contracts'
 import type { SubtitlePresentation } from '~/utils/subtitle-view'
 
+const { t } = useInterfaceLocale()
 const props = defineProps<{
   session: ListenerSnapshot
   connectionState: string
@@ -14,29 +15,29 @@ const props = defineProps<{
 
 const message = computed(() => {
   if (props.connectionState !== 'connected') {
-    return '连接正在恢复，暂时无法更新字幕。'
+    return t('subtitleReconnecting')
   }
   if (props.changingLanguage) {
-    return '正在切换字幕语言…'
+    return t('subtitleChanging')
   }
   if (!props.session.outputLanguage) {
-    return '字幕尚未启用'
+    return t('subtitlesDisabled')
   }
   if (props.session.state === 'JOINING') {
-    return '正在等待收听通道就绪。'
+    return t('waitingChannel')
   }
   if (props.subtitles.state === 'UNAVAILABLE') {
     return props.subtitles.failure === 'QUOTA_EXHAUSTED'
-      ? '当前字幕服务额度已用尽。原声继续播放。'
-      : '当前字幕服务暂不可用，正在恢复。原声继续播放。'
+      ? t('subtitleQuota')
+      : t('subtitleUnavailable')
   }
   if (props.subtitles.state === 'STOPPED') {
-    return '语音来源已停止。'
+    return t('subtitleSourceStopped')
   }
   if (props.subtitles.state === 'CONNECTING') {
-    return '正在连接当前语言的字幕服务…'
+    return t('subtitleConnecting')
   }
-  return '等待指挥字幕…'
+  return t('subtitleWaiting')
 })
 const visible = computed(() =>
   props.connectionState === 'connected' &&
@@ -51,10 +52,10 @@ const visible = computed(() =>
   <section
     :class="['listener-subtitles', { 'listener-subtitles-compact': compact }]"
     :style="{ '--subtitle-text-size': `${textSize}rem` }"
-    aria-label="当前指挥字幕"
+    :aria-label="t('currentSubtitles')"
   >
     <p v-if="compact" class="subtitle-context muted">
-      {{ languageName ?? '指挥字幕' }}
+      {{ languageName ?? t('commanderSubtitles') }}
     </p>
     <div
       v-for="subtitle in visible"
@@ -65,29 +66,32 @@ const visible = computed(() =>
     >
       <small class="subtitle-context muted"
         >{{ subtitle.speakerDisplayName }} ·
-        {{ subtitle.translationIsFinal ? '已完成字幕' : '实时字幕' }}</small
+        {{
+          subtitle.translationIsFinal ? t('subtitleFinal') : t('subtitleInterim')
+        }}</small
       >
       <p class="subtitle-message" :lang="subtitle.outputLanguage">
         {{
-          subtitle.translatedText || (subtitle.failure ? '翻译暂不可用' : '正在翻译…')
+          subtitle.translatedText ||
+          (subtitle.failure ? t('translationUnavailable') : t('translating'))
         }}
       </p>
       <details v-if="!compact" :open="!subtitle.translatedText">
         <summary>
           {{
             subtitle.sourceAlignment === 'independent'
-              ? '当前原文流（独立识别）'
-              : '原文'
-          }}{{ subtitle.sourceIsFinal ? '' : '（识别中）' }}
+              ? t('sourceIndependent')
+              : t(subtitle.sourceIsFinal ? 'sourceFinal' : 'sourceInterim')
+          }}
         </summary>
         <p :lang="subtitle.sourceLanguage">{{ subtitle.originalText }}</p>
-        <small v-if="!subtitle.translatedText" class="muted"
-          >实时翻译可能跳过与输出语言相同的语音，此处显示独立识别的原文。</small
-        >
+        <small v-if="!subtitle.translatedText" class="muted">{{
+          t('translationMaySkipSource')
+        }}</small>
       </details>
-      <small v-if="!compact && subtitle.discontinuity" class="muted"
-        >部分过期内容已丢弃，已回到当前语音。</small
-      >
+      <small v-if="!compact && subtitle.discontinuity" class="muted">{{
+        t('subtitleDiscontinuity')
+      }}</small>
     </div>
     <p
       v-if="!visible.length || subtitles.state === 'UNAVAILABLE'"
@@ -96,8 +100,8 @@ const visible = computed(() =>
     >
       {{ message }}
     </p>
-    <small v-if="!compact && !session.outputLanguage" class="muted">
-      管理员配置识别与翻译后，指挥字幕会显示在这里。
-    </small>
+    <small v-if="!compact && !session.outputLanguage" class="muted">{{
+      t('subtitleSetup')
+    }}</small>
   </section>
 </template>

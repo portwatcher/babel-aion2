@@ -8,6 +8,7 @@ import {
 import type * as Leaflet from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
+const { t } = useInterfaceLocale()
 const props = defineProps<{
   strokes: MapStroke[]
   pending: MapStrokeInput | null
@@ -317,30 +318,31 @@ onBeforeUnmount(() => {
       ref="element"
       class="map-canvas"
       role="region"
-      aria-label="深渊地图，方向键平移，加减号缩放，0 复位"
+      :aria-label="t('mapKeyboardHelp')"
       @pointerdown="down"
       @pointermove="move"
       @pointerup="up"
       @pointercancel="pointerCancel"
       @keydown="key"
     />
-    <div class="map-zoom" role="group" aria-label="地图缩放">
+    <div class="map-zoom" role="group" :aria-label="t('mapZoom')">
       <Button
-        label="放大"
+        :label="t('mapZoomIn')"
         severity="secondary"
         :disabled="zoom >= 7"
         @click="changeZoom(1)"
       />
       <Button
-        label="缩小"
+        :label="t('mapZoomOut')"
         severity="secondary"
         :disabled="zoom <= 0"
         @click="changeZoom(-1)"
       />
-      <Button label="复位" severity="secondary" @click="reset" />
+      <Button :label="t('mapReset')" severity="secondary" @click="reset" />
     </div>
     <p v-if="loadError" class="map-load-error" role="status">
-      部分底图加载失败。<button type="button" @click="retryTiles">重试加载</button>
+      {{ t('mapTilesFailed')
+      }}<button type="button" @click="retryTiles">{{ t('retryLoad') }}</button>
     </p>
   </div>
 </template>

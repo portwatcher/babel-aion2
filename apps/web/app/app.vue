@@ -1,11 +1,19 @@
+<script setup lang="ts">
+const { t, administrator } = useInterfaceLocale()
+useInterfaceControlLocale()
+</script>
+
 <template>
-  <a class="skip-link" href="#main">跳转到主要内容</a>
+  <a class="skip-link" href="#main">{{ t('skipContent') }}</a>
   <div class="site-shell">
     <header class="site-header">
-      <NuxtLink to="/" class="site-title" aria-label="Babel 首页">Babel</NuxtLink>
+      <NuxtLink to="/" class="site-title" :aria-label="t('home')">Babel</NuxtLink>
       <span class="site-context">AION2 · Global / Asia</span>
+      <nav v-if="!administrator" :aria-label="t('navigation')">
+        <InterfaceLocaleSelect />
+      </nav>
     </header>
     <NuxtPage />
-    <footer class="site-footer">原声指挥 · 多语言字幕</footer>
+    <footer class="site-footer">{{ t('footer') }}</footer>
   </div>
 </template>

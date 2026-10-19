@@ -12,13 +12,13 @@ const selectedRoomId = computed(() =>
   typeof route.query.roomId === 'string' ? route.query.roomId : null,
 )
 const roomChoices = computed(() => [
-  { id: null, name: '原有指挥室' },
+  { id: null, name: 'Original listening room' },
   ...(directory.value?.rooms ?? []).filter((room) => room.id !== DEFAULT_ROOM_ID),
 ])
 async function selectRoom(id: string | null) {
   await navigateTo({ path: '/admin', query: id ? { roomId: id } : {} })
 }
-useHead({ title: '管理 · Babel' })
+useHead({ title: 'Administration · Babel' })
 const { status, loading, error, connect } = useAdministratorStatus()
 const terminologyVersion = ref<number | null>(null)
 const providers = shallowRef<ProviderSummary[]>([])
@@ -27,18 +27,20 @@ const providers = shallowRef<ProviderSummary[]>([])
 <template>
   <main id="main" tabindex="-1" class="main-content">
     <div class="page-heading">
-      <p class="eyebrow">管理员</p>
-      <h1>指挥室管理</h1>
-      <p class="muted">{{ status?.administrator.email ?? '正在建立管理会话…' }}</p>
+      <p class="eyebrow">Administrator</p>
+      <h1>Room administration</h1>
+      <p class="muted">
+        {{ status?.administrator.email ?? 'Establishing administrator session…' }}
+      </p>
     </div>
     <section v-if="error" class="empty-state" aria-live="polite">
-      <h2>管理会话未建立</h2>
+      <h2>Administrator session unavailable</h2>
       <p>{{ error }}</p>
-      <Button label="重试" severity="secondary" :loading="loading" @click="connect" />
+      <Button label="Retry" severity="secondary" :loading="loading" @click="connect" />
     </section>
     <template v-else-if="status">
       <div class="field management-section">
-        <label for="management-room">管理房间</label>
+        <label for="management-room">Managed room</label>
         <Select
           input-id="management-room"
           :model-value="selectedRoomId"
@@ -65,30 +67,33 @@ const providers = shallowRef<ProviderSummary[]>([])
         :aria-busy="loading"
         aria-labelledby="services-title"
       >
-        <h2 id="services-title">服务接入</h2>
-        <p class="muted">原声连接状态显示在房间设置中。字幕服务需分别配置和验证。</p>
+        <h2 id="services-title">Services</h2>
+        <p class="muted">
+          Original audio status appears in room settings. Configure and validate
+          subtitle services separately.
+        </p>
         <dl class="service-list">
           <div>
-            <dt>Discord 指挥原声</dt>
-            <dd>由房间来源控制</dd>
+            <dt>Discord commander audio</dt>
+            <dd>Controlled by the room source</dd>
           </div>
           <div>
-            <dt>玩家音频分发</dt>
-            <dd>通过收听通道分发</dd>
+            <dt>Player audio delivery</dt>
+            <dd>Delivered through the listening channel</dd>
           </div>
           <div>
-            <dt>识别与翻译服务</dt>
+            <dt>Recognition and translation</dt>
             <dd>
               {{
                 status.services.subtitles === 'READY'
-                  ? '字幕处理可用'
-                  : '字幕工作进程暂不可用'
+                  ? 'Subtitle processing ready'
+                  : 'Subtitle worker unavailable'
               }}
             </dd>
           </div>
           <div>
-            <dt>字幕语言</dt>
-            <dd>由输出语言设置控制</dd>
+            <dt>Subtitle languages</dt>
+            <dd>Controlled by output language settings</dd>
           </div>
         </dl>
       </section>

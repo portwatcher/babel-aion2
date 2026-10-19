@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PublicRoomConfiguration } from '@babel/contracts'
 import { audioStatus } from '~/utils/audio-status'
+const { t } = useInterfaceLocale()
 definePageMeta({ key: (route) => String(route.params.roomId) })
 const route = useRoute()
 const roomId = String(route.params.roomId)
@@ -48,15 +49,15 @@ onBeforeUnmount(() => clearInterval(configurationTimer))
 <template>
   <main id="main" tabindex="-1" class="main-content">
     <div class="page-heading">
-      <NuxtLink to="/" class="muted">← 房间列表</NuxtLink>
-      <p class="eyebrow">指挥收听室</p>
-      <h1>{{ configuration?.room.name ?? 'AION2 深渊战' }}</h1>
-      <p class="muted">听见原声，跟上每一道指令。</p>
+      <NuxtLink to="/" class="muted">{{ t('backRooms') }}</NuxtLink>
+      <p class="eyebrow">{{ t('roomEyebrow') }}</p>
+      <h1>{{ configuration?.room.name ?? t('directoryEyebrow') }}</h1>
+      <p class="muted">{{ t('roomTagline') }}</p>
     </div>
     <section v-if="configurationError" class="empty-state" aria-live="polite">
-      <h2>暂时无法获取房间状态</h2>
-      <p>请检查网络连接，然后重试。</p>
-      <Button label="重新加载" severity="secondary" @click="refresh()" />
+      <h2>{{ t('configurationUnavailable') }}</h2>
+      <p>{{ t('checkConnection') }}</p>
+      <Button :label="t('reload')" severity="secondary" @click="refresh()" />
     </section>
     <template v-else-if="configuration">
       <p v-if="notice" class="session-notice" role="status">{{ notice }}</p>
@@ -64,19 +65,19 @@ onBeforeUnmount(() => clearInterval(configurationTimer))
         <p class="form-error">{{ error }}</p>
         <Button
           v-if="restoreFailed"
-          label="重试恢复会话"
+          :label="t('retryRestore')"
           severity="secondary"
           @click="restore"
         />
       </div>
       <div class="room-layout">
         <section v-if="restoring" class="entry-panel" aria-busy="true">
-          <p>正在恢复本页连接…</p>
+          <p>{{ t('restoring') }}</p>
         </section>
         <section v-else-if="leavePending" class="entry-panel">
-          <p>本页连接已停止。</p>
+          <p>{{ t('connectionStopped') }}</p>
           <Button
-            label="重试退出"
+            :label="t('retryLeave')"
             severity="secondary"
             :loading="submitting"
             @click="leave"
@@ -107,14 +108,14 @@ onBeforeUnmount(() => clearInterval(configurationTimer))
         <div class="room-detail">
           <section class="room-detail" aria-labelledby="room-status-title">
             <div class="section-heading">
-              <h2 id="room-status-title">频道状态</h2>
+              <h2 id="room-status-title">{{ t('channelStatus') }}</h2>
               <Tag
-                :value="audioStatus[configuration.room.audioState].label"
+                :value="t(audioStatus[configuration.room.audioState].label)"
                 severity="secondary"
               />
             </div>
             <p class="muted">
-              {{ audioStatus[configuration.room.audioState].description }}
+              {{ t(audioStatus[configuration.room.audioState].description) }}
             </p>
           </section>
           <div class="detail-divider" />

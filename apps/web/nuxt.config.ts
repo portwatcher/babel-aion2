@@ -21,10 +21,13 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
-      title: 'Babel · AION2 深渊战',
-      htmlAttrs: { lang: 'zh-CN', class: 'babel-dark' },
+      title: 'Babel · AION2 Abyss',
+      htmlAttrs: { lang: 'en', class: 'babel-dark' },
       meta: [
-        { name: 'description', content: 'AION2 原声指挥与多语言字幕。' },
+        {
+          name: 'description',
+          content: 'Original commander audio and multilingual subtitles for AION2.',
+        },
         { name: 'color-scheme', content: 'dark' },
       ],
     },

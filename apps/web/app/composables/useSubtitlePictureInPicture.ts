@@ -26,10 +26,11 @@ function copyPageStyles(target: Document) {
 }
 
 export function useSubtitlePictureInPicture(sessionKey: () => string) {
+  const { t, locale } = useInterfaceLocale()
   const supported = ref(false)
   const opening = ref(false)
   const target = shallowRef<HTMLElement | null>(null)
-  const error = ref('')
+  const failed = ref(false)
   let pip: Window | null = null
   let generation = 0
   let disposed = false
@@ -53,7 +54,7 @@ export function useSubtitlePictureInPicture(sessionKey: () => string) {
     }
     const requestedGeneration = ++generation
     opening.value = true
-    error.value = ''
+    failed.value = false
     let opened: Window | undefined
     try {
       // Invoke directly from the click; awaiting other work first loses activation.
@@ -64,13 +65,13 @@ export function useSubtitlePictureInPicture(sessionKey: () => string) {
       }
       pip = opened
       const page = opened.document
-      page.title = 'Babel · 指挥字幕'
+      page.title = t('pipTitle')
       page.documentElement.lang = document.documentElement.lang
       page.documentElement.className = document.documentElement.className
       page.body.className = 'subtitle-pip-page'
       copyPageStyles(page)
       const mount = page.createElement('main')
-      mount.setAttribute('aria-label', '指挥字幕')
+      mount.setAttribute('aria-label', t('commanderSubtitles'))
       page.body.append(mount)
       target.value = mount
       const currentWindow = opened
@@ -89,7 +90,7 @@ export function useSubtitlePictureInPicture(sessionKey: () => string) {
       if (!disposed && generation === requestedGeneration) {
         pip = null
         target.value = null
-        error.value = '未能打开字幕小窗，请再次点击。也可以继续使用本页。'
+        failed.value = true
       }
     } finally {
       if (generation === requestedGeneration) {
@@ -98,6 +99,13 @@ export function useSubtitlePictureInPicture(sessionKey: () => string) {
     }
   }
 
+  watch(locale, () => {
+    if (pip) {
+      pip.document.title = t('pipTitle')
+      pip.document.documentElement.lang = locale.value
+      target.value?.setAttribute('aria-label', t('commanderSubtitles'))
+    }
+  })
   watch(sessionKey, close, { flush: 'sync' })
   onMounted(() => {
     supported.value =
@@ -112,5 +120,12 @@ export function useSubtitlePictureInPicture(sessionKey: () => string) {
     window.removeEventListener('pagehide', close)
   })
 
-  return { supported, opening, target, error, open, close }
+  return {
+    supported,
+    opening,
+    target,
+    error: computed(() => (failed.value ? t('pipFailed') : '')),
+    open,
+    close,
+  }
 }

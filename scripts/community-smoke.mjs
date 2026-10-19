@@ -223,6 +223,19 @@ try {
   const first = await create('第一战术室', 'siel', [], 'alpha')
   const second = await create('第二战术室', 'nezekan', ['Pilot'], 'beta')
   assert.equal((await create('Duplicate guild', 'siel', [], 'alpha')).conflict, true)
+  const localizedRoom = await fetch(`${a.origin}/rooms/${first.roomId}`, {
+    headers: { 'accept-language': 'ja-JP' },
+  })
+  assert.equal(localizedRoom.status, 200)
+  const roomHtml = await localizedRoom.text()
+  assert.ok(
+    roomHtml.includes('ゲームのキャラクター ID'),
+    'room entry is translated during SSR',
+  )
+  assert.ok(
+    roomHtml.includes('共有戦術マップ'),
+    'map controls are translated during SSR',
+  )
   const administrator = await management.signIn(a)
   async function manage(path, body, method = body ? 'POST' : 'GET') {
     const response = await fetch(`${a.origin}${path}`, {
@@ -238,6 +251,17 @@ try {
     assert.equal(response.status, 200, 'authenticated room management')
     return response.json()
   }
+  const localizedAdmin = await fetch(`${a.origin}/admin?roomId=${second.roomId}`, {
+    headers: {
+      'cf-access-jwt-assertion': administrator.jwt,
+      cookie: `${administrator.cookie}; babel-interface-locale=ko`,
+      'accept-language': 'ja-JP',
+    },
+  })
+  assert.equal(localizedAdmin.status, 200)
+  const adminHtml = await localizedAdmin.text()
+  assert.match(adminHtml, /<html[^>]*lang="en"/)
+  assert.ok(adminHtml.includes('Room administration'))
   const selected = await manage(`/api/management/room?roomId=${second.roomId}`)
   assert.equal(selected.room.id, second.roomId)
   await manage(`/api/management/room/stop?roomId=${second.roomId}`, {

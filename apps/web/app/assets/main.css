@@ -77,6 +77,14 @@ small {
 }
 .site-header nav {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.interface-locale-select {
+  min-width: 8rem;
+  max-width: 100%;
 }
 .main-content {
   padding-block: 64px 80px;

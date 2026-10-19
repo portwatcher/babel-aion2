@@ -21,7 +21,7 @@ function submit() {
     ...(credential.value ? { credential: credential.value } : {}),
   })
   if (!input.success || (!props.current && !credential.value)) {
-    error.value = '请输入有效的 OpenAI API Key，不能包含空格。'
+    error.value = 'Enter a valid OpenAI API Key without spaces.'
     return
   }
   emit('save', input.data)
@@ -37,7 +37,7 @@ onBeforeUnmount(() => {
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <div class="field">
       <label for="provider-credential">{{
-        current ? '替换 OpenAI API Key' : 'OpenAI API Key'
+        current ? 'Replace OpenAI API Key' : 'OpenAI API Key'
       }}</label>
       <InputText
         id="provider-credential"
@@ -50,12 +50,12 @@ onBeforeUnmount(() => {
       />
       <small class="muted">{{
         current
-          ? '已加密保存。留空保留已有 Key，保存后不会回显。'
-          : 'Key 仅在服务器加密保存，不会发送给玩家或回显。'
+          ? 'Stored encrypted. Leave blank to keep the saved key. It is never displayed.'
+          : 'The key is encrypted on the server and never displayed or sent to players.'
       }}</small>
     </div>
     <div class="management-actions">
-      <Button type="submit" label="保存 API Key" :loading="busy" />
+      <Button type="submit" label="Save API Key" :loading="busy" />
     </div>
   </form>
 </template>

@@ -66,7 +66,7 @@ async function save(input: ProviderSave) {
         method: 'PUT',
         body: input,
       }),
-    'API Key 已加密保存。',
+    'API Key saved encrypted.',
   )
 }
 async function test() {
@@ -80,7 +80,7 @@ async function test() {
         method: 'POST',
         body: { expectedVersion: value.version },
       }),
-    '已完成流式识别与翻译连接测试。',
+    'Streaming recognition and translation connection test completed.',
   )
 }
 onMounted(load)
@@ -96,19 +96,20 @@ onBeforeUnmount(() => {
     :aria-busy="busy"
   >
     <div class="section-heading">
-      <h2 id="providers-title">OpenAI 字幕服务</h2>
+      <h2 id="providers-title">OpenAI subtitle service</h2>
       <Button
-        label="重新载入"
+        label="Reload"
         severity="secondary"
         :disabled="busy || sampleBusy"
         @click="load"
       />
     </div>
     <p class="muted">
-      一个 API Key 用于流式语音识别和多语言实时翻译，无需填写模型或接口地址。
+      One API Key enables streaming recognition and multilingual live translation. No
+      model or endpoint settings are needed.
     </p>
     <p v-if="loaded && !protectionReady" class="muted">
-      服务器尚未配置凭据保护，暂不能保存或测试服务。
+      Credential protection is unavailable. Saving and testing are disabled.
     </p>
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
@@ -121,19 +122,20 @@ onBeforeUnmount(() => {
     <div v-if="current" class="management-actions">
       <Tag
         :value="
-          current.lastTest ? providerTestLabel(current.lastTest.code) : '尚未测试'
+          current.lastTest ? providerTestLabel(current.lastTest.code) : 'Not tested'
         "
         :severity="current.lastTest?.code === 'PASS' ? 'success' : 'secondary'"
       />
       <Button
-        label="测试连接"
+        label="Test connection"
         severity="secondary"
         :disabled="busy || sampleBusy || !protectionReady"
         @click="test"
       />
     </div>
     <p class="muted">
-      连接测试检查两种模型的访问权限；授权音频样本用于核对实际字幕。测试可能产生服务费用。
+      Connection tests check access to both models. Use authorized audio samples to
+      verify captions. Tests may incur service charges.
     </p>
     <ProviderSample
       :providers="providers"

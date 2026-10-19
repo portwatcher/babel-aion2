@@ -4,13 +4,13 @@ export function managementFailure(error: unknown) {
       ? error.statusCode
       : null
   if (status === 409) {
-    return '配置已在另一处更新。请重新载入，再提交修改。'
+    return 'Configuration changed elsewhere. Reload before submitting changes.'
   }
   if (status === 401 || status === 403) {
-    return '管理会话已失效，请通过 Access 重新登录。'
+    return 'Administrator session expired. Sign in again through Access.'
   }
   if (status === 400) {
-    return '请检查填写的设置，服务器未保存这次修改。'
+    return 'Check the settings. The server did not save these changes.'
   }
-  return '操作结果尚未确认，请重新载入核对。'
+  return 'The result is unconfirmed. Reload to check the saved state.'
 }
