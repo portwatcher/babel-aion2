@@ -76,3 +76,13 @@ publisher, SRTP, native Opus decoding and persisted physical-close receipts. The
 do not establish public NAT behavior, production network capacity, browser TLS
 trust, China mainland reachability, or Discord-to-player latency. Those remain
 separate deployment and human acceptance gates.
+
+## Production verification
+
+The 2026-10-19 [deployment check](deployment.md#current-web-and-voice-verification--2026-10-19)
+separately verified public UDP/TCP relay allocation, bidirectional data between the
+actual worker and an external relay client, and normal Chrome media connection
+and exit with relay required at both ends. The production source remained
+UNCONFIGURED; this was not Discord speech, restricted-network/TLS compatibility,
+mainland-China latency or capacity proof. Endpoint addresses, shared credentials
+and firewall rules remain in private infra.

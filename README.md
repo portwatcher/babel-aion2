@@ -6,8 +6,10 @@ private today and prepared for eventual open source.
 The player interface is a dark, low-distraction battle panel. The original
 requirements are kept in sync in [design.md](design.md) and [GOAL.md](GOAL.md).
 
-The website is deployed at [babel.juryquinn.com](https://babel.juryquinn.com/).
-Production voice delivery remains unfinished. The
+The website and private voice worker are deployed at
+[babel.juryquinn.com](https://babel.juryquinn.com/); a real browser relay connection
+is verified. Production Discord source configuration and live speech remain
+unfinished. The
 [current acceptance status](docs/test-report.md#current-acceptance-status--2026-10-19)
 separates shipped web behavior, local proofs and outstanding live checks.
 
@@ -24,7 +26,8 @@ also feeds shared recognition and language-specific translation, delivered throu
 the existing authenticated player socket to the page and PiP. Live provider quality
 and production-network acceptance remain unfinished.
 Explicit STUN/TURN settings support temporary relay credentials and browser renewal
-within the same listener. Local relay proof does not establish public reachability.
+within the same listener. Public relay connectivity has its own deployment proof;
+restricted player networks, capacity and real speech remain separate checks.
 Administrators can save versioned room/Discord settings, protect the bot credential
 with server-side encryption, persist a stopped room, and remove a specific listener
 generation. Saving a changed source stops it; the separate start action requests
@@ -183,8 +186,10 @@ See [AGENTS.md](AGENTS.md) for worktree, cleanup, security, and interface rules.
 
 The deployed web URLs are `https://babel.juryquinn.com` and
 `https://babel.juryquinn.com/admin`. Releases and production configuration live in
-the separate private infra repository. The current web release passed production
-migrations, replica readiness, public HTTP and Access-boundary checks. Production
-voice-worker networking and live audio/subtitle acceptance remain unfinished;
+the separate private infra repository. The current web and voice release passed
+production migrations, replica readiness, private control authentication, public
+TURN forwarding and actual browser media connection/exit checks. The production
+Discord source still needs administrator configuration; real speech, subtitle
+quality and player-network acceptance remain unfinished;
 see [deployment evidence](docs/deployment.md) and
 [source and secret boundaries](docs/source-and-secrets.md).

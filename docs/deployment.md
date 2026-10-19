@@ -17,8 +17,9 @@ configuration or credentials and does not start the optional voice worker.
 The `voice-worker` build target packages Discord/DAVE reception, shared subtitle
 processing and private WebRTC admission with pruned dependencies and UID 1000.
 Keep its authenticated control service private. Source ownership and explicit
-[STUN/TURN settings](media-network.md) are implemented; production worker images,
-public relay routing and firewall rules remain separate private infra work.
+[STUN/TURN settings](media-network.md) are implemented. The private infra release
+now publishes and deploys both images with authenticated control, explicit pool
+budgets and existing TURN routing; see the current verification below.
 
 The migration command is `node database/migrate.mjs` with `DATABASE_URL` supplied
 at runtime. The infra release applies migrations before starting the new web
@@ -33,7 +34,10 @@ policy. Public player access remains separate from administrator Access.
 
 The private infra workflow checks out an exact Babel commit through a read-only
 deploy key. It runs `npm run ci:local`, real PostgreSQL migrations and session
-tests, and container runtime checks before image publication. Each release uses
+tests, and container runtime checks before image publication. The actual worker
+image must pass native Opus encode/decode, non-root read-only startup,
+authenticated media/subtitle readiness, unauthorized rejection and graceful
+shutdown against a disposable database. Each release uses
 an immutable tag and records the source commit in OCI labels. Existing GitOps
 resources are updated only after publication; ArgoCD owns reconciliation.
 
@@ -47,17 +51,57 @@ No production image is published from a local checkout.
 Player WebSockets, persistent sessions, provider/language administration, a PiP
 window, revocable media admission, per-member Discord reception, PCM publication
 and authorized shared subtitles are implemented. Live audio/provider acceptance,
-native PiP/game behavior and production networking remain unfinished. A JOINING
+native PiP/game behavior, restricted player networks and capacity remain unfinished. A JOINING
 connection cannot receive commands. Production may start with an empty language
 list; the administrator later validates and enables configured paths.
-See [validation](test-report.md) for local and production evidence. The web
-rollout below is verified; production voice-worker deployment and live media
-acceptance remain separate gates.
+See [validation](test-report.md) for local and production evidence. Production
+web/worker rollout and one real browser relay connection are verified; configured
+Discord speech and full player-network acceptance remain separate gates.
 
 Verify Access, database readiness, routing, and actual rollout state separately.
 Use the private infra runbook for operational credentials, backup and recovery.
 
-## Current web release verification — 2026-10-19
+## Current web and voice verification — 2026-10-19
+
+Source `4b763079b5c07261ce64845d8c4c58121eb1edb6` was released through the
+private self-hosted Linux AMD64 workflow. Local-equivalent CI passed 18 tests;
+PostgreSQL validation passed ten tests. Both packaged runtime checks and three
+private release-helper tests passed before either image was published.
+
+ArgoCD completed migration and reports Synced / Healthy. Two web replicas and
+one voice worker are ready with zero restarts. Their actual image digests match
+publication:
+
+- Web: `sha256:3241e7d7010e30d9a0ba4e98dfe7eae84f3eb6521f126dafacc6752d906107d3`.
+- Voice: `sha256:b70476ec41eb360a665249ca392377aaa3d4cd461baeb8184e9fa536b9e53a87`.
+
+Web-to-worker media and subtitle readiness returned 200 with the configured
+credential, and 401 with missing or incorrect credentials. The public lobby,
+configuration, health endpoints and 19 frontend assets returned 200; protected
+administrator paths redirected to Access. Checked public responses contained
+none of the configured sensitive values. Runtime configuration remains in infra.
+
+The existing public TURN service passed UDP/TCP allocation and bidirectional
+data forwarding. A separate probe from the actual non-root worker exchanged ten
+packets each way with an external relay client through the deployed policies.
+Both worker and browser require relay candidates. A real Chrome listener entered
+through the normal public form and displayed a connected original-audio channel.
+Normal exit then returned the online list to zero; persistent socket/media close
+receipts were confirmed and no ACTIVE/JOINING listener remained.
+
+The initial rollout sampled at most eight database connections. A later readiness
+probe observed nine, below the role limit; these idle checks are not a capacity
+test. Pool settings account for web rollout overlap and the worker's separate
+pools. Operational values and network policy details stay in private infra.
+
+The production room remains UNCONFIGURED. Provider/language lists remain empty,
+and the authenticated human administrator flow still waits at the Access email
+login form. No Discord source was moved from the existing local preview. This
+release proves deployment and media connectivity, not live speech, provider
+quality, TURN TLS/restricted-network compatibility, mainland-China performance,
+native game-window behavior, host-loss fencing or production disaster recovery.
+
+## Earlier web release verification — 2026-10-19
 
 Source `bbe9fc204d61b37a46284581416504bc172cb46e` was released through the
 existing private workflow after PR #1 merged. The self-hosted Linux AMD64 run
