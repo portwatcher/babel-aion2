@@ -13,6 +13,10 @@ has decoded one real member's audio; audible playback and multiple-speaker
 acceptance remain unfinished. The
 [current acceptance status](docs/test-report.md#current-acceptance-status--2026-10-19)
 separates shipped web behavior, local proofs and outstanding live checks.
+Production Chrome also passed nickname replacement, same-session refresh,
+administrator removal, subtitle-window closure and recovery after a graceful
+worker restart. A cross-node relay routing failure found during that restart
+was corrected in private infra.
 
 Listener storage, HTTP operations and player WebSockets implement atomic global
 nickname replacement, idempotent entry, browser restoration, language subscription

@@ -8,18 +8,20 @@ unchanged from `bbe9fc2`; private infra now deploys the worker and relay policie
 The dated reports below retain the conditions of each run. A local or isolated
 PASS applies only to that named check, not automatically to production.
 
-| Acceptance area                              | Result                    | Evidence and remaining dependency                                                                                                                                                                    |
-| -------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Web release and access boundaries            | PASS                      | Two production web replicas, 12 migrations, public browser/assets and direct-origin rejection checks passed; see the production release report below                                                 |
-| Local listener, media and subtitle contracts | PASS                      | Built application suites cover nickname replacement, actual peer closure, per-member PCM, shared subtitle transport and child-process recovery; live provider responses are not part of these proofs |
-| Production voice infrastructure              | PASS                      | One ready worker, authenticated private control, configured pool budgets, actual pod/public TURN forwarding and normal Chrome media connection/exit passed; see the current deployment report        |
-| Production Discord configuration             | PASS                      | Human Access login, normal encrypted-credential save and separate start succeeded. ALL_CHANNEL reports LISTENING with no failure reason; a real browser listener connected while the source was live |
-| Production single-member receipt             | PASS                      | After the human joined the configured voice channel, the actual worker reported the correct member identity and 282 decoded frames at 02:03 UTC, generation 9, with no failure reason                |
-| Audible playback and multiple members        | NOT RUN                   | The browser audio channel is connected. Human playback confirmation after receipt, simultaneous speakers and production member re-entry remain outstanding                                           |
-| Live subtitle quality                        | WAITING FOR CONFIGURATION | Soniox/DeepL settings and validation are implemented. Authorized credentials and representative commands are needed to validate each chosen output language                                          |
-| Native window and game use                   | NOT RUN                   | Browser controls and shared subtitle state passed; earlier native inspection was blocked by the locked Mac. Background audio and the actual AION2 display mode still need direct device validation   |
-| Deployed latency and capacity                | NOT RUN                   | Production transport now connects, but actual source/playback timing, load and player networks including mainland China remain unmeasured; connection success is not end-to-end latency evidence     |
-| Production disaster recovery                 | NOT RUN                   | Child-process recovery, isolated database restore and published-image rollback passed. Supervisor/container/host-loss fencing and actual production restore/rollback remain outstanding              |
+| Acceptance area                              | Result                    | Evidence and remaining dependency                                                                                                                                                                                |
+| -------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web release and access boundaries            | PASS                      | Two production web replicas, 12 migrations, public browser/assets and direct-origin rejection checks passed; see the production release report below                                                             |
+| Local listener, media and subtitle contracts | PASS                      | Built application suites cover nickname replacement, actual peer closure, per-member PCM, shared subtitle transport and child-process recovery; live provider responses are not part of these proofs             |
+| Production voice infrastructure              | PASS                      | One ready worker, authenticated private control, configured pool budgets, actual pod/public TURN forwarding and normal Chrome media connection/exit passed; see the current deployment report                    |
+| Production Discord configuration             | PASS                      | Human Access login, normal encrypted-credential save and separate start succeeded. ALL_CHANNEL reports LISTENING with no failure reason; a real browser listener connected while the source was live             |
+| Production single-member receipt             | PASS                      | After the human joined the configured voice channel, the actual worker reported the correct member identity and 282 decoded frames at 02:03 UTC, generation 9, with no failure reason                            |
+| Production session and PiP lifecycle         | PASS                      | Real Chrome replacement, same-session refresh, playback action, administrator removal and PiP closure passed against deployed replicas; independent persisted transport receipts confirm closure                 |
+| Graceful production worker replacement       | PASS                      | Settings and listener generation survived GitOps replacement. A cross-node TURN routing regression was reproduced and corrected; the browser reconnected and the new source decoded another 29 frames            |
+| Audible playback and multiple members        | NOT RUN                   | The browser audio channel is connected. Human playback confirmation after receipt, simultaneous speakers and production member re-entry remain outstanding                                                       |
+| Live subtitle quality                        | WAITING FOR CONFIGURATION | Soniox/DeepL settings and validation are implemented. Authorized credentials and representative commands are needed to validate each chosen output language                                                      |
+| Native window and game use                   | NOT RUN                   | Real Chrome subtitle-window opening and replacement-driven closure passed with subtitles disabled. Native desktop inspection failed; background audible playback and actual AION2 display mode remain unverified |
+| Deployed latency and capacity                | NOT RUN                   | Production transport now connects, but actual source/playback timing, load and player networks including mainland China remain unmeasured; connection success is not end-to-end latency evidence                 |
+| Production disaster recovery                 | NOT RUN                   | Child-process recovery, isolated database restore and published-image rollback passed. Supervisor/container/host-loss fencing and actual production restore/rollback remain outstanding                          |
 
 Empty production provider and language lists are intentional and do not block
 the web release or original-audio deployment. Optional character enrichment is
@@ -32,6 +34,9 @@ changed text contains no configured local secrets. `design.md` and `GOAL.md`
 remain identical.
 
 ## Production voice rollout — 2026-10-19
+
+The later session and controlled-restart checks below extend this initial rollout
+evidence. They do not establish audible playback or abrupt host-loss recovery.
 
 PASS: [current web and voice deployment](deployment.md#current-web-and-voice-verification--2026-10-19)
 records the published/running image digests, healthy two-web/one-worker rollout,
@@ -65,6 +70,33 @@ confirmed. No voice recording was retained.
 NOT RUN: confirmed audible production playback, multiple-member behavior,
 provider quality, restricted/TLS relay paths,
 mainland-China latency, capacity, native game behavior and disaster recovery.
+
+## Production sessions and graceful worker recovery — 2026-10-19
+
+These checks use normal production Chrome forms and the authenticated management
+page. Database observations are read-only; no admission state, closure receipt or
+player was seeded. Only the named verification listener was replaced or removed.
+
+| Check                              | Result          | Evidence                                                                                                                                                                                                                                                                                          |
+| ---------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nickname replacement               | PASS            | Generation 1 becomes REPLACED and the old page shows the specified notice. Its actual socket/media closure timestamps precede generation 2's first media admission. Reloading the old page does not re-enter                                                                                      |
+| Current-session refresh            | PASS            | Generation 2 and its session ID survive refresh, with one open socket and one media connection. The browser requests a playback action; clicking the visible button clears the blocked-playback state                                                                                             |
+| Administrator removal and re-entry | PASS            | Normal confirmation ends generation 2 with ADMINISTRATOR_REMOVED. The page returns to entry, the online list reaches zero and all transport receipts close. Explicit re-entry creates generation 3                                                                                                |
+| Real subtitle window               | PASS            | Chrome opens a separate document showing the actual disabled-subtitle state. Session/socket/media records remain unchanged. Replacement closes the window, confirmed by the browser's window inventory and old-page state                                                                         |
+| Persistent settings and ownership  | PASS            | Two normal GitOps worker replacements log child exit code 0 and persist exited-owner/source/media closure. A digest including the encrypted room credential is unchanged. Each new source starts after the prior owner exits                                                                      |
+| Cross-node relay regression        | FAIL, then PASS | The first replacement lands on another node: Discord reconnects, but public-node TURN TCP allocation times out after 5 seconds and Chrome repeatedly renegotiates. The same pod reaches the existing internal Service, exchanging ten packets each way with an external public allocation         |
+| Deployed correction and recovery   | PASS            | Private infra switches only the worker TURN destination to the existing Service and rolls the worker. The deployed relay probe passes ten packets each way. Chrome reconnects without a new listener or manual refresh; source generation 11 reports the correct member and 29 new decoded frames |
+
+The final worker is healthy and one generation-3 listener remains for the pending
+human listening check. Extra test pages and the PiP window are closed. The two web
+replicas retain their process owners. No shared TURN service, key, public endpoint,
+port or network permission was expanded. The final running image is unchanged;
+the correction is private infrastructure configuration.
+
+These observations do not prove speaker-output audibility, simultaneous members,
+live translated subtitles, background sound, AION2 fullscreen behavior, capacity,
+or recovery after abrupt supervisor/container/host loss. Native desktop window
+inspection failed, while browser access to the actual PiP document succeeded.
 
 ## Optional character source probe — 2026-10-19
 

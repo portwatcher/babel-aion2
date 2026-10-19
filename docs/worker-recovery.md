@@ -86,3 +86,13 @@ Database tests separately protect delayed registration, terminated-ID rejection,
 source generation, repeated old-owner confirmation and untouched legacy unknown
 player rows. Those tests exercise storage, not live Discord shutdown. See the
 [test report](test-report.md) for current platform evidence and limits.
+
+Production subsequently passed graceful GitOps worker replacement with a live
+Discord source and real Chrome listener. Settings and encrypted credentials were
+preserved, old owners exited with code 0, their source/media receipts closed, and
+the browser recovered within its existing listener generation. The rollout also
+exposed a cross-node TURN routing failure; the deployed worker now uses the
+existing internal Service and the browser connection plus actual member receipt
+recovered. This proves controlled worker replacement, not abrupt loss of the
+supervisor, container or host. See the
+[production lifecycle report](test-report.md#production-sessions-and-graceful-worker-recovery--2026-10-19).

@@ -86,3 +86,16 @@ and exit with relay required at both ends. The production source remained
 UNCONFIGURED; this was not Discord speech, restricted-network/TLS compatibility,
 mainland-China latency or capacity proof. Endpoint addresses, shared credentials
 and firewall rules remain in private infra.
+
+A later normal worker replacement exposed a cross-node routing failure: the
+worker could connect to Discord but TCP allocation against the TURN node's public
+address timed out. The same pod successfully allocated through the existing
+cluster Service and exchanged ten packets each way with an external public
+allocation. The private deployment now uses that Service for
+`MEDIA_WORKER_TURN_URL`; browser TURN URLs retain the public endpoints. The
+deployed probe and Chrome reconnection passed after the change, without adding
+network permissions or public services. An initially healthy co-located worker
+does not prove the route works after rescheduling.
+
+See [production recovery evidence](test-report.md#production-sessions-and-graceful-worker-recovery--2026-10-19).
+Audible playback, player-network coverage and capacity remain separate checks.

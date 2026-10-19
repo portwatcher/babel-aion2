@@ -11,7 +11,8 @@ changes and requires review before committing.
 The app opens its PostgreSQL pool on the first database operation or configured
 listener reconciliation sweep and closes it on server shutdown.
 Without database configuration the public lobby stays available; readiness and
-administrator sessions fail closed. No worker starts audio automatically.
+administrator sessions fail closed. An unconfigured worker starts no audio;
+a configured running room reconnects after a normal worker restart.
 
 Apply migrations through `0011_tough_psylocke` before this web build. Web readiness
 checks room configuration columns, listener lifecycle columns and player socket
