@@ -50,8 +50,8 @@ onBeforeUnmount(() => {
       />
       <small class="muted">{{
         current
-          ? 'Stored encrypted. Leave blank to keep the saved key. It is never displayed.'
-          : 'The key is encrypted on the server and never displayed or sent to players.'
+          ? 'Encrypted. Leave blank to keep the saved key.'
+          : 'Encrypted on the server and never shown again.'
       }}</small>
     </div>
     <div class="management-actions">

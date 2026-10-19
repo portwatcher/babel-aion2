@@ -104,10 +104,7 @@ onBeforeUnmount(() => {
         @click="load"
       />
     </div>
-    <p class="muted">
-      One API Key enables streaming recognition and multilingual live translation. No
-      model or endpoint settings are needed.
-    </p>
+    <p class="muted">One API key covers recognition and translation.</p>
     <p v-if="loaded && !protectionReady" class="muted">
       Credential protection is unavailable. Saving and testing are disabled.
     </p>
@@ -133,10 +130,7 @@ onBeforeUnmount(() => {
         @click="test"
       />
     </div>
-    <p class="muted">
-      Connection tests check access to both models. Use authorized audio samples to
-      verify captions. Tests may incur service charges.
-    </p>
+    <p class="muted">Tests may incur OpenAI charges.</p>
     <ProviderSample
       :providers="providers"
       :disabled="busy || !protectionReady"

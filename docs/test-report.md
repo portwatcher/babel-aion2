@@ -1,5 +1,19 @@
 # Validation
 
+## Interface copy and responsive layout cleanup · 2026-10-19
+
+Scope: every player page (room list, room entry, joined room, map, room
+creation, error page) and the administration copy, reviewed against the
+`better-*` interface skills. Removed restated eyebrows, taglines, footer and
+per-field caveats; merged the joined-room status lines and the duplicate
+channel-status block into one status line; moved subtitles above settings.
+
+| Check                               | Status  | Evidence                                                                                                                                                       |
+| ----------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source and built runtime            | PASS    | `npm run ci:local` and `npm run test:community:db` pass with updated SSR heading and label assertions in all four interface locales.                           |
+| Reflow at 320, 375, 768 and desktop | PASS    | Local in-app browser: room list, entry and creation pages, and the joined-room components rendered with fixture props, show no horizontal scroll at any width. |
+| Joined room with a live session     | NOT RUN | The joined view was checked with fixture props on a temporary local page; no live Discord audio or subtitle stream was connected.                              |
+
 ## Direct room links and character verification · 2026-10-19
 
 | Check                                                    | Status  | Evidence                                                                                                                                                                                                                            |

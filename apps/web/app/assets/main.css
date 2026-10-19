@@ -37,33 +37,37 @@ p {
   margin: 0;
 }
 h1 {
-  font-size: 2rem;
-  line-height: 1.3;
+  font-size: clamp(1.5rem, 1.25rem + 1vw, 2rem);
+  line-height: 1.2;
   font-weight: 650;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 h2 {
-  font-size: 1.25rem;
-  line-height: 1.5;
+  font-size: 1.125rem;
+  line-height: 1.4;
   font-weight: 600;
 }
 p {
-  line-height: 1.8;
+  line-height: 1.5;
   max-width: 65ch;
+  text-wrap: pretty;
 }
 small {
   font-size: 0.875rem;
-  line-height: 1.7;
+  line-height: 1.5;
 }
 .site-shell {
   width: min(1120px, 100%);
   margin-inline: auto;
-  padding-inline: 32px;
+  padding-inline: clamp(16px, 4vw, 32px);
 }
 .site-header {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding-block: 28px;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding-block: 16px;
   border-bottom: 1px solid var(--babel-border);
 }
 .site-title {
@@ -76,10 +80,9 @@ small {
   font-size: 0.875rem;
 }
 .site-header nav {
-  margin-left: auto;
+  margin-inline-start: auto;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 12px;
 }
 .interface-locale-select {
@@ -87,12 +90,25 @@ small {
   max-width: 100%;
 }
 .main-content {
-  padding-block: 64px 80px;
+  padding-block: clamp(24px, 5vw, 48px) 64px;
 }
 .page-heading {
   display: grid;
-  gap: 12px;
-  margin-bottom: 40px;
+  gap: 8px;
+  margin-bottom: clamp(24px, 4vw, 32px);
+}
+.back-link {
+  justify-self: start;
+  color: var(--babel-muted);
+  font-size: 0.875rem;
+  text-decoration: none;
+  padding-block: 4px;
+}
+@media (hover: hover) {
+  .back-link:hover {
+    color: var(--babel-text);
+    text-decoration: underline;
+  }
 }
 .eyebrow {
   color: var(--babel-muted);
@@ -103,41 +119,37 @@ small {
 }
 .room-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  gap: 48px;
+  grid-template-columns: minmax(0, 1.6fr) minmax(16rem, 1fr);
+  gap: clamp(24px, 4vw, 48px);
   align-items: start;
 }
 .entry-panel {
-  padding: 28px;
+  padding: clamp(16px, 3vw, 24px);
   background: var(--babel-surface);
   border: 1px solid var(--babel-border);
   border-radius: 12px;
+  min-width: 0;
 }
-.entry-panel h2 {
-  margin-bottom: 28px;
+.entry-panel:has(> .entry-form:only-child) {
+  max-width: 32rem;
 }
 .entry-form,
 .field {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 .entry-form {
-  gap: 24px;
+  gap: 20px;
 }
 .field label {
   font-size: 0.875rem;
   font-weight: 600;
 }
 .field .p-inputtext,
-.field .p-select {
+.field .p-select,
+.field .p-textarea {
   width: 100%;
   min-height: 44px;
-}
-.entry-notice {
-  font-size: 0.875rem;
-}
-.entry-form > small {
-  margin-top: -12px;
 }
 .form-error {
   color: #fecaca;
@@ -146,23 +158,56 @@ small {
 .form-error:empty {
   display: none;
 }
+.form-actions,
+.listener-actions,
+.listener-audio {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
 .listener-panel {
   display: grid;
-  gap: 24px;
+  gap: 20px;
 }
-.listener-panel h2 {
-  margin-bottom: 0;
+.listener-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px 16px;
+}
+.listener-identity {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.listener-identity h2 {
   overflow-wrap: anywhere;
+}
+.listener-identity p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.listener-settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));
+  gap: 16px;
 }
 .listener-subtitles {
   display: grid;
-  gap: 8px;
-  padding-block: 20px;
-  border-block: 1px solid var(--babel-border);
+  gap: 12px;
+  align-content: start;
+  min-height: 7rem;
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--babel-background);
 }
 .subtitle-message {
   font-size: var(--subtitle-text-size, 1.25rem);
-  line-height: 1.5;
+  line-height: 1.4;
   overflow-wrap: anywhere;
 }
 .subtitle-context {
@@ -170,6 +215,8 @@ small {
   overflow-wrap: anywhere;
 }
 .subtitle-command {
+  display: grid;
+  gap: 4px;
   min-width: 0;
 }
 .subtitle-command details {
@@ -179,14 +226,16 @@ small {
 .subtitle-command summary {
   cursor: pointer;
   padding-block: 8px;
+  color: var(--babel-muted);
 }
 .subtitle-pip-page {
   min-width: 0;
   padding: 16px;
 }
 .listener-subtitles-compact {
+  min-height: 0;
   padding: 0;
-  border: 0;
+  background: none;
 }
 .listener-subtitles-compact .subtitle-message {
   display: -webkit-box;
@@ -196,13 +245,16 @@ small {
 }
 .session-notice,
 .session-feedback {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 .session-feedback {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px 16px;
+}
+.form-feedback {
+  margin: 20px 0 0;
 }
 .player-list {
   list-style: none;
@@ -213,14 +265,14 @@ small {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding-block: 16px;
+  gap: 12px;
+  padding-block: 12px;
   border-bottom: 1px solid var(--babel-border);
 }
 .player-identity {
   display: grid;
   min-width: 0;
-  gap: 4px;
+  gap: 2px;
 }
 .player-identity strong {
   overflow-wrap: anywhere;
@@ -283,8 +335,8 @@ small {
 }
 .room-detail {
   display: grid;
-  gap: 16px;
-  padding-block: 8px;
+  gap: 12px;
+  min-width: 0;
 }
 .section-heading {
   display: flex;
@@ -293,21 +345,14 @@ small {
   gap: 16px;
   flex-wrap: wrap;
 }
-.detail-divider {
-  height: 1px;
-  background: var(--babel-border);
-  margin-block: 16px;
-}
 .empty-state {
   display: grid;
-  gap: 20px;
+  gap: 12px;
   justify-items: start;
+  padding-block: 32px;
 }
-.site-footer {
-  border-top: 1px solid var(--babel-border);
-  padding-block: 24px 40px;
-  color: var(--babel-muted);
-  font-size: 0.875rem;
+.entry-panel.empty-state {
+  padding: clamp(16px, 3vw, 24px);
 }
 .service-list {
   margin: 8px 0;
@@ -326,15 +371,16 @@ small {
 }
 .error-page {
   display: grid;
-  gap: 24px;
+  gap: 16px;
+  justify-items: start;
   max-width: 720px;
-  padding: 80px 24px;
+  padding: clamp(40px, 10vw, 80px) 16px;
   margin-inline: auto;
 }
 .skip-link {
   position: fixed;
   top: 12px;
-  left: 12px;
+  inset-inline-start: 12px;
   transform: translateY(-200%);
   padding: 12px 20px;
   background: var(--babel-surface);
@@ -397,28 +443,8 @@ small {
   max-width: 100%;
 }
 
-@media (max-width: 720px) {
-  .site-shell {
-    padding-inline: 20px;
-  }
-  .site-header {
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-  .site-context {
-    font-size: 0.75rem;
-  }
-  .main-content {
-    padding-block: 40px 56px;
-  }
+@media (max-width: 52rem) {
   .room-layout {
     grid-template-columns: minmax(0, 1fr);
-    gap: 32px;
-  }
-  .entry-panel {
-    padding: 24px 20px;
-  }
-  h1 {
-    font-size: 1.75rem;
   }
 }

@@ -62,30 +62,23 @@ function changeLanguage(value: string | null) {
 </script>
 
 <template>
-  <section class="entry-panel" aria-labelledby="entry-title">
-    <h2 id="entry-title">{{ t('prepareEntry') }}</h2>
-    <p v-if="configuration.admission" class="admission-notice muted">
-      Asia / {{ configuration.admission.server }} ·
-      {{
-        configuration.admission.restricted
-          ? t('roomEntryRestricted')
-          : t('allCharacters')
-      }}
-    </p>
-    <form class="entry-form" @submit.prevent="enter">
+  <section class="entry-panel" :aria-label="t('verifyAndJoin')">
+    <form class="entry-form" novalidate @submit.prevent="enter">
       <div class="field">
         <label for="nickname">{{ t('characterId') }}</label>
         <InputText
           id="nickname"
           v-model="nickname"
           autocomplete="off"
-          :placeholder="t('characterPlaceholder')"
+          autocapitalize="off"
+          spellcheck="false"
+          :maxlength="NICKNAME_MAX_LENGTH"
           :invalid="Boolean(validationError)"
           :disabled="submitting"
-          aria-describedby="nickname-limit nickname-notice nickname-error"
+          aria-describedby="nickname-help nickname-error"
         />
-        <small id="nickname-limit" class="muted">{{
-          t('characterLimit', { count: NICKNAME_MAX_LENGTH })
+        <small v-if="configuration.admission" id="nickname-help" class="muted">{{
+          t('characterHelp', { server: configuration.admission.server })
         }}</small>
         <p id="nickname-error" class="form-error" role="alert">{{ validationError }}</p>
       </div>
@@ -95,8 +88,8 @@ function changeLanguage(value: string | null) {
         :disabled="submitting"
         @update:model-value="changeLanguage"
       />
-      <p id="nickname-notice" class="entry-notice muted">
-        {{ configuration.admission ? t('characterEntryNotice') : t('entryNotice') }}
+      <p v-if="!configuration.entryAvailable" id="availability-notice" class="muted">
+        {{ t('entryClosed') }}
       </p>
       <Button
         type="submit"
@@ -105,9 +98,7 @@ function changeLanguage(value: string | null) {
         "
         :disabled="!configuration.entryAvailable"
         :loading="submitting"
-        aria-describedby="availability-notice"
       />
-      <small id="availability-notice" class="muted">{{ t('entryAvailability') }}</small>
     </form>
   </section>
 </template>

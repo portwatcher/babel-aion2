@@ -14,6 +14,5 @@ useInterfaceControlLocale()
       </nav>
     </header>
     <NuxtPage />
-    <footer class="site-footer">{{ t('footer') }}</footer>
   </div>
 </template>

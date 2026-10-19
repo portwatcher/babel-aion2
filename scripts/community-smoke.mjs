@@ -283,7 +283,7 @@ try {
   )
   const verificationHtml = await localizedVerification.text()
   assert.ok(
-    verificationHtml.includes('ゲームのキャラクター ID'),
+    verificationHtml.includes('キャラクターID'),
     'verification is translated during SSR',
   )
   assert.ok(
@@ -328,7 +328,7 @@ try {
   assert.equal(localizedAdmin.status, 200)
   const adminHtml = await localizedAdmin.text()
   assert.match(adminHtml, /<html[^>]*lang="en"/)
-  assert.ok(adminHtml.includes('Room administration'))
+  assert.ok(adminHtml.includes('Administration</h1>'))
   const selected = await manage(`/api/management/room?roomId=${second.roomId}`)
   for (const fields of [
     { guildId: '100000000000000099' },

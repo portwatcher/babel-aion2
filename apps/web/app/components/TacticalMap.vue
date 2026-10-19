@@ -53,36 +53,32 @@ watch(
 <template>
   <section class="tactical-section" aria-labelledby="tactical-title">
     <div class="section-heading">
-      <div class="page-heading-copy">
-        <p class="eyebrow">{{ t('mapEyebrow') }}</p>
-        <h2 id="tactical-title">{{ t('mapTitle') }}</h2>
-      </div>
-      <Tag
-        :value="!session ? t('mapJoin') : current ? t('mapSynced') : t('mapResyncing')"
-        severity="secondary"
-      />
+      <h2 id="tactical-title">{{ t('mapTitle') }}</h2>
+      <Tag v-if="session && !current" :value="t('mapResyncing')" severity="secondary" />
     </div>
     <div class="map-toolbar" role="group" :aria-label="t('mapTools')">
-      <Button
-        :label="drawing ? t('mapDrawing') : t('mapDraw')"
-        :aria-pressed="drawing"
-        :disabled="!enabled || busy || Boolean(pending)"
-        :severity="drawing ? 'primary' : 'secondary'"
-        @click="setTool(drawing ? 'move' : 'draw')"
-      />
-      <Button
-        :label="t('mapMove')"
-        severity="secondary"
-        :aria-pressed="!drawing && !erasing"
-        @click="setTool('move')"
-      />
-      <Button
-        :label="t('mapErase')"
-        :aria-pressed="erasing"
-        :severity="erasing ? 'primary' : 'secondary'"
-        :disabled="!enabled || busy || Boolean(pending)"
-        @click="setTool(erasing ? 'move' : 'erase')"
-      />
+      <div class="map-modes">
+        <Button
+          :label="t('mapMove')"
+          :aria-pressed="!drawing && !erasing"
+          :severity="!drawing && !erasing ? 'primary' : 'secondary'"
+          @click="setTool('move')"
+        />
+        <Button
+          :label="t('mapDraw')"
+          :aria-pressed="drawing"
+          :disabled="!enabled || busy || Boolean(pending)"
+          :severity="drawing ? 'primary' : 'secondary'"
+          @click="setTool(drawing ? 'move' : 'draw')"
+        />
+        <Button
+          :label="t('mapErase')"
+          :aria-pressed="erasing"
+          :severity="erasing ? 'primary' : 'secondary'"
+          :disabled="!enabled || busy || Boolean(pending)"
+          @click="setTool(erasing ? 'move' : 'erase')"
+        />
+      </div>
       <div class="map-colors" role="group" :aria-label="t('mapColors')">
         <button
           v-for="(choice, index) in MAP_COLORS"
@@ -106,16 +102,17 @@ watch(
       <Button
         :label="t('mapUndo')"
         severity="secondary"
+        variant="text"
         :disabled="!enabled || busy || !own.length"
         @click="own.at(-1) && remove(own.at(-1)!.id)"
       />
     </div>
-    <p class="muted map-help">
-      {{ erasing ? t('mapEraseHelp') : drawing ? t('mapDrawHelp') : t('mapMoveHelp') }}
+    <p v-if="drawing || erasing" class="muted map-help">
+      {{ erasing ? t('mapEraseHelp') : t('mapDrawHelp') }}
     </p>
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <div v-if="pending && !busy" class="map-toolbar" role="status">
-      <p>{{ t('mapStrokeUnconfirmed') }}</p>
+      <p class="form-error">{{ t('mapStrokeUnconfirmed') }}</p>
       <Button
         :label="t('mapRetrySave')"
         :disabled="!enabled"
@@ -185,20 +182,22 @@ watch(
           v-if="session"
           :label="t('mapRefresh')"
           severity="secondary"
+          variant="text"
+          size="small"
           :loading="busy"
           @click="refresh"
         />
       </aside>
     </div>
     <p class="muted map-attribution">
-      {{ t('mapAttribution')
-      }}<a
+      {{ t('mapAttribution') }}
+      <a
         href="https://interactivemap.app/aion2/maps/tw/abyss-reshanta-a"
         target="_blank"
         rel="noopener noreferrer"
         >InteractiveMap.app</a
       >
-      · {{ t('mapScope') }}
+      · AION2 / NCSOFT
     </p>
   </section>
 </template>

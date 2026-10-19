@@ -150,10 +150,7 @@ onBeforeUnmount(() => {
         severity="secondary"
       />
     </div>
-    <p class="muted">
-      Discord server and voice channel are obtained when the bot is installed. Rooms on
-      the same Discord server share one audio source.
-    </p>
+
     <AdminVoiceSource />
     <p v-if="notice" role="status">{{ notice }}</p>
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
@@ -203,8 +200,8 @@ onBeforeUnmount(() => {
         />
         <small id="capture-mode-help" class="muted">{{
           captureMode === 'ALL_CHANNEL'
-            ? 'Receive speaking members automatically, with separate audio per Discord user. No member IDs are required.'
-            : 'Receive audio only from the members listed below.'
+            ? 'Capture everyone who speaks in the channel.'
+            : 'Capture only the members listed below.'
         }}</small>
       </div>
       <div v-if="captureMode === 'SELECTED_USERS'" class="field">
@@ -216,13 +213,10 @@ onBeforeUnmount(() => {
           rows="3"
           aria-describedby="commanders-help"
         />
-        <small id="commanders-help" class="muted"
-          >One ID per line. Receive audio only from these members.</small
-        >
+        <small id="commanders-help" class="muted">One Discord user ID per line.</small>
       </div>
       <p class="muted">
-        Bot credentials are managed by the installation service. Stopping this room does
-        not stop other rooms on the same Discord server.
+        Stopping this room does not affect other rooms on the same Discord server.
       </p>
       <div class="management-actions">
         <Button type="submit" label="Save settings" :loading="busy" />
@@ -240,10 +234,7 @@ onBeforeUnmount(() => {
           @click="setRunning(false)"
         />
       </div>
-      <small class="muted"
-        >Configuration version {{ current.version }} · Reloading discards unsaved
-        changes on this page.</small
-      >
+      <small class="muted">Version {{ current.version }}</small>
     </form>
     <Button
       v-else

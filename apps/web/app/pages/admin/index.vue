@@ -31,8 +31,7 @@ const providers = shallowRef<ProviderSummary[]>([])
 <template>
   <main id="main" tabindex="-1" class="main-content">
     <div class="page-heading">
-      <p class="eyebrow">Administrator</p>
-      <h1>Room administration</h1>
+      <h1>Administration</h1>
       <p class="muted">
         {{ status?.administrator.email ?? 'Establishing administrator session…' }}
       </p>
@@ -59,8 +58,7 @@ const providers = shallowRef<ProviderSummary[]>([])
         <AdminListeners />
       </template>
       <p v-else class="muted">
-        No rooms installed. Create a room and install the bot through Discord to get
-        started.
+        No rooms yet. <a href="/rooms/create">Create a room</a>
       </p>
       <AdminProviders
         :terminology-version="terminologyVersion"
@@ -77,35 +75,10 @@ const providers = shallowRef<ProviderSummary[]>([])
         :aria-busy="loading"
         aria-labelledby="services-title"
       >
-        <h2 id="services-title">Services</h2>
+        <h2 id="services-title">Subtitle worker</h2>
         <p class="muted">
-          Original audio status appears in room settings. Configure and validate
-          subtitle services separately.
+          {{ status.services.subtitles === 'READY' ? 'Ready' : 'Unavailable' }}
         </p>
-        <dl class="service-list">
-          <div>
-            <dt>Discord commander audio</dt>
-            <dd>Controlled by the room source</dd>
-          </div>
-          <div>
-            <dt>Player audio delivery</dt>
-            <dd>Delivered through the listening channel</dd>
-          </div>
-          <div>
-            <dt>Recognition and translation</dt>
-            <dd>
-              {{
-                status.services.subtitles === 'READY'
-                  ? 'Subtitle processing ready'
-                  : 'Subtitle worker unavailable'
-              }}
-            </dd>
-          </div>
-          <div>
-            <dt>Subtitle languages</dt>
-            <dd>Controlled by output language settings</dd>
-          </div>
-        </dl>
       </section>
     </template>
   </main>

@@ -68,9 +68,9 @@ function save() {
           required
         />
         <small class="muted"
-          >Supports Chinese, Japanese, Korean, English, Spanish, Portuguese, French,
-          Russian, German, Hindi, Indonesian, Vietnamese and Italian. Use zh-Hans and
-          zh-Hant for separate Chinese scripts. Codes cannot change after saving.</small
+          >Chinese (zh-Hans, zh-Hant), Japanese, Korean, English, Spanish, Portuguese,
+          French, Russian, German, Hindi, Indonesian, Vietnamese or Italian. Cannot
+          change after saving.</small
         >
       </div>
       <div class="field">
@@ -95,9 +95,8 @@ function save() {
       <label for="output-terms">Use enabled game terminology hints</label>
     </div>
     <small class="muted"
-      >Validate the saved path with authorized audio. Terminology hints apply only to
-      original-caption recognition; live translation does not support custom
-      glossaries.</small
+      >Validate with an authorized sample after saving. Terms apply to recognition
+      only.</small
     >
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <div class="management-actions">

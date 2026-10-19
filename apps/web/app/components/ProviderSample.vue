@@ -150,21 +150,14 @@ onBeforeUnmount(() => {
   <form class="entry-form provider-editor" @submit.prevent="preview">
     <h3>{{ path ? `Validate sample path: ${path.name}` : 'Audio sample test' }}</h3>
     <p class="muted">
-      Use the saved OpenAI API Key to compare original and translated text from an
-      authorized sample. Test text stays on this page; it does not enable languages or
-      reach players.
+      Compare original and translated text for an authorized sample. Audio goes to
+      OpenAI and may incur charges; nothing is stored.
     </p>
     <p v-if="path" class="muted">
       Output {{ path.code }} ·
       {{ path.includeTerms ? 'Use terminology hints' : 'No terminology hints' }}.
-      Validation status is saved with this language configuration.
     </p>
-    <p class="muted">
-      Audio is sent concurrently to OpenAI recognition and target-language translation
-      sessions and incurs service charges. Use authorized samples; the server does not
-      persist audio or test text. Recognition and translation stream during processing;
-      this finite comparison appears after completion.
-    </p>
+
     <div v-if="!path" class="field">
       <label :for="`${formId}-language`">Sample output language code</label>
       <InputText
@@ -209,8 +202,7 @@ onBeforeUnmount(() => {
       <label :for="`${formId}-terms`">Use enabled game terminology hints</label>
     </div>
     <small v-if="!path" class="muted"
-      >Hints apply only to recognition. Live translation does not support custom
-      glossaries. Disable hints to compare results.
+      >Terms apply to recognition only.
       <a href="#terms-title">Manage terminology</a></small
     >
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>

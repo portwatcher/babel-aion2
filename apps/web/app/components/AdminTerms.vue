@@ -146,9 +146,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <p class="muted">
-      Enter only verified AION2 Global terms. Enabled entries guide original-caption
-      recognition. Live translation does not support custom glossaries. Check actual
-      translations with authorized samples.
+      Verified AION2 Global terms only. Terms guide recognition, not translation.
     </p>
     <form class="entry-form" @submit.prevent="load()">
       <div class="field">
@@ -165,11 +163,7 @@ onBeforeUnmount(() => {
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
     <p v-if="page && !page.items.length" class="muted">
-      {{
-        query
-          ? 'No matching source terms.'
-          : 'No game terms. Terms from other editions or unverified sources are not prefilled.'
-      }}
+      {{ query ? 'No matching source terms.' : 'No game terms yet.' }}
     </p>
     <ul v-if="page?.items.length" class="configuration-list">
       <li v-for="term in page.items" :key="term.id">

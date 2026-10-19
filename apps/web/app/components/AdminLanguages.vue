@@ -219,15 +219,12 @@ onBeforeUnmount(() => {
         />
       </div>
     </div>
-    <p class="muted">
-      Configure subtitle languages and display order. Sample validation records provider
-      and terminology versions; it does not establish live translation quality.
-    </p>
+
     <p id="language-activation-help" class="muted">
       {{
         page?.activationAvailable
-          ? 'Enable a language after validating its current sample path. Players see only enabled languages.'
-          : 'The subtitle worker is unavailable. Save and validate settings now, then enable languages when it recovers.'
+          ? 'Validate a language before enabling it. Players only see enabled languages.'
+          : 'Subtitle worker unavailable. You can save and validate, but not enable.'
       }}
     </p>
     <p v-if="page" class="muted">
@@ -244,7 +241,7 @@ onBeforeUnmount(() => {
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
     <p v-if="page && !languages.length" class="muted">
-      No output languages. Save an OpenAI API Key, then create a language path.
+      No output languages. Save an OpenAI API key, then add one.
     </p>
     <ul v-else class="configuration-list">
       <li v-for="(language, index) in languages" :key="language.code">
