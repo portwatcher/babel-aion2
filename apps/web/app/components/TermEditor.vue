@@ -167,8 +167,7 @@ function save() {
         @click="expressions.push({ language: '', text: '' })"
       />
       <small class="muted"
-        >Match sample output language codes. Use zh-Hans and zh-Hant for Simplified and
-        Traditional Chinese respectively.</small
+        >Use output language codes, such as zh-Hans or zh-Hant.</small
       >
     </div>
     <div class="check-field">

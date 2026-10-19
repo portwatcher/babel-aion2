@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { audioStatus } from '~/utils/audio-status'
 const { t } = useInterfaceLocale()
 const {
   roomNumber,
@@ -42,22 +41,7 @@ const {
         @play-audio="playAudio"
         @toggle-mute="toggleMute"
       />
-      <div class="room-detail">
-        <section class="room-detail" aria-labelledby="room-status-title">
-          <div class="section-heading">
-            <h2 id="room-status-title">{{ t('channelStatus') }}</h2>
-            <Tag
-              :value="t(audioStatus[configuration.room.audioState].label)"
-              severity="secondary"
-            />
-          </div>
-          <p class="muted">
-            {{ t(audioStatus[configuration.room.audioState].description) }}
-          </p>
-        </section>
-        <div class="detail-divider" />
-        <PlayerList :players="players" :current="playersCurrent" />
-      </div>
+      <PlayerList :players="players" :current="playersCurrent" />
     </div>
     <TacticalMap
       :room-number="roomNumber"

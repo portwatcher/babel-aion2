@@ -4,15 +4,15 @@ import assert from 'node:assert/strict'
 // translated error pages and the administrator boundary all run through Nuxt SSR.
 export async function checkInterfaceLocales(origin) {
   const cases = [
-    ['en-US,en;q=0.9', 'en', 'Choose your broadcast room', 'Room name'],
-    ['zh-CN,zh;q=0.9', 'zh-CN', '选择你的转播房间', '房间名称'],
-    ['ja-JP,ja;q=0.9', 'ja', '配信ルームを選択', 'ルーム名'],
-    ['ko-KR,ko;q=0.9', 'ko', '중계 방 선택', '방 이름'],
-    ['fr-FR,de;q=0.8', 'en', 'Choose your broadcast room', 'Room name'],
-    ['', 'en', 'Choose your broadcast room', 'Room name'],
-    ['en;q=0.2,ko-KR;q=0.9', 'ko', '중계 방 선택', '방 이름'],
-    ['ja;q=0,zh-Hant;q=0.8', 'zh-CN', '选择你的转播房间', '房间名称'],
-    ['ja;q=invalid,ko;q=2,en;q=0', 'en', 'Choose your broadcast room', 'Room name'],
+    ['en-US,en;q=0.9', 'en', 'Broadcast rooms', 'Room name'],
+    ['zh-CN,zh;q=0.9', 'zh-CN', '转播房间', '房间名称'],
+    ['ja-JP,ja;q=0.9', 'ja', '配信ルーム', 'ルーム名'],
+    ['ko-KR,ko;q=0.9', 'ko', '중계 방', '방 이름'],
+    ['fr-FR,de;q=0.8', 'en', 'Broadcast rooms', 'Room name'],
+    ['', 'en', 'Broadcast rooms', 'Room name'],
+    ['en;q=0.2,ko-KR;q=0.9', 'ko', '중계 방', '방 이름'],
+    ['ja;q=0,zh-Hant;q=0.8', 'zh-CN', '转播房间', '房间名称'],
+    ['ja;q=invalid,ko;q=2,en;q=0', 'en', 'Broadcast rooms', 'Room name'],
   ]
   await Promise.all(
     cases.map(async ([header, locale, heading, label]) => {
@@ -59,7 +59,7 @@ export async function checkInterfaceLocales(origin) {
   assert.equal(missing.status, 404)
   const missingHtml = await missing.text()
   assert.match(missingHtml, /<html[^>]*lang="ko"/)
-  assert.ok(missingHtml.includes('이 페이지를 열 수 없습니다'))
+  assert.ok(missingHtml.includes('페이지를 표시할 수 없습니다'))
 
   for (const path of ['/admin', '/admin/settings', '/%61dmin/settings']) {
     const response = await fetch(`${origin}${path}`, {
@@ -72,7 +72,7 @@ export async function checkInterfaceLocales(origin) {
     assert.equal(response.status, 401)
     const html = await response.text()
     assert.match(html, /<html[^>]*lang="en"/)
-    assert.ok(html.includes('Return to listening room'))
+    assert.ok(html.includes('Back to rooms'))
     const content = html.match(/<main[\s\S]*?<\/main>/)?.[0]
     assert.ok(content, `${path}: rendered administrator error content`)
     assert.doesNotMatch(content, /[\p{Script=Han}]/u)

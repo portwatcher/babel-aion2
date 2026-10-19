@@ -65,16 +65,20 @@ onBeforeUnmount(() => clearInterval(configurationTimer))
 <template>
   <main id="main" tabindex="-1" class="main-content">
     <div class="page-heading">
-      <NuxtLink to="/" class="muted">{{ t('backRooms') }}</NuxtLink>
-      <p class="eyebrow">{{ t('roomEyebrow') }}</p>
-      <h1>{{ configuration?.room.name ?? t('directoryEyebrow') }}</h1>
-      <p class="muted">
-        {{ t(verifying ? 'characterVerificationHelp' : 'roomTagline') }}
+      <NuxtLink to="/" class="back-link"
+        ><span aria-hidden="true">←</span> {{ t('backRooms') }}</NuxtLink
+      >
+      <h1>{{ configuration?.room.name }}</h1>
+      <p v-if="configuration?.admission" class="muted">
+        {{ configuration.admission.server
+        }}<template v-if="configuration.admission.restricted">
+          · {{ t('restrictedCharacters') }}</template
+        >
       </p>
     </div>
     <section v-if="configurationError" class="empty-state" aria-live="polite">
       <h2>{{ t('configurationUnavailable') }}</h2>
-      <p>{{ t('checkConnection') }}</p>
+      <p class="muted">{{ t('checkConnection') }}</p>
       <Button :label="t('reload')" severity="secondary" @click="refresh()" />
     </section>
     <template v-else-if="configuration">
@@ -88,7 +92,7 @@ onBeforeUnmount(() => clearInterval(configurationTimer))
           @click="restore"
         />
       </div>
-      <section v-if="leavePending" class="entry-panel">
+      <section v-if="leavePending" class="entry-panel empty-state">
         <p>{{ t('connectionStopped') }}</p>
         <Button
           :label="t('retryLeave')"

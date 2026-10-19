@@ -1,5 +1,4 @@
 .page-heading-copy,
-.room-directory,
 .tactical-section {
   display: grid;
   gap: 12px;
@@ -7,67 +6,89 @@
 .directory-heading {
   display: flex;
   justify-content: space-between;
-  align-items: end;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 24px;
+  gap: 16px 24px;
 }
-.directory-heading > a {
-  flex-shrink: 0;
+.heading-count {
+  color: var(--babel-muted);
+  font-weight: 400;
+  margin-inline-start: 4px;
+}
+.directory-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  flex: 1 1 20rem;
+  justify-content: end;
+}
+.directory-actions .p-inputtext {
+  flex: 1 1 12rem;
+  max-width: 20rem;
+  min-height: 44px;
 }
 a.p-button {
   text-decoration: none;
   min-height: 44px;
 }
-.room-directory {
-  gap: 24px;
-}
 .room-directory-list {
   list-style: none;
   padding: 0;
   margin: 0;
+  border-top: 1px solid var(--babel-border);
 }
 .room-directory-list > li {
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 24px;
-  padding-block: 28px;
+  gap: 12px 24px;
+  padding-block: 20px;
   border-bottom: 1px solid var(--babel-border);
 }
 .room-directory-identity {
   display: grid;
-  gap: 8px;
+  gap: 4px;
   min-width: 0;
+  flex: 1 1 16rem;
 }
 .room-directory-identity h2 {
   overflow-wrap: anywhere;
-}
-.room-directory-identity h2 a {
-  text-decoration: none;
-}
-.room-directory-identity h2 a:hover {
-  text-decoration: underline;
 }
 .room-directory-status {
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: end;
+  margin-inline-start: auto;
 }
-.lobby-empty {
-  padding-block: 40px;
+.room-directory-status .muted {
+  font-variant-numeric: tabular-nums;
 }
-.admission-notice {
-  margin-bottom: 24px;
+.installation-summary {
+  display: grid;
+  gap: 4px;
+}
+.creation-notes ul {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  display: grid;
+  gap: 8px;
+  color: var(--babel-muted);
+  line-height: 1.5;
 }
 .tactical-section {
-  margin-top: 64px;
-  gap: 20px;
+  margin-top: clamp(32px, 6vw, 56px);
+  gap: 16px;
+}
+.map-modes {
+  display: flex;
+  gap: 4px;
 }
 .tactical-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 240px;
+  grid-template-columns: minmax(0, 1fr) 15rem;
   gap: 24px;
   align-items: start;
 }
@@ -92,7 +113,7 @@ a.p-button {
 .map-toolbar,
 .map-colors {
   display: flex;
-  gap: 12px;
+  gap: 8px 16px;
   align-items: center;
   flex-wrap: wrap;
 }
@@ -127,7 +148,7 @@ a.p-button {
 .map-zoom {
   position: absolute;
   top: 12px;
-  left: 12px;
+  inset-inline-start: 12px;
   z-index: 500;
   display: flex;
   gap: 4px;
@@ -139,7 +160,12 @@ a.p-button {
 .map-legend {
   min-width: 0;
   display: grid;
-  gap: 16px;
+  gap: 12px;
+  justify-items: start;
+}
+.map-legend > ol,
+.map-legend > p {
+  justify-self: stretch;
 }
 .map-legend h3 {
   margin: 0;
@@ -169,7 +195,7 @@ a.p-button {
   border: 0;
   background: transparent;
   color: var(--babel-text);
-  text-align: left;
+  text-align: start;
   cursor: pointer;
   padding: 8px 0;
 }
@@ -180,7 +206,7 @@ a.p-button {
   overflow-wrap: anywhere;
 }
 .map-stroke-focus small {
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 .map-is-drawing .map-canvas {
   cursor: crosshair;
@@ -201,8 +227,7 @@ a.p-button {
 }
 .map-load-error {
   position: absolute;
-  left: 12px;
-  right: 12px;
+  inset-inline: 12px;
   bottom: 12px;
   z-index: 500;
   background: var(--babel-surface);
@@ -226,22 +251,16 @@ a.p-button {
     max-height: 240px;
   }
 }
-@media (max-width: 720px) {
-  .room-directory-list > li {
-    align-items: start;
+@media (max-width: 40rem) {
+  .directory-actions {
+    justify-content: start;
   }
-  .room-directory-status {
-    width: 100%;
-  }
-  .room-directory-status > a {
-    margin-left: auto;
+  .directory-actions .p-inputtext {
+    max-width: none;
   }
   .map-canvas {
     height: 60svh;
-    min-height: 340px;
-  }
-  .tactical-section {
-    margin-top: 40px;
+    min-height: 320px;
   }
 }
 .map-is-erasing .map-canvas {

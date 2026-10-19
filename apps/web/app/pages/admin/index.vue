@@ -7,7 +7,6 @@ const { status, loading, error, connect } = useAdministratorStatus()
 <template>
   <main id="main" tabindex="-1" class="main-content">
     <div class="page-heading">
-      <p class="eyebrow">Administrator</p>
       <h1>Website administration</h1>
       <p class="muted">
         {{ status?.administrator.email ?? 'Establishing administrator session…' }}

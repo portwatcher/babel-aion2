@@ -270,7 +270,7 @@ try {
   )
   const verificationHtml = await localizedVerification.text()
   assert.ok(
-    verificationHtml.includes('ゲームのキャラクター ID'),
+    verificationHtml.includes('キャラクターID'),
     'verification is translated during SSR',
   )
   assert.ok(

@@ -95,15 +95,15 @@ onMounted(() => {
 <template>
   <main id="main" tabindex="-1" class="main-content">
     <div class="page-heading">
-      <NuxtLink to="/" class="muted">{{ t('backRooms') }}</NuxtLink>
-      <p class="eyebrow">{{ t('directoryEyebrow') }}</p>
+      <NuxtLink to="/" class="back-link"
+        ><span aria-hidden="true">←</span> {{ t('backRooms') }}</NuxtLink
+      >
       <h1>{{ t('createBroadcastRoom') }}</h1>
       <p class="muted">{{ t('createRoomHelp') }}</p>
     </div>
-    <div class="room-layout">
+    <div class="room-layout create-layout">
       <section class="entry-panel">
         <form v-if="!installation" class="entry-form" @submit.prevent="install">
-          <h2>{{ t('roomSettings') }}</h2>
           <div class="field">
             <label for="room-name">{{ t('roomName') }}</label>
             <InputText
@@ -112,7 +112,6 @@ onMounted(() => {
               required
               maxlength="64"
               :disabled="busy"
-              :placeholder="t('roomNamePlaceholder')"
             />
           </div>
           <div class="field">
@@ -132,7 +131,6 @@ onMounted(() => {
               v-model="allowed"
               :disabled="busy"
               rows="4"
-              :placeholder="t('allowedCharactersPlaceholder')"
               aria-describedby="allowed-ids-help"
             />
             <small id="allowed-ids-help" class="muted">{{
@@ -150,15 +148,17 @@ onMounted(() => {
           />
         </form>
         <form v-else class="entry-form" @submit.prevent="create">
-          <h2>{{ t('selectBroadcastChannel') }}</h2>
-          <p>{{ installation.name }} · Asia / {{ installation.server }}</p>
-          <p class="muted">
-            {{
-              installation.allowedIds.length
-                ? t('restrictedCount', { count: installation.allowedIds.length })
-                : t('allCharacters')
-            }}
-          </p>
+          <div class="installation-summary">
+            <h2>{{ installation.name }}</h2>
+            <p class="muted">
+              {{ installation.server }} ·
+              {{
+                installation.allowedIds.length
+                  ? t('restrictedCount', { count: installation.allowedIds.length })
+                  : t('allCharacters')
+              }}
+            </p>
+          </div>
           <div class="field">
             <label for="voice-channel">{{ t('voiceChannel') }}</label>
             <Select
@@ -170,38 +170,42 @@ onMounted(() => {
               :placeholder="t('chooseVoiceChannel')"
               :disabled="busy"
             />
+            <small v-if="!installation.channels.length" class="muted">{{
+              t('noVoiceChannels')
+            }}</small>
           </div>
-          <p v-if="!installation.channels.length" class="muted">
-            {{ t('noVoiceChannels') }}
-          </p>
+          <div class="form-actions">
+            <Button
+              type="submit"
+              :label="t('createAndJoin')"
+              :loading="busy"
+              :disabled="!voiceChannelId"
+            />
+            <Button
+              :label="t('refreshChannels')"
+              severity="secondary"
+              :disabled="busy"
+              @click="readInstallation"
+            />
+          </div>
+        </form>
+        <div v-if="error" class="session-feedback form-feedback" role="alert">
+          <p class="form-error">{{ error }}</p>
           <Button
-            :label="t('refreshChannels')"
+            v-if="route.query.installed && !installation"
+            :label="t('retryInstallation')"
             severity="secondary"
-            :disabled="busy"
+            :loading="busy"
             @click="readInstallation"
           />
-          <Button
-            type="submit"
-            :label="t('createAndJoin')"
-            :loading="busy"
-            :disabled="!voiceChannelId"
-          />
-        </form>
-        <p v-if="error" class="form-error admission-notice" role="alert">{{ error }}</p>
-        <Button
-          v-if="route.query.installed && !installation"
-          :label="t('retryInstallation')"
-          severity="secondary"
-          :loading="busy"
-          @click="readInstallation"
-        />
+        </div>
       </section>
-      <aside class="room-detail" :aria-label="t('creationInstructions')">
-        <h2>{{ t('teamHeading') }}</h2>
-        <p class="muted">{{ t('installationPermissions') }}</p>
-        <p class="muted">{{ t('broadcastConsent') }}</p>
-        <p class="muted">{{ t('roomCreationScope') }}</p>
-        <p class="muted">{{ t('characterExistenceNotice') }}</p>
+      <aside class="room-detail creation-notes" aria-labelledby="creation-notes-title">
+        <h2 id="creation-notes-title">{{ t('creationInstructions') }}</h2>
+        <ul>
+          <li>{{ t('installationPermissions') }}</li>
+          <li>{{ t('broadcastConsent') }}</li>
+        </ul>
       </aside>
     </div>
   </main>

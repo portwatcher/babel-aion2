@@ -22,14 +22,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: string | null] }>()
       :placeholder="
         languages.length ? t('selectOutputLanguage') : t('subtitlesDisabled')
       "
-      aria-describedby="language-notice"
       @update:model-value="emit('update:modelValue', $event)"
     />
-    <small v-if="!languages.length" id="language-notice" class="muted">{{
-      t('outputLanguageUnavailable')
-    }}</small>
-    <small v-else id="language-notice" class="muted">{{
-      t('outputLanguageHelp')
-    }}</small>
   </div>
 </template>

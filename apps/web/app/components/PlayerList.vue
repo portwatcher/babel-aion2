@@ -23,7 +23,6 @@ function time(value: string) {
         current ? t('connectionCount', { count: players.length }) : t('updating')
       }}</span>
     </div>
-    <p class="muted">{{ t('playersNotice') }}</p>
     <p v-if="current && !players.length" class="muted">{{ t('playersEmpty') }}</p>
     <ul v-if="players.length" class="player-list">
       <li v-for="player in players" :key="player.sessionId">

@@ -78,16 +78,9 @@ const visible = computed(() =>
       </p>
       <details v-if="!compact" :open="!subtitle.translatedText">
         <summary>
-          {{
-            subtitle.sourceAlignment === 'independent'
-              ? t('sourceIndependent')
-              : t(subtitle.sourceIsFinal ? 'sourceFinal' : 'sourceInterim')
-          }}
+          {{ t(subtitle.sourceIsFinal ? 'sourceFinal' : 'sourceInterim') }}
         </summary>
         <p :lang="subtitle.sourceLanguage">{{ subtitle.originalText }}</p>
-        <small v-if="!subtitle.translatedText" class="muted">{{
-          t('translationMaySkipSource')
-        }}</small>
       </details>
       <small v-if="!compact && subtitle.discontinuity" class="muted">{{
         t('subtitleDiscontinuity')
@@ -100,8 +93,5 @@ const visible = computed(() =>
     >
       {{ message }}
     </p>
-    <small v-if="!compact && !session.outputLanguage" class="muted">{{
-      t('subtitleSetup')
-    }}</small>
   </section>
 </template>

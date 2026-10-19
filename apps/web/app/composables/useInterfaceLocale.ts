@@ -7,6 +7,8 @@ export function useInterfaceLocale() {
   return {
     ...state,
     t: (key: InterfaceMessageKey, parameters: Record<string, string | number> = {}) =>
-      t(key, parameters),
+      typeof parameters.count === 'number'
+        ? t(key, parameters, parameters.count)
+        : t(key, parameters),
   }
 }
