@@ -1112,12 +1112,17 @@ Discord source about 3.2 seconds after every claim and reclaiming 5 seconds late
 (one room advanced from generation 11 to 25 in four minutes); players saw the bot
 repeatedly join and leave. The worker previously treated any member Opus decode
 error, member receive-stream error or informational voice-connection error as a
-fatal source failure, and logged nothing.
+fatal source failure, and logged nothing. After logging was added, every failure
+was an `AggregateError` of TCP timeouts to Discord's Cloudflare voice gateway on
+port 2083. The voice worker NetworkPolicy in private infra only allowed public
+TCP 443; it now also allows the Cloudflare HTTPS-alternate ports (2053, 2083,
+2087, 2096, 8443).
 
-| Check                                                   | Result  | Evidence                                                                               |
-| ------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------- |
-| Member packet errors are non-fatal; failures are logged | PASS    | `npm run ci:local` passed                                                              |
-| Production stops flapping after rollout                 | WAITING | Requires the new voice image and observation of run durations and `source-failed` logs |
+| Check                                                   | Result | Evidence                                                                                                                                                 |
+| ------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Member packet errors are non-fatal; failures are logged | PASS   | `npm run ci:local` passed                                                                                                                                |
+| Voice pod reaches Discord voice gateway TCP 2083        | PASS   | Socket probe from the worker pod: timeout before the policy change, open after                                                                           |
+| Production stops flapping                               | PASS   | After the policy applied at 11:21 UTC, room `b99f0b7a…` generation 284 stayed open with no further `source-failed` logs; earlier runs closed after 3–5 s |
 
 ## Git and task cleanup
 
