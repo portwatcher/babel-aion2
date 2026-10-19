@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test, type TestContext } from 'node:test'
-import { setTimeout as delay } from 'node:timers/promises'
+import { performance } from 'node:perf_hooks'
 import opus from '@discordjs/opus'
 import { GuildBroadcast } from '../src/guild-broadcast.ts'
 import type { VoiceSourceConfiguration } from '@babel/database/voice-sources'
@@ -34,7 +34,21 @@ function energy(pcm: Buffer, frequency: number, channel: number) {
   return Math.hypot(real, imaginary) / (pcm.length / 4)
 }
 
+/** Drives the 20 ms playback interval and its monotonic clock without scheduler delay. */
+function playbackClock(t: TestContext) {
+  let now = 0
+  t.mock.method(performance, 'now', () => now)
+  t.mock.timers.enable({ apis: ['setInterval'] })
+  return (durationMs: number) => {
+    for (let elapsed = 0; elapsed < durationMs; elapsed += 20) {
+      now += 20
+      t.mock.timers.tick(20)
+    }
+  }
+}
+
 function receiver(t: TestContext, allowed = () => true) {
+  const advance = playbackClock(t)
   const decoder = new opus.OpusEncoder(48_000, 2)
   const frames: Buffer[] = []
   let failed = false
@@ -48,56 +62,58 @@ function receiver(t: TestContext, allowed = () => true) {
     },
   )
   t.after(() => audio.close())
-  async function waitFor(count: number) {
-    const deadline = Date.now() + 2_000
-    while (frames.length < count && Date.now() < deadline) {
-      await delay(5)
-    }
+  function play(count: number) {
+    const before = frames.length
+    advance(count * 20)
     assert.equal(failed, false)
-    assert.ok(frames.length >= count, 'Opus publication did not reach the receiver')
+    assert.equal(
+      frames.length,
+      before + count,
+      'Opus publication did not reach the receiver',
+    )
     assert.ok(frames.every((frame) => frame.length === 960 * 2 * 2))
   }
-  return { audio, frames, waitFor }
+  return { audio, frames, advance, play }
 }
 
-test('playback mixes independent stereo speakers and assembles short frames without losing a real pause', async (t) => {
+test('playback mixes independent stereo speakers and assembles short frames without losing a real pause', (t) => {
   const r = receiver(t)
   for (let half = 0; half < 6; half += 1) {
     r.audio.receive('one', tone(1_000, 10, 0))
     r.audio.receive('two', tone(2_000, 10, 1))
   }
-  await r.waitFor(3)
+  r.play(3)
   const audible = Buffer.concat(r.frames.slice(0, 3))
   assert.ok(energy(audible, 1_000, 0) > 1_000)
   assert.ok(energy(audible, 2_000, 1) > 1_000)
   assert.ok(energy(audible, 2_000, 0) < 200)
   assert.ok(energy(audible, 1_000, 1) < 200)
-  await r.waitFor(10)
+  r.play(7)
   const pause = Buffer.concat(r.frames.slice(8, 10))
   assert.ok(energy(pause, 1_000, 0) < 100)
   assert.ok(energy(pause, 2_000, 1) < 100)
 })
 
-test('backlog drops old sound, retains only 100 ms, and no output survives loss of permission or close', async (t) => {
+test('backlog drops old sound, retains only 100 ms, and no output survives loss of permission or close', (t) => {
   let allowed = true
   const r = receiver(t, () => allowed)
   r.audio.receive('one', Buffer.concat([tone(400, 400), tone(3_000, 100)]))
-  await r.waitFor(3)
+  r.play(3)
   const current = Buffer.concat(r.frames.slice(0, 3))
   assert.ok(energy(current, 3_000, 0) > 2_000)
   assert.ok(energy(current, 400, 0) < 100)
   allowed = false
   const count = r.frames.length
   r.audio.receive('one', tone(400, 100))
-  await delay(60)
+  r.advance(60)
   assert.equal(r.frames.length, count)
   allowed = true
-  await r.waitFor(count + 6)
+  r.play(6)
   assert.ok(energy(Buffer.concat(r.frames.slice(-2)), 400, 0) < 100)
   r.audio.close()
   const closedCount = r.frames.length
   r.audio.receive('one', tone(400, 100))
-  await delay(60)
+  r.advance(60)
   assert.equal(r.frames.length, closedCount)
 })
 
@@ -122,6 +138,7 @@ test('one guild broadcast delivers real Opus to independent rooms and retires on
     updatedAt: new Date(),
   })
   let allowed = true
+  const advance = playbackClock(t)
   const broadcast = new GuildBroadcast(
     () => allowed,
     {
@@ -159,23 +176,20 @@ test('one guild broadcast delivers real Opus to independent rooms and retires on
   t.after(() => broadcast.close())
   await broadcast.reconcile([room('one'), room('two')])
   broadcast.receive('commander', 'Commander', tone(1_000, 60))
-  const wait = async (count: number) => {
-    const deadline = Date.now() + 2_000
-    while ((frames.get('two')?.length ?? 0) < count && Date.now() < deadline) {
-      await delay(5)
-    }
-    assert.ok((frames.get('two')?.length ?? 0) >= count)
+  const play = (count: number) => {
+    const before = frames.get('two')?.length ?? 0
+    advance(count * 20)
+    assert.equal(frames.get('two')?.length ?? 0, before + count)
   }
-  await wait(3)
+  play(3)
   for (const roomId of ['one', 'two']) {
     assert.ok(energy(Buffer.concat(frames.get(roomId)!.slice(0, 3)), 1_000, 0) > 1_000)
     assert.deepEqual(captions.get(roomId), ['Commander'])
   }
   await broadcast.reconcile([room('one', true), room('two')])
   const count = frames.get('one')!.length
-  const next = frames.get('two')!.length + 3
   broadcast.receive('commander', 'Still live', tone(2_000, 60))
-  await wait(next)
+  play(3)
   assert.equal(frames.get('one')!.length, count)
   assert.deepEqual([...retired], ['one'])
   assert.deepEqual(captions.get('one'), ['Commander'])
@@ -184,6 +198,6 @@ test('one guild broadcast delivers real Opus to independent rooms and retires on
   allowed = false
   const ended = frames.get('two')!.length
   broadcast.receive('commander', 'Obsolete', tone(400, 60))
-  await delay(60)
+  advance(60)
   assert.equal(frames.get('two')!.length, ended)
 })
