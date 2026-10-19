@@ -17,6 +17,7 @@
     "@babel/processes": "*",
     "@babel/providers": "*",
     "@babel/telemetry": "*",
+    "@fontsource/cinzel": "5.3.0",
     "@primeuix/themes": "2.0.3",
     "@primevue/nuxt-module": "4.5.4",
     "better-auth": "1.7.10",
