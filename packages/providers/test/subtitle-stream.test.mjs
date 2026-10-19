@@ -175,6 +175,112 @@ test('target changes fence obsolete sockets and equal timestamps do not discard 
     code: 'INVALID_CONFIGURATION',
   })
 })
+test('a stalled handshake is isolated, transient targets reconnect and late source completions cannot replace newer speech', async (t) => {
+  const network = await fixture(t)
+  const sourceKey = network.credential(),
+    japaneseKey = network.credential(),
+    koreanKey = network.credential()
+  const held = network.hold(japaneseKey, 'translation', true)
+  const s = stream(network, sourceKey)
+  t.after(() => {
+    held.release()
+    s.close()
+  })
+  const japanese = [],
+    korean = []
+  s.subscribe(path(japaneseKey, 'ja'), (event) => japanese.push(event))
+  s.subscribe(path(koreanKey, 'ko'), (event) => korean.push(event))
+  await s.ready
+  await held.started
+  await until(
+    () => network.observations.find((value) => value.key === koreanKey)?.configuration,
+    'independent Korean handshake',
+  )
+  let offset = 0
+  for (let i = 0; i < 10; i++) {
+    s.write(Buffer.alloc(1920), offset)
+    offset += 960
+    await setTimeout(20)
+  }
+  const recognition = network.observations.find(
+    (value) => value.protocol === 'recognition',
+  )
+  const koreanOutput = network.observations.find((value) => value.key === koreanKey)
+  assert.equal(recognition.frames.length, 10)
+  assert.equal(
+    koreanOutput.frames.length,
+    10,
+    'ready lane receives audio while another is unconfigured',
+  )
+  network.emit(
+    sourceKey,
+    { type: 'input_audio_buffer.committed', item_id: 'older' },
+    recognition,
+  )
+  network.emit(
+    sourceKey,
+    { type: 'input_audio_buffer.committed', item_id: 'newer' },
+    recognition,
+  )
+  network.emit(
+    sourceKey,
+    {
+      type: 'conversation.item.input_audio_transcription.delta',
+      item_id: 'newer',
+      delta: 'Retreat.',
+    },
+    recognition,
+  )
+  await until(
+    () => values(korean).at(-1)?.text === 'Retreat.',
+    'current source fragment delivered',
+  )
+  network.emit(
+    sourceKey,
+    {
+      type: 'conversation.item.input_audio_transcription.completed',
+      item_id: 'older',
+      transcript: 'Attack.',
+    },
+    recognition,
+  )
+  held.release()
+  await until(
+    () =>
+      network.observations.find((value) => value.key === japaneseKey).frames.length ===
+      5,
+    'only newest 100 ms retained for stalled target',
+  )
+  assert.equal(values(korean).at(-1).text, 'Retreat.')
+  network.disconnect(koreanKey)
+  await until(
+    () => network.observations.filter((value) => value.key === koreanKey).length === 2,
+    'failed target reconnects independently',
+  )
+  const replacement = network.observations
+    .filter((value) => value.key === koreanKey)
+    .at(-1)
+  await until(() => replacement.configuration, 'replacement configured')
+  network.emit(
+    koreanKey,
+    {
+      type: 'session.output_transcript.delta',
+      event_id: 'recovered',
+      delta: '후퇴하세요.',
+      elapsed_ms: 200,
+    },
+    replacement,
+  )
+  await until(
+    () => values(korean).at(-1)?.translatedText === '후퇴하세요.',
+    'recovered target publishes fresh stream',
+  )
+  assert.equal(values(korean).at(-1).discontinuity, true)
+  assert.equal(
+    network.observations.filter((value) => value.protocol === 'recognition').length,
+    1,
+  )
+})
 test('sample processing uses the same direct streaming path and hints apply only to recognition', async (t) => {
   const network = await fixture(t)
   const key = network.credential('speech')
@@ -186,11 +292,15 @@ test('sample processing uses the same direct streaming path and hints apply only
     context: 'Synthetic test term',
     expressions: [{ language: 'ja', text: 'テスト' }],
   }
+  const audio = readPcmWave(syntheticWave())
+  // A valid WAV may end on an odd input sample, rather than a full 20 ms frame.
+  audio.data = audio.data.subarray(0, audio.data.length - 2)
+  audio.durationMs = audio.data.length / 96
   const result = await previewSubtitleSample({
     recognition: { settings, credential: key, version: 1 },
     translation: { settings, credential: key, version: 1 },
     outputLanguage: 'ja',
-    audio: readPcmWave(syntheticWave()),
+    audio,
     terminology: { version: 1, terms: [term] },
   })
   assert.equal(result.code, 'PASS')

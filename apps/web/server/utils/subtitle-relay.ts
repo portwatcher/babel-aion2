@@ -138,7 +138,7 @@ export function createSubtitleRelay(
         unavailable(target)
         retry = setTimeout(
           () => void connect(),
-          Math.min(15_000, 1_000 * 2 ** Math.min(attempts++, 4)),
+          Math.min(5_000, 250 * 2 ** Math.min(attempts++, 5)),
         )
         retry.unref()
       }

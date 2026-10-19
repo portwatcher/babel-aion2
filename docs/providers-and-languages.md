@@ -47,7 +47,7 @@ validated. Errors are reduced to safe credential, model, quota, rate, permission
 configuration, response, timeout or availability categories. Untrusted endpoint
 settings are rejected; upstream error messages are never forwarded.
 
-Migration 0013 disables and clears unsupported provider paths and their proofs,
+Migration 0014 disables and clears unsupported provider paths and their proofs,
 clears disabled room defaults, removes retired provider configurations and their
 cascaded encrypted history, and advances the language catalog. It seeds no key,
 language or proof. Operator-supplied credentials belong only in encrypted runtime

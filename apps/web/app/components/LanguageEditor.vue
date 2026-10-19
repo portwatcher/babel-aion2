@@ -65,7 +65,8 @@ function save() {
           required
         />
         <small class="muted"
-          >简体和繁体请分别使用 zh-Hans 与 zh-Hant。保存后代码不可更改。</small
+          >支持中文、日语、韩语、英语、西班牙语、葡萄牙语、法语、俄语、德语、印地语、印尼语、越南语和意大利语。简繁分别使用
+          zh-Hans 与 zh-Hant，代码保存后不可更改。</small
         >
       </div>
       <div class="field">

@@ -70,14 +70,43 @@ PASS applies only to that named check, not automatically to production.
 | Deployed latency and capacity                | NOT RUN                   | Production transport now connects, but actual source/playback timing, load and player networks including mainland China remain unmeasured; connection success is not end-to-end latency evidence                                |
 | Production disaster recovery                 | NOT RUN                   | Production-snapshot restoration and isolated published-image rollback passed. Durable backup retention, old-service fencing, production failover and live deployment rollback remain outstanding                                |
 
-Empty production provider and language lists are intentional and do not block
+An empty production language list and disabled subtitle configuration are intentional and do not block
 the web release or original-audio deployment. Optional character enrichment is
 disabled under the source policy recorded below; nickname entry remains available.
 
-Latest source checks: `npm run ci:local` is PASS with 229 first-party sources,
-maximum 495 lines, formatting, strict types, 18 tests, builds and built HTTP
-smoke. `test:db` passes 11 real PostgreSQL tests, and both child-process recovery
-checks pass. `design.md` and `GOAL.md` remain identical.
+Latest OpenAI source checks: `npm run ci:local` is PASS with first-party source
+bounds (maximum 495 lines), formatting, strict types, 17 tests, builds and built
+HTTP smoke. `test:db` passes 13 real PostgreSQL tests. Earlier child-process
+recovery evidence is recorded separately. `design.md` and `GOAL.md` remain identical.
+
+## OpenAI continuous subtitles — 2026-10-19
+
+The current refactor replaces the retired provider adapters with
+`gpt-live-transcribe` (`delay: minimal`) and `gpt-realtime-translate`. One encrypted
+OpenAI API Key serves both purposes. Direct-audio translation runs concurrently
+with recognition and publishes every transcript fragment immediately. Chinese
+script formatting is local. Recognition hints are supported; custom translation
+glossaries are not. Independent streams have no fabricated utterance alignment.
+
+| Check                                     | Status  | Evidence                                                                                                                                                                                                                                            |
+| ----------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local CI                                  | PASS    | `npm run ci:local`: source bounds, formatting, strict types, 17 tests, web/migration/worker/recovery builds and built HTTP smoke                                                                                                                    |
+| Database and retiring providers           | PASS    | `npm run test:db`: 13 tests on disposable PostgreSQL, including revoking retired paths/proofs, removing their encrypted history and preserving the OpenAI configuration                                                                             |
+| Provider management                       | PASS    | Built HTTP + PostgreSQL: encryption, protected reads, replacement/restore preservation, cross-process leases, stale results and audit redaction                                                                                                     |
+| Sample and language administration        | PASS    | Built HTTP + PostgreSQL: upload bounds, real paced PCM, source hints only, one key referenced by both roles, independent windows, quota/silence, snapshot changes, proof persistence and fail-closed activation                                     |
+| Continuous transport                      | PASS    | Actual local provider WS → worker private HTTP → built player WS, with an actual WebRTC receiver: shared targets, incremental fragments, no replayed prefixes, source replacement, target faults, language changes and physical nickname revocation |
+| Handshake and recovery isolation          | PASS    | Real loopback WS: a held target handshake does not stop another target or source frames; only 100 ms is retained; transient target reconnect preserves shared recognition; older source completion cannot overwrite newer text                      |
+| Real model access and incremental output  | PASS    | Server-side live API probe decrypted the authorized stored key in memory. A 5,644 ms synthetic English clip produced Japanese/Korean/Chinese before audio ended; all targets drained through `session.closed`                                       |
+| Observed first text                       | PASS    | One live sample after prepared handshakes: original 772 ms; Japanese 1,092 ms; Korean 3,327 ms; Chinese 2,324 ms. Cold preparation 1,080 ms. This is not a latency percentile or a quality benchmark                                                |
+| Representative multilingual battle speech | NOT RUN | No accuracy evaluation on authorized real commands, overlapping speakers or terminology; same-target-language omissions need explicit evaluation                                                                                                    |
+| Discord-to-screen latency and capacity    | NOT RUN | The live probe begins at paced PCM input, and the local integration ends at player WS reception; production capture, network and browser rendering are not measured together                                                                        |
+
+The supplied key was saved encrypted in runtime database storage and read back
+successfully without exposing it. No production output language was enabled.
+The source implementation and migration are verified separately from deployment.
+Earlier provider-specific results below are historical and do not validate this
+refactor. See [streaming limits](streaming-subtitles.md) and
+[provider configuration](providers-and-languages.md).
 
 ## Production recovery-controller rollout — 2026-10-19
 

@@ -89,7 +89,8 @@ export function openSharedSubtitleStream(input: {
                 ...value,
                 text: sourceEvents > subscriber.sourceAfter ? value.text : '',
                 translatedText:
-                  value.utteranceId === subscriber.window
+                  value.utteranceId === subscriber.window &&
+                  subscriber.translationOffset > 0
                     ? subtitleText(
                         output.path.outputLanguage,
                         output.value.translatedText.slice(subscriber.translationOffset),
@@ -159,7 +160,15 @@ export function openSharedSubtitleStream(input: {
         // These APIs do not provide cross-session utterance alignment. Keep a
         // bounded display window, label source text independently, and never
         // manufacture matching source timestamps or finality for translated text.
-        if (output.value.translatedText.length + text.length > 2048) {
+        const fragment =
+          text.length > 2048 ? text.slice(-2048).replace(/^[\uDC00-\uDFFF]/u, '') : text
+        if (fragment !== text) {
+          output.value.discontinuity = true
+        }
+        if (
+          output.value.translatedText.length + fragment.length > 2048 ||
+          /[.!?。！？]\s*$/u.test(output.value.translatedText)
+        ) {
           output.value = {
             ...output.value,
             utteranceId: randomUUID(),
@@ -168,7 +177,7 @@ export function openSharedSubtitleStream(input: {
             translationRevision: 0,
           }
         }
-        output.value.translatedText += text
+        output.value.translatedText += fragment
         output.value.translationRevision += 1
         publish(output)
       },

@@ -215,7 +215,12 @@ try {
   )
   assert.equal(network.observations.length, 0)
   await pastCooldown()
-  const preview = await result(await request(server, auth, path))
+  const preview = await result(
+    await request(server, auth, path, 'POST', {
+      ...input,
+      translation: input.recognition,
+    }),
+  )
   assert.equal(preview.code, 'PASS')
   assert.equal(preview.audioDurationMs, 1000)
   assert.deepEqual(preview.terminology, {

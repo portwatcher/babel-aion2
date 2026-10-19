@@ -110,7 +110,7 @@ export async function createProviderFixture() {
           bytes: bytes.length,
           silence: bytes.every((value) => value === 0),
         })
-        if (mode === 'speech' || mode === 'echo') {
+        if (mode === 'speech' || mode === 'echo' || mode === 'sentences') {
           if (protocol === 'recognition' && observation.frames.length <= 2) {
             const delta = observation.frames.length === 1 ? 'Wait ' : '3 seconds.'
             text += delta
@@ -132,6 +132,18 @@ export async function createProviderFixture() {
                   : 'Wait 3 seconds.',
             })
           }
+        }
+        if (
+          mode === 'sentences' &&
+          protocol === 'translation' &&
+          observation.frames.length === 3
+        ) {
+          emit({
+            type: 'session.output_transcript.delta',
+            event_id: randomUUID(),
+            elapsed_ms: 400,
+            delta: 'Do not attack.',
+          })
         }
       } else if (event.type === 'input_audio_buffer.commit') {
         observation.elapsedMs = performance.now() - started

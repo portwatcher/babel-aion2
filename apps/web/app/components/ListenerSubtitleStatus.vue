@@ -65,14 +65,14 @@ const visible = computed(() =>
     >
       <small class="subtitle-context muted"
         >{{ subtitle.speakerDisplayName }} ·
-        {{ subtitle.translationIsFinal ? '稳定字幕' : '临时字幕' }}</small
+        {{ subtitle.translationIsFinal ? '已完成字幕' : '实时字幕' }}</small
       >
       <p class="subtitle-message" :lang="subtitle.outputLanguage">
         {{
           subtitle.translatedText || (subtitle.failure ? '翻译暂不可用' : '正在翻译…')
         }}
       </p>
-      <details v-if="!compact">
+      <details v-if="!compact" :open="!subtitle.translatedText">
         <summary>
           {{
             subtitle.sourceAlignment === 'independent'
@@ -81,6 +81,9 @@ const visible = computed(() =>
           }}{{ subtitle.sourceIsFinal ? '' : '（识别中）' }}
         </summary>
         <p :lang="subtitle.sourceLanguage">{{ subtitle.originalText }}</p>
+        <small v-if="!subtitle.translatedText" class="muted"
+          >实时翻译可能跳过与输出语言相同的语音，此处显示独立识别的原文。</small
+        >
       </details>
       <small v-if="!compact && subtitle.discontinuity" class="muted"
         >部分过期内容已丢弃，已回到当前语音。</small

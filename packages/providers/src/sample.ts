@@ -44,7 +44,8 @@ export async function previewSubtitleSample(input: {
           }
           const segment = sampleSegmentSchema.parse(event.value)
           if (!segments.has(segment.utteranceId) && segments.size >= 32) {
-            throw new ProviderFailure('INVALID_RESPONSE')
+            code = 'INVALID_RESPONSE'
+            return
           }
           segments.set(segment.utteranceId, segment)
         },
@@ -57,8 +58,16 @@ export async function previewSubtitleSample(input: {
     const finalized = [...segments.values()].filter(
       (segment) => segment.isFinal && segment.text.trim(),
     )
-    if (code === 'PASS' && !finalized.length) {
-      code = 'NO_SPEECH'
+    if (code === 'PASS') {
+      if (!finalized.length) {
+        code = 'NO_SPEECH'
+      } else if (
+        ![...segments.values()].some(
+          (segment) => segment.translationIsFinal && segment.translatedText.trim(),
+        )
+      ) {
+        code = 'INVALID_RESPONSE'
+      }
     }
     for (const segment of segments.values()) {
       if (segment.failure) {

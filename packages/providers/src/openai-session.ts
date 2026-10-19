@@ -117,7 +117,13 @@ export function openOpenAISession(input: {
     response.resume()
     fail(openaiFailure(response.statusCode ?? 503))
   })
-  socket.on('error', () => fail(new ProviderFailure('UNAVAILABLE')))
+  socket.on('error', (error) =>
+    fail(
+      new ProviderFailure(
+        /timed out/iu.test(error.message) ? 'TIMEOUT' : 'UNAVAILABLE',
+      ),
+    ),
+  )
   socket.on('close', () => {
     if (!closed) {
       fail(new ProviderFailure('UNAVAILABLE'))
@@ -206,6 +212,9 @@ export function openOpenAISession(input: {
       settle()
     },
     awaitCompletion() {
+      if (closed) {
+        return finished.promise
+      }
       clearTimeout(deadline)
       deadline = setTimeout(
         () => fail(new ProviderFailure('TIMEOUT')),

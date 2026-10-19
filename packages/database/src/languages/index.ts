@@ -169,10 +169,17 @@ export function createLanguageService(
           value.translatedText.trim() &&
           !value.failure,
       ).length
+      // Independent continuous streams cannot prove per-utterance alignment.
+      // Require a completed source/target window after the session drains;
+      // earlier display windows can contain a provisional source hypothesis.
+      const independent = sample.segments.every(
+        (value) => value.sourceAlignment === 'independent',
+      )
       const resultCode =
         sample.code === 'PASS' &&
         (!stable ||
-          stable !== sample.segments.filter((value) => value.text.trim()).length)
+          (!independent &&
+            stable !== sample.segments.filter((value) => value.text.trim()).length))
           ? 'INVALID_RESPONSE'
           : sample.code
       await db.transaction(async (tx) => {

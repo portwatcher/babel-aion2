@@ -167,7 +167,14 @@ try {
     'Rejected language requests cannot spend provider work',
   )
 
+  network.setMode(translationKey, 'sentences')
   const validated = await value(await sample(language))
+  network.setMode(translationKey, 'speech')
+  assert.equal(
+    validated.sample.segments.length,
+    2,
+    'continuous caption windows need no invented source/target utterance alignment',
+  )
   language = validated.language
   assert.equal(validated.sample.code, 'PASS')
   assert.equal(language.validationState, 'CURRENT')

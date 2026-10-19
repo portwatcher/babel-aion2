@@ -25,7 +25,7 @@ endpointing after 120 ms of silence or five seconds of continuous input. Source
 commits affect source finality only; translation never waits for them. An ending
 sample pads a sub-100-ms tail so the provider can commit its final source buffer.
 
-A continuous translation stream has no utterance-done event. Bounded 2,048-character
+A continuous translation stream has no utterance-done event. Sentence boundaries and a 2,048-character limit define
 display windows carry a sequence/revision, and finality is set only after the
 provider acknowledges a drained session close. An independent source stream is
 shown as such; the application does not invent source timestamps, language
