@@ -1,18 +1,17 @@
 <script setup lang="ts">
+const { t, administrator } = useInterfaceLocale()
+useInterfaceControlLocale()
 defineProps<{ error: { statusCode: number; message: string } }>()
 </script>
 
 <template>
   <main class="error-page">
+    <InterfaceLocaleSelect v-if="!administrator" />
     <p class="eyebrow">Babel · {{ error.statusCode }}</p>
-    <h1>暂时无法打开此页面</h1>
+    <h1>{{ t('errorTitle') }}</h1>
     <p class="muted">
-      {{
-        error.statusCode === 404
-          ? '页面不存在，请返回收听室。'
-          : '请检查服务配置，或通过 Access 入口重新登录管理页面。'
-      }}
+      {{ error.statusCode === 404 ? t('errorNotFound') : t('errorUnavailable') }}
     </p>
-    <a href="/">返回收听室</a>
+    <a href="/">{{ t('returnRoom') }}</a>
   </main>
 </template>

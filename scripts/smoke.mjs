@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
 import { startTestServer } from './test-server.mjs'
+import { checkInterfaceLocales } from './interface-locale-smoke.mjs'
 
 const server = await startTestServer()
 const { origin } = server
@@ -40,8 +41,9 @@ try {
   })
   assert.equal(entry.status, 503)
   assert.equal((await fetch(`${origin}/api/health/ready`)).status, 503)
+  await checkInterfaceLocales(origin)
   console.log(
-    'PASS built HTTP smoke: public lobby, empty languages, Access boundaries, closed entry and readiness.',
+    'PASS built HTTP smoke: public lobby, empty languages, Access boundaries, closed entry, readiness and SSR interface locales.',
   )
 } finally {
   await server.close()

@@ -59,7 +59,8 @@ async function remove() {
     })
     if (!disposed) {
       selected.value = null
-      notice.value = '已请求结束该连接。确认所有收听通道停止前，名单会保留“正在断开”。'
+      notice.value =
+        'Disconnection requested. The listener remains Disconnecting until all delivery channels stop.'
       await refresh()
     }
   } catch (failure) {
@@ -85,11 +86,11 @@ onBeforeUnmount(() => {
     <PlayerList :players="players" :current="current">
       <template #actions="{ player }">
         <Button
-          label="移除"
+          label="Remove"
           severity="secondary"
           size="small"
           :disabled="player.state === 'DISCONNECTING' || removing"
-          :aria-label="`移除 ${player.nickname}`"
+          :aria-label="`Remove ${player.nickname}`"
           @click="select(player)"
         />
       </template>
@@ -100,18 +101,18 @@ onBeforeUnmount(() => {
       v-if="selected"
       class="management-confirmation"
       role="group"
-      aria-label="确认移除连接"
+      aria-label="Confirm listener removal"
     >
-      <p>结束「{{ selected.nickname }}」的这次收听连接？</p>
+      <p>End the listening session for “{{ selected.nickname }}”?</p>
       <div class="management-actions">
         <Button
-          label="确认移除"
+          label="Confirm removal"
           severity="danger"
           :loading="removing"
           @click="remove"
         />
         <Button
-          label="取消"
+          label="Cancel"
           severity="secondary"
           :disabled="removing"
           @click="selected = null"

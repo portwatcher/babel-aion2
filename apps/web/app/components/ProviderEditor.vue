@@ -15,13 +15,16 @@ const seconds = ref('15')
 const credential = ref('')
 const error = ref('')
 const types = [
-  { label: 'Soniox · 语音识别候选', value: 'soniox' },
-  { label: 'DeepL · 文本翻译候选', value: 'deepl' },
+  { label: 'Soniox · Recognition candidate', value: 'soniox' },
+  { label: 'DeepL · Translation candidate', value: 'deepl' },
 ]
 const models = [
-  { label: '优先质量，自动兼容', value: 'prefer_quality_optimized' },
-  { label: '优先质量', value: 'quality_optimized' },
-  { label: '优先延迟', value: 'latency_optimized' },
+  {
+    label: 'Prefer quality, automatic compatibility',
+    value: 'prefer_quality_optimized',
+  },
+  { label: 'Prefer quality', value: 'quality_optimized' },
+  { label: 'Prefer low latency', value: 'latency_optimized' },
 ]
 const endpoints = [
   { label: 'DeepL API Free', value: 'https://api-free.deepl.com' },
@@ -64,7 +67,8 @@ function submit() {
     ...(credential.value ? { credential: credential.value } : {}),
   })
   if (!input.success || (!props.current && !credential.value)) {
-    error.value = '请检查名称、模型、测试超时和凭据。凭据不能包含空格。'
+    error.value =
+      'Check the name, model, test timeout and credential. Credentials cannot contain spaces.'
     return
   }
   emit('save', input.data)
@@ -77,10 +81,10 @@ onBeforeUnmount(() => {
 
 <template>
   <form class="entry-form provider-editor" @submit.prevent="submit">
-    <h3>{{ current ? `编辑「${current.name}」` : '新增候选配置' }}</h3>
+    <h3>{{ current ? `Edit “${current.name}”` : 'Add candidate configuration' }}</h3>
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <div class="field">
-      <label for="provider-name">配置名称</label>
+      <label for="provider-name">Configuration name</label>
       <InputText
         id="provider-name"
         v-model="name"
@@ -90,7 +94,7 @@ onBeforeUnmount(() => {
       />
     </div>
     <div class="field">
-      <label for="provider-type">服务与功能</label>
+      <label for="provider-type">Service and function</label>
       <Select
         input-id="provider-type"
         v-model="type"
@@ -101,7 +105,7 @@ onBeforeUnmount(() => {
       />
     </div>
     <div v-if="type === 'deepl'" class="field">
-      <label for="provider-endpoint">API 套餐</label>
+      <label for="provider-endpoint">API plan</label>
       <Select
         input-id="provider-endpoint"
         v-model="endpoint"
@@ -111,9 +115,9 @@ onBeforeUnmount(() => {
         :disabled="busy"
       />
     </div>
-    <p v-else class="muted">使用 Soniox 官方实时语音接口。</p>
+    <p v-else class="muted">Uses the official Soniox real-time speech endpoint.</p>
     <div class="field">
-      <label for="provider-model">模型</label>
+      <label for="provider-model">Model</label>
       <InputText
         v-if="type === 'soniox'"
         id="provider-model"
@@ -132,7 +136,7 @@ onBeforeUnmount(() => {
       />
     </div>
     <div class="field">
-      <label for="provider-timeout">连接测试超时（秒）</label>
+      <label for="provider-timeout">Connection test timeout (seconds)</label>
       <InputText
         id="provider-timeout"
         v-model="seconds"
@@ -145,7 +149,7 @@ onBeforeUnmount(() => {
     </div>
     <div class="field">
       <label for="provider-credential">{{
-        current ? '替换 API 凭据（可选）' : 'API 凭据'
+        current ? 'Replace API credential (optional)' : 'API credential'
       }}</label>
       <InputText
         id="provider-credential"
@@ -158,19 +162,22 @@ onBeforeUnmount(() => {
       />
       <small class="muted">{{
         current
-          ? '留空保留已有凭据，保存后不会回显。'
-          : '凭据仅在服务器加密保存，不会回显。'
+          ? 'Leave blank to keep the saved credential. Its value is never returned.'
+          : 'Credentials are encrypted on the server and never returned.'
       }}</small>
     </div>
-    <p class="muted">更改已有连接参数或凭据时会先测试新设置。测试失败会保留原配置。</p>
+    <p class="muted">
+      New connection settings or credentials are tested before saving. A failed test
+      preserves the previous configuration.
+    </p>
     <div class="management-actions">
       <Button
         type="submit"
-        :label="current ? '保存修改' : '保存候选配置'"
+        :label="current ? 'Save changes' : 'Save candidate configuration'"
         :loading="busy"
       />
       <Button
-        label="取消编辑"
+        label="Cancel editing"
         severity="secondary"
         :disabled="busy"
         @click="emit('cancel')"

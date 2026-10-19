@@ -6,6 +6,13 @@ private today and prepared for eventual open source.
 The player interface is a dark, low-distraction battle panel. The original
 requirements are kept in sync in [design.md](design.md) and [GOAL.md](GOAL.md).
 
+The player interface supports English, Simplified Chinese, Japanese and Korean.
+It detects browser preferences during SSR and falls back to English. The compact
+header selector overrides detection; its choice is stored in localStorage and
+mirrored in a cookie for subsequent server rendering. Administration always uses
+English. Interface language does not change the selected subtitle language or
+listener session. See [interface localization](docs/interface-localization.md).
+
 The website and private voice worker are deployed at
 [babel.juryquinn.com](https://babel.juryquinn.com/); a real browser relay connection
 is verified. The production Discord source is configured in all-channel mode and

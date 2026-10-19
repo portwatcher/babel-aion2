@@ -377,7 +377,20 @@ Keep Simplified Chinese and Traditional Chinese distinct.
 Use the site default if no suitable match exists.
 
 Keep website interface text separate from subtitle output.
-The website interface can remain in Simplified Chinese.
+The player interface supports English (`en`), Simplified Chinese (`zh-CN`),
+Japanese (`ja`), and Korean (`ko`). Country shorthand cn/jp/kr maps to the
+corresponding language code. Detect the initial interface locale from browser
+preferences, including Accept-Language during server-side rendering. Fall back
+to English if no supported preference matches.
+
+Show a compact interface-language selector. An explicit selection overrides
+browser detection and is saved in localStorage. Mirror the selection in a cookie
+so later server-rendered requests use the same choice. Hydrate the server locale
+before restoring browser-only storage. Keep the choice independent of subtitle
+output language and the current listener session.
+
+The administrator interface, shared administrator controls, and administrator
+error pages use English only, regardless of browser or saved player locale.
 
 ### Language changes
 

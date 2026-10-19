@@ -102,6 +102,19 @@ controller seals new admission and confirms scoped closure from actual terminal
 container evidence; missing/unknown hosts remain blocked. See
 [Kubernetes recovery](kubernetes-recovery.md).
 
+## Interface localization
+
+Each Nuxt request installs its own Vue I18n instance, following the Perohub
+frontend pattern. A saved interface cookie takes precedence over weighted
+Accept-Language detection, with English as the fallback. Nuxt serializes the
+initial locale for consistent hydration. After mounting, valid localStorage
+preferences take precedence and repair the SSR cookie. The header selector
+updates both stores and the reactive locale without re-entering the room.
+Player copy, validation, status, PiP and error pages use four typed catalogs.
+Administrator routes force English, including shared components and error pages,
+while preserving the player preference. HTML varies on Accept-Language and Cookie.
+See [interface localization](interface-localization.md).
+
 ## Shared code
 
 `@babel/contracts` has no server dependencies. It defines nickname validation,

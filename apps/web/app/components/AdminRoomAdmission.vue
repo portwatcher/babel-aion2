@@ -31,7 +31,7 @@ async function publish() {
       .filter(Boolean),
   })
   if (!input.success) {
-    error.value = '请选择区服并检查角色 ID 名单'
+    error.value = 'Choose a server and check the character ID list.'
     return
   }
   busy.value = true
@@ -56,48 +56,59 @@ onMounted(load)
 
 <template>
   <section class="management-section" aria-labelledby="admission-title">
-    <h2 id="admission-title">加入规则</h2>
+    <h2 id="admission-title">Admission rules</h2>
     <template v-if="admission">
       <p>
         Asia / {{ admission.server }} ·
-        {{ admission.allowedIds.length ? '指定角色可加入' : '本区服所有角色可加入' }}
+        {{
+          admission.allowedIds.length
+            ? 'Only listed characters can join'
+            : 'All characters on this server can join'
+        }}
       </p>
       <p v-if="admission.allowedIds.length" class="muted">
-        {{ admission.allowedIds.join('、') }}
+        {{ admission.allowedIds.join(', ') }}
       </p>
-      <p class="muted">房间已加入公开列表，成员进入时需通过 AION2 Index 角色校验。</p>
+      <p class="muted">
+        The room is publicly listed. Joining members must pass AION2 Index character
+        verification.
+      </p>
     </template>
     <form v-else-if="loaded" class="entry-form" @submit.prevent="publish">
       <p class="muted">
-        为原有房间设置区服后，它会显示在房间列表中，并沿用当前 Discord
-        来源。现有成员需要退出后重新验证角色。
+        Set a server to publish the original room while keeping its Discord source.
+        Existing members must leave and verify their characters again.
       </p>
       <div class="field">
-        <label for="existing-room-server">区服（必选）</label>
+        <label for="existing-room-server">Game server (required)</label>
         <Select
           input-id="existing-room-server"
           v-model="server"
           :options="[...ASIA_SERVERS]"
           :disabled="busy"
-          placeholder="选择 Asia 区服"
+          placeholder="Choose an Asia server"
         />
       </div>
       <div class="field">
-        <label for="existing-room-ids">允许加入的角色 ID（可选）</label>
+        <label for="existing-room-ids">Allowed character IDs (optional)</label>
         <Textarea
           id="existing-room-ids"
           v-model="allowed"
           rows="4"
           :disabled="busy"
-          placeholder="每行一个 ID，留空允许本区服所有角色加入"
+          placeholder="One ID per line; leave blank to allow all characters on this server"
         />
       </div>
-      <Button type="submit" label="设置区服并开放原有房间" :loading="busy" />
+      <Button
+        type="submit"
+        label="Set server and publish original room"
+        :loading="busy"
+      />
     </form>
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <Button
       v-if="!loaded && !busy"
-      label="重新加载加入规则"
+      label="Reload admission rules"
       severity="secondary"
       @click="load"
     />

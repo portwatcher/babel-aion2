@@ -1,3 +1,4 @@
+import type { InterfaceMessageKey } from '~/locales'
 import {
   mapStrokeSchema,
   type ListenerSnapshot,
@@ -5,14 +6,21 @@ import {
   type MapStrokeInput,
 } from '@babel/contracts'
 
+class RoomMapError extends Error {
+  constructor(readonly key: 'mapLimit' | 'mapSessionEnded' | 'mapSyncFailed') {
+    super(key)
+  }
+}
+
 export function useRoomMap(
   roomId: string,
   session: Ref<ListenerSnapshot | null>,
   credential: Ref<string | null>,
 ) {
+  const { t } = useInterfaceLocale()
   const strokes = shallowRef<MapStroke[]>([])
   const current = ref(false)
-  const error = ref('')
+  const error = ref<InterfaceMessageKey | ''>('')
   const busy = ref(false)
   const denied = ref(false)
   const enabled = computed(() =>
@@ -44,12 +52,12 @@ export function useRoomMap(
       denied.value = true
     }
     if (!response.ok) {
-      throw new Error(
+      throw new RoomMapError(
         response.status === 429
-          ? '房间画线已达上限，请删除一些自己的线条。'
+          ? 'mapLimit'
           : denied.value
-            ? '会话已结束，请重新加入房间后画线。'
-            : '地图同步失败，请重试。',
+            ? 'mapSessionEnded'
+            : 'mapSyncFailed',
       )
     }
     return response.json() as Promise<unknown>
@@ -77,7 +85,7 @@ export function useRoomMap(
     } catch (failure) {
       if (!disposed && requestVersion === version) {
         current.value = false
-        error.value = failure instanceof Error ? failure.message : '地图同步失败'
+        error.value = failure instanceof RoomMapError ? failure.key : 'mapSyncFailed'
       }
     } finally {
       reading = false
@@ -105,7 +113,7 @@ export function useRoomMap(
       return true
     } catch (failure) {
       if (!disposed) {
-        error.value = failure instanceof Error ? failure.message : '画线未保存'
+        error.value = failure instanceof RoomMapError ? failure.key : 'mapSaveFailed'
       }
       return false
     } finally {
@@ -124,7 +132,7 @@ export function useRoomMap(
       }
     } catch (failure) {
       if (!disposed) {
-        error.value = failure instanceof Error ? failure.message : '删除失败'
+        error.value = failure instanceof RoomMapError ? failure.key : 'mapDeleteFailed'
       }
     } finally {
       busy.value = false
@@ -150,5 +158,14 @@ export function useRoomMap(
     clearInterval(timer)
     controller.abort()
   })
-  return { strokes, current, busy, error, enabled, refresh, save, remove }
+  return {
+    strokes,
+    current,
+    busy,
+    error: computed(() => (error.value ? t(error.value) : '')),
+    enabled,
+    refresh,
+    save,
+    remove,
+  }
 }

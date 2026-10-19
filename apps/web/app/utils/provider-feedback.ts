@@ -2,17 +2,18 @@ import { providerTestCodeSchema, type ProviderTestCode } from '@babel/contracts'
 import { managementFailure } from './management-errors'
 
 const labels: Record<ProviderTestCode, string> = {
-  PASS: '连接测试通过',
-  INVALID_CREDENTIAL: '凭据无效',
-  MODEL_UNAVAILABLE: '模型不可用',
-  QUOTA_EXHAUSTED: '额度已用尽',
-  RATE_LIMITED: '服务请求受限',
-  PERMISSION_DENIED: '凭据权限不足',
-  INVALID_CONFIGURATION: '服务不接受这些设置',
-  TIMEOUT: '连接测试超时',
-  UNAVAILABLE: '服务暂时不可用',
-  INVALID_RESPONSE: '服务响应不完整',
-  CONTEXT_TOO_LARGE: '术语上下文过大，请停用部分术语或关闭本次样本的术语提示',
+  PASS: 'Connection test passed',
+  INVALID_CREDENTIAL: 'Invalid credential',
+  MODEL_UNAVAILABLE: 'Model unavailable',
+  QUOTA_EXHAUSTED: 'Quota exhausted',
+  RATE_LIMITED: 'Rate limited',
+  PERMISSION_DENIED: 'Insufficient credential permissions',
+  INVALID_CONFIGURATION: 'Service rejected these settings',
+  TIMEOUT: 'Connection test timed out',
+  UNAVAILABLE: 'Service temporarily unavailable',
+  INVALID_RESPONSE: 'Incomplete service response',
+  CONTEXT_TOO_LARGE:
+    'Terminology context too large. Disable some terms or turn off terminology hints for this sample',
 }
 export const providerTestLabel = (code: ProviderTestCode) => labels[code]
 
@@ -23,31 +24,31 @@ export function providerFailure(error: unknown) {
     details && typeof details === 'object' && 'data' in details ? details.data : null
   if (data && typeof data === 'object' && 'code' in data) {
     if (data.code === 'INVALID_AUDIO') {
-      return '请检查语言代码，并选择 0.2–10 秒的单声道、16 位 PCM WAV（16 或 48 kHz）。'
+      return 'Check the language code and select a 0.2–10 second mono 16-bit PCM WAV at 16 or 48 kHz.'
     }
     if (data.code === 'REQUEST_TOO_LARGE') {
-      return '样本文件过大，请选择不超过 1 MB 的 WAV。'
+      return 'Sample too large. Select a WAV no larger than 1 MB.'
     }
     if (data.code === 'TERMINOLOGY_CHANGED') {
-      return '术语表在处理期间已变化，请重新测试当前版本。'
+      return 'Terminology changed during processing. Test the current version again.'
     }
     if (data.code === 'CONNECTION_TEST_FAILED' && 'testCode' in data) {
       const code = providerTestCodeSchema.safeParse(data.testCode)
       if (code.success) {
-        return `${providerTestLabel(code.data)}。原配置未更改。`
+        return `${providerTestLabel(code.data)}. The previous configuration is unchanged.`
       }
     }
     if (data.code === 'TEST_IN_PROGRESS') {
-      return '此配置的连接测试正在进行，请稍后重试。'
+      return 'A connection test is already running for this configuration. Try again later.'
     }
     if (data.code === 'TEST_COOLDOWN') {
-      return '请在上次测试开始至少 10 秒后重试。'
+      return 'Wait at least 10 seconds after the previous test started before retrying.'
     }
     if (data.code === 'PROVIDER_IN_USE') {
-      return '语言路径仍在引用此配置，请先解除引用。'
+      return 'A language path still references this configuration. Remove the reference first.'
     }
     if (data.code === 'TYPE_IMMUTABLE') {
-      return '服务类型不能更换，请新增另一份配置。'
+      return 'Provider type cannot change. Add a separate configuration.'
     }
   }
   return managementFailure(error)

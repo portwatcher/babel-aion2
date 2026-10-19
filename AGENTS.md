@@ -104,8 +104,9 @@
 - The requested `better-interface` skill is installed at
   `.agents/skills/better-interface/SKILL.md`. Use it for combined interface
   reviews; use installed `better-*` domain skills for focused work.
-- Read `.impeccable.md` for the provisional design context. Keep interface copy
-  in Simplified Chinese and separate from selectable subtitle languages.
+- Read `.impeccable.md` for the provisional design context. Keep player interface copy
+  in the English, Simplified Chinese, Japanese and Korean catalogs, independent
+  of selectable subtitle languages. Administration uses hard-coded English only.
 
 ## Validation and release
 

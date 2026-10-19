@@ -91,7 +91,7 @@ async function save(input: ProviderSave) {
         method: 'PUT',
         body: input,
       }),
-    '配置已保存。字幕通道尚未启用。',
+    'Configuration saved. Subtitle delivery is not enabled yet.',
   )
 }
 async function test(provider: ProviderSummary) {
@@ -101,7 +101,7 @@ async function test(provider: ProviderSummary) {
         method: 'POST',
         body: { expectedVersion: provider.version },
       }),
-    '连接测试已结束，请查看该配置的结果。',
+    'Connection test complete. Check the result for this configuration.',
   )
 }
 async function restore() {
@@ -118,7 +118,7 @@ async function restore() {
           restoreVersion: restoreVersion.value,
         },
       }),
-    '历史设置已通过连接测试，并保存为新版本。',
+    'Historical settings passed the connection test and were saved as a new version.',
   )
   restoreVersion.value = null
 }
@@ -142,7 +142,7 @@ async function remove() {
         editing.value = false
         selected.value = null
       }
-      notice.value = '配置及其凭据历史已删除。'
+      notice.value = 'Configuration and credential history deleted.'
     }
   } catch (failure) {
     if (!disposed) {
@@ -165,15 +165,15 @@ onBeforeUnmount(() => {
     :aria-busy="busy"
   >
     <div class="section-heading">
-      <h2 id="providers-title">字幕服务配置</h2>
+      <h2 id="providers-title">Subtitle provider configurations</h2>
       <div class="management-actions">
         <Button
-          label="新增候选配置"
+          label="Add candidate configuration"
           :disabled="busy || !loaded || !protectionReady"
           @click="edit(null)"
         />
         <Button
-          label="重新载入服务配置"
+          label="Reload providers"
           severity="secondary"
           :disabled="busy"
           @click="load"
@@ -181,19 +181,20 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <p class="muted">
-      连接测试检查凭据与模型访问。随后需要验证输出语言的样本路径，并手动启用语言。
+      Connection tests check credentials and model access. Then validate the output
+      language sample path and enable the language manually.
     </p>
     <p class="muted">
-      Soniox 测试发送 1 秒静音；DeepL
-      测试将固定英文短句翻译成德文。测试及连接参数更新可能产生服务费用。
+      Soniox tests send one second of silence. DeepL tests translate a fixed English
+      phrase into German. Tests and connection updates may incur provider charges.
     </p>
     <p v-if="loaded && !protectionReady" class="muted">
-      服务器尚未配置凭据保护，暂不能保存或测试服务。
+      Credential protection is not configured. Providers cannot be saved or tested yet.
     </p>
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
     <p v-if="loaded && !providers.length" class="muted">
-      尚无服务配置。生产字幕语言仍为空。
+      No provider configurations. Production subtitle languages remain empty.
     </p>
     <ul v-else class="configuration-list">
       <li v-for="provider in providers" :key="provider.id">
@@ -201,7 +202,9 @@ onBeforeUnmount(() => {
           <h3>{{ provider.name }}</h3>
           <Tag
             :value="
-              provider.lastTest ? providerTestLabel(provider.lastTest.code) : '尚未测试'
+              provider.lastTest
+                ? providerTestLabel(provider.lastTest.code)
+                : 'Not tested'
             "
             :severity="provider.lastTest?.code === 'PASS' ? 'success' : 'secondary'"
           />
@@ -209,33 +212,34 @@ onBeforeUnmount(() => {
         <p class="muted">
           {{
             provider.settings.type === 'soniox'
-              ? 'Soniox · 语音识别候选'
-              : 'DeepL · 文本翻译候选'
+              ? 'Soniox · Recognition candidate'
+              : 'DeepL · Translation candidate'
           }}
-          · 版本 {{ provider.version }}
+          · Version {{ provider.version }}
         </p>
         <small v-if="provider.lastTest" class="muted"
-          >上次测试 {{ new Date(provider.lastTest.checkedAt).toLocaleString() }} ·
-          {{ provider.lastTest.durationMs }} ms；不代表字幕质量已验证。</small
+          >Last test {{ new Date(provider.lastTest.checkedAt).toLocaleString('en') }} ·
+          {{ provider.lastTest.durationMs }} ms; This does not validate subtitle
+          quality.</small
         >
         <div class="management-actions">
           <Button
-            :aria-label="`编辑 ${provider.name}`"
-            label="编辑"
+            :aria-label="`Edit ${provider.name}`"
+            label="Edit"
             severity="secondary"
             :disabled="busy || !protectionReady"
             @click="edit(provider)"
           />
           <Button
-            :aria-label="`测试 ${provider.name}`"
-            label="测试已保存配置"
+            :aria-label="`Test ${provider.name}`"
+            label="Test saved configuration"
             severity="secondary"
             :disabled="busy || !protectionReady"
             @click="test(provider)"
           />
           <Button
-            :aria-label="`删除 ${provider.name}`"
-            label="删除"
+            :aria-label="`Delete ${provider.name}`"
+            label="Delete"
             severity="danger"
             :disabled="busy"
             @click="removing = provider"
@@ -252,23 +256,25 @@ onBeforeUnmount(() => {
       @cancel="editing = false"
     />
     <div v-if="editing && selected?.history.length" class="management-confirmation">
-      <label for="provider-history">恢复历史设置（显示最近 20 个版本）</label>
+      <label for="provider-history"
+        >Restore historical settings (latest 20 versions)</label
+      >
       <Select
         input-id="provider-history"
         v-model="restoreVersion"
         :options="
           selected.history.map((row) => ({
-            label: `版本 ${row.version} · ${row.name}`,
+            label: `Version ${row.version} · ${row.name}`,
             value: row.version,
           }))
         "
         option-label="label"
         option-value="value"
         :disabled="busy"
-        placeholder="选择历史版本"
+        placeholder="Select a historical version"
       />
       <Button
-        label="测试并恢复该版本"
+        label="Test and restore version"
         severity="secondary"
         :disabled="busy || !restoreVersion"
         @click="restore"
@@ -284,18 +290,18 @@ onBeforeUnmount(() => {
       v-if="removing"
       class="management-confirmation"
       role="group"
-      aria-label="确认删除服务配置"
+      aria-label="Confirm provider deletion"
     >
-      <p>删除「{{ removing.name }}」及其全部凭据历史？</p>
+      <p>Delete “{{ removing.name }}” and all its credential history?</p>
       <div class="management-actions">
         <Button
-          label="确认删除配置"
+          label="Confirm deletion"
           severity="danger"
           :disabled="busy"
           @click="remove"
         />
         <Button
-          label="取消删除"
+          label="Cancel deletion"
           severity="secondary"
           :disabled="busy"
           @click="removing = null"
