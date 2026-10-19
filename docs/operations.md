@@ -119,7 +119,8 @@ Also account for revocations written after the snapshot: a point-in-time backup
 does not contain that later history. Production recovery must fence the old
 services and outstanding credentials before exposing the restored application.
 Supervisor/host recovery and production disaster-recovery coordination remain
-unfinished; the local checks below do not establish those paths.
+unfinished; neither the local fixture nor isolated production-snapshot restoration
+establishes those paths.
 
 `npm run test:restore:db` rehearses real custom-format dumps and restores using
 only generated local fixture data. It creates its own source and destination
@@ -147,7 +148,25 @@ provider settings/history, terminology and language validation revisions, and
 denial of a previously ended listener. A separate running-state snapshot retains
 an unconfirmed player receipt: nickname replacement stays JOINING while an
 unrelated nickname becomes ACTIVE. See [validation](test-report.md) for tested
-PostgreSQL versions. No production backup or restore has been rehearsed.
+PostgreSQL versions. This command uses generated fixture data rather than a
+production backup.
+
+Private infra also provides `babel-restore-rehearsal.mjs`, exercised against a
+read-only production snapshot on 2026-10-19. It uses the deployed database and web
+image digests, restores into an isolated local Docker database, checks all 19
+application/migration tables and schema, repeats migrations and starts the actual
+web runtime without a voice worker. The existing key decrypts the restored room
+credential; a wrong key is rejected. Restored unknown owners and transport receipts
+remain unconfirmed. See the [production snapshot report](test-report.md#production-snapshot-restoration--2026-10-19).
+
+Run that command from private infra using its documented Kubernetes access and
+local Docker prerequisites. Restore destinations are created by the tool, not
+supplied as connection URLs. It stores only an AES-256-GCM-encrypted temporary
+dump on disk, keeps its one-use backup key in memory and removes both the archive
+and temporary registry configuration afterward. It is a restore rehearsal, not a
+backup retention service. Keep a durable backup and its separate recovery key in
+approved protected storage for actual recovery; production roles/grants,
+old-service fencing and later revocations still need the production recovery plan.
 
 `NUXT_PROVIDER_ENCRYPTION_KEY` protects saved Discord bot credentials and current
 and historical provider credentials. Generate

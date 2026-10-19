@@ -8,21 +8,22 @@ unchanged from `bbe9fc2`; private infra now deploys the worker and relay policie
 The dated reports below retain the conditions of each run. A local or isolated
 PASS applies only to that named check, not automatically to production.
 
-| Acceptance area                              | Result                    | Evidence and remaining dependency                                                                                                                                                                                |
-| -------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Web release and access boundaries            | PASS                      | Two production web replicas, 12 migrations, public browser/assets and direct-origin rejection checks passed; see the production release report below                                                             |
-| Local listener, media and subtitle contracts | PASS                      | Built application suites cover nickname replacement, actual peer closure, per-member PCM, shared subtitle transport and child-process recovery; live provider responses are not part of these proofs             |
-| Production voice infrastructure              | PASS                      | One ready worker, authenticated private control, configured pool budgets, actual pod/public TURN forwarding and normal Chrome media connection/exit passed; see the current deployment report                    |
-| Production Discord configuration             | PASS                      | Human Access login, normal encrypted-credential save and separate start succeeded. ALL_CHANNEL reports LISTENING with no failure reason; a real browser listener connected while the source was live             |
-| Production single-member receipt             | PASS                      | After the human joined the configured voice channel, the actual worker reported the correct member identity and 282 decoded frames at 02:03 UTC, generation 9, with no failure reason                            |
-| Production session and PiP lifecycle         | PASS                      | Real Chrome replacement, same-session refresh, playback action, administrator removal and PiP closure passed against deployed replicas; independent persisted transport receipts confirm closure                 |
-| Graceful production worker replacement       | PASS                      | Settings and listener generation survived GitOps replacement. A cross-node TURN routing regression was reproduced and corrected; the browser reconnected and the new source decoded another 29 frames            |
-| Single-member audible playback               | PASS                      | After the relay correction and browser reconnection, the human confirmed hearing their own Discord voice through the production Babel webpage                                                                    |
-| Multiple-member behavior                     | NOT RUN                   | Simultaneous speakers, production source separation and production member leave/re-entry remain outstanding                                                                                                      |
-| Live subtitle quality                        | WAITING FOR CONFIGURATION | Soniox/DeepL settings and validation are implemented. Authorized credentials and representative commands are needed to validate each chosen output language                                                      |
-| Native window and game use                   | NOT RUN                   | Real Chrome subtitle-window opening and replacement-driven closure passed with subtitles disabled. Native desktop inspection failed; background audible playback and actual AION2 display mode remain unverified |
-| Deployed latency and capacity                | NOT RUN                   | Production transport now connects, but actual source/playback timing, load and player networks including mainland China remain unmeasured; connection success is not end-to-end latency evidence                 |
-| Production disaster recovery                 | NOT RUN                   | Child-process recovery, isolated database restore and published-image rollback passed. Supervisor/container/host-loss fencing and actual production restore/rollback remain outstanding                          |
+| Acceptance area                              | Result                    | Evidence and remaining dependency                                                                                                                                                                                   |
+| -------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web release and access boundaries            | PASS                      | Two production web replicas, 12 migrations, public browser/assets and direct-origin rejection checks passed; see the production release report below                                                                |
+| Local listener, media and subtitle contracts | PASS                      | Built application suites cover nickname replacement, actual peer closure, per-member PCM, shared subtitle transport and child-process recovery; live provider responses are not part of these proofs                |
+| Production voice infrastructure              | PASS                      | One ready worker, authenticated private control, configured pool budgets, actual pod/public TURN forwarding and normal Chrome media connection/exit passed; see the current deployment report                       |
+| Production Discord configuration             | PASS                      | Human Access login, normal encrypted-credential save and separate start succeeded. ALL_CHANNEL reports LISTENING with no failure reason; a real browser listener connected while the source was live                |
+| Production single-member receipt             | PASS                      | After the human joined the configured voice channel, the actual worker reported the correct member identity and 282 decoded frames at 02:03 UTC, generation 9, with no failure reason                               |
+| Production session and PiP lifecycle         | PASS                      | Real Chrome replacement, same-session refresh, playback action, administrator removal and PiP closure passed against deployed replicas; independent persisted transport receipts confirm closure                    |
+| Graceful production worker replacement       | PASS                      | Settings and listener generation survived GitOps replacement. A cross-node TURN routing regression was reproduced and corrected; the browser reconnected and the new source decoded another 29 frames               |
+| Production snapshot restoration              | PASS                      | A read-only production snapshot restored all 19 application/migration tables, schema, sequences and one encrypted Discord credential into isolated local PostgreSQL; the exact published web image passed readiness |
+| Single-member audible playback               | PASS                      | After the relay correction and browser reconnection, the human confirmed hearing their own Discord voice through the production Babel webpage                                                                       |
+| Multiple-member behavior                     | NOT RUN                   | Simultaneous speakers, production source separation and production member leave/re-entry remain outstanding                                                                                                         |
+| Live subtitle quality                        | WAITING FOR CONFIGURATION | Soniox/DeepL settings and validation are implemented. Authorized credentials and representative commands are needed to validate each chosen output language                                                         |
+| Native window and game use                   | NOT RUN                   | Real Chrome subtitle-window opening and replacement-driven closure passed with subtitles disabled. Native desktop inspection failed; background audible playback and actual AION2 display mode remain unverified    |
+| Deployed latency and capacity                | NOT RUN                   | Production transport now connects, but actual source/playback timing, load and player networks including mainland China remain unmeasured; connection success is not end-to-end latency evidence                    |
+| Production disaster recovery                 | NOT RUN                   | Production-snapshot restoration and isolated published-image rollback passed. Durable backup retention, old-service fencing, production failover and live deployment rollback remain outstanding                    |
 
 Empty production provider and language lists are intentional and do not block
 the web release or original-audio deployment. Optional character enrichment is
@@ -100,6 +101,43 @@ The single-member listening result does not establish simultaneous members,
 live translated subtitles, background sound, AION2 fullscreen behavior, capacity,
 or recovery after abrupt supervisor/container/host loss. Native desktop window
 inspection failed, while browser access to the actual PiP document succeeded.
+
+## Production snapshot restoration — 2026-10-19
+
+PASS: private infra now provides a reusable rehearsal that reads the actual
+production database through the existing application role. A read-only exported
+PostgreSQL snapshot supplies both the custom-format dump and independent table
+digests. The production database and room settings are not modified.
+
+The rehearsal restores the encrypted archive into a new local PostgreSQL
+container using the production database image, encoding and locale. Restore uses
+a generated non-superuser role; no production database URL is accepted as a
+restore destination. The published web image runs as UID 1000 with a read-only
+filesystem on an internal Docker network, without published ports or a voice
+worker. It never attempts a Discord connection.
+
+| Check                         | Result | Evidence                                                                                                                                                                                                                          |
+| ----------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Consistent data and schema    | PASS   | All 19 application/migration tables, columns, constraints, indexes and sequence values match the exported snapshot; migration history contains 12 entries                                                                         |
+| Encryption and settings       | PASS   | The custom-format archive survives AES-256-GCM encryption/decryption. Room version 5, ALL_CHANNEL and running state survive; the existing protected key decrypts the one saved Discord credential and a different key is rejected |
+| Published runtime             | PASS   | Repeating its migrations changes no snapshot data. Lobby, liveness, readiness and player configuration return 200; unauthenticated management returns 401                                                                         |
+| Unconfirmed transport records | PASS   | The restored three open process owners and one open socket/media/source receipt each remain unconfirmed after web startup. The new web owner shuts down cleanly; restoration supplies no invented close receipt                   |
+| Isolation and cleanup         | PASS   | No ports are published, no voice worker is started, and only labelled rehearsal resources are removed. Temporary databases, encrypted archive, registry credentials and newly pulled image references are removed                 |
+| Production continuity         | PASS   | Subsequent inspection shows unchanged room settings, the same healthy web/voice pods with zero restarts, and Discord still LISTENING at source generation 11                                                                      |
+
+An earlier digest comparison differed only in migration-row ordering between
+database platform variants. Production locale order was 10, 11, 12, 1, 2…;
+byte order was 1, 10, 11, 12, 2…. The rehearsal uses explicit byte ordering for
+digests and the production database image/locale for restoration. No missing
+production rows or schema difference was found.
+
+This proof uses the real stored data and current published release, extending
+the earlier generated-fixture restore check. It does not establish durable backup
+retention, restoration of production roles/grants, live failover, reconciliation
+of later revocations, or fencing after abrupt host loss. The temporary backup key
+is discarded; this rehearsal does not retain a usable disaster-recovery backup.
+Provider/language tables are currently empty, so live provider recovery and
+translation quality are not exercised. See [operations](operations.md#backup-and-restore-procedure).
 
 ## Optional character source probe — 2026-10-19
 
