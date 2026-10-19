@@ -38,7 +38,7 @@ function save() {
   try {
     canonical = new Intl.Locale(code.value.trim()).baseName
   } catch {
-    error.value = '请输入有效的语言代码，例如 zh-Hans、zh-Hant、ja 或 ko。'
+    error.value = 'Enter a valid language code, such as zh-Hans, zh-Hant, ja or ko.'
     return
   }
   const input = languageSaveSchema.safeParse({
@@ -49,7 +49,8 @@ function save() {
     includeTerms: includeTerms.value,
   })
   if (!languageCodeSchema.safeParse(canonical).success || !input.success) {
-    error.value = '请检查语言代码、显示名称，并选择识别与翻译配置。'
+    error.value =
+      'Check the language code and display name, and select recognition and translation configurations.'
     return
   }
   emit('save', canonical, input.data)
@@ -58,35 +59,38 @@ function save() {
 
 <template>
   <form class="entry-form provider-editor" @submit.prevent="save">
-    <h3>{{ current ? `编辑输出语言：${current.name}` : '新增输出语言' }}</h3>
+    <h3>
+      {{ current ? `Edit output language: ${current.name}` : 'Add output language' }}
+    </h3>
     <div class="management-fields">
       <div class="field">
-        <label for="output-code">语言代码</label>
+        <label for="output-code">Language code</label>
         <InputText
           id="output-code"
           v-model="code"
           maxlength="35"
           :disabled="busy || !!current"
-          placeholder="例如 zh-Hans、ja、ko"
+          placeholder="e.g. zh-Hans, ja, ko"
           required
         />
         <small class="muted"
-          >简体和繁体请分别使用 zh-Hans 与 zh-Hant。保存后代码不可更改。</small
+          >Use zh-Hans for Simplified Chinese and zh-Hant for Traditional Chinese. The
+          code cannot change after saving.</small
         >
       </div>
       <div class="field">
-        <label for="output-name">显示名称</label>
+        <label for="output-name">Display name</label>
         <InputText
           id="output-name"
           v-model="name"
           maxlength="80"
           :disabled="busy"
-          placeholder="例如 简体中文"
+          placeholder="e.g. Simplified Chinese"
           required
         />
       </div>
       <div class="field">
-        <label for="output-recognition">语音识别服务</label>
+        <label for="output-recognition">Speech recognition provider</label>
         <Select
           input-id="output-recognition"
           v-model="recognitionId"
@@ -94,11 +98,11 @@ function save() {
           option-label="name"
           option-value="id"
           :disabled="busy || current?.enabled"
-          placeholder="选择 Soniox 配置"
+          placeholder="Select Soniox configuration"
         />
       </div>
       <div class="field">
-        <label for="output-translation">文本翻译服务</label>
+        <label for="output-translation">Text translation provider</label>
         <Select
           input-id="output-translation"
           v-model="translationId"
@@ -106,7 +110,7 @@ function save() {
           option-label="name"
           option-value="id"
           :disabled="busy || current?.enabled"
-          placeholder="选择 DeepL 配置"
+          placeholder="Select DeepL configuration"
         />
       </div>
     </div>
@@ -117,16 +121,22 @@ function save() {
         binary
         :disabled="busy || current?.enabled"
       />
-      <label for="output-terms">使用已启用的游戏术语提示</label>
+      <label for="output-terms">Use enabled game terminology hints</label>
     </div>
     <small class="muted"
-      >保存后需用授权音频验证路径。启用术语提示时，词表内容也会发送给识别和翻译服务。</small
+      >Validate the saved path with authorized audio. When terminology hints are
+      enabled, catalog content is sent to recognition and translation providers.</small
     >
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <div class="management-actions">
-      <Button type="submit" label="保存输出语言" :loading="busy" :disabled="busy" />
       <Button
-        label="取消编辑语言"
+        type="submit"
+        label="Save output language"
+        :loading="busy"
+        :disabled="busy"
+      />
+      <Button
+        label="Cancel language editing"
         severity="secondary"
         :disabled="busy"
         @click="emit('cancel')"

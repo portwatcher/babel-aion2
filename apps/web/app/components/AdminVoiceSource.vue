@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const { t } = useInterfaceLocale()
 import { voiceSourceStatusSchema, type VoiceSourceStatus } from '@babel/contracts'
 import { audioStatus } from '~/utils/audio-status'
 
@@ -10,13 +11,13 @@ let timer: ReturnType<typeof setInterval> | undefined
 const reason = computed(() => {
   switch (source.value?.reason) {
     case 'CONFIGURATION':
-      return '请检查来源设置和 worker 的凭据保护配置。'
+      return 'Check source settings and worker credential protection.'
     case 'OWNERSHIP':
-      return '另一个 worker 或尚未确认关闭的旧来源占有此机器人。'
+      return 'Another worker or a previous source awaiting confirmed shutdown owns this bot.'
     case 'STORAGE':
-      return '来源存储暂不可用，音频已停止。'
+      return 'Source storage unavailable. Audio has stopped.'
     case 'DISCORD':
-      return 'Discord 连接暂不可用，正在重试。'
+      return 'Discord connection unavailable. Retrying.'
     default:
       return ''
   }
@@ -55,14 +56,14 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="field" aria-live="polite">
-    <p v-if="unavailable" class="muted">暂时无法连接语音 worker。</p>
+    <p v-if="unavailable" class="muted">Voice worker temporarily unreachable.</p>
     <template v-else-if="source">
-      <p>{{ audioStatus[source.state].description }}</p>
+      <p>{{ t(audioStatus[source.state].description) }}</p>
       <p v-if="reason" class="muted">{{ reason }}</p>
-      <ul v-if="source.speakers.length" aria-label="已接收的频道音源">
+      <ul v-if="source.speakers.length" aria-label="Received channel audio sources">
         <li v-for="speaker in source.speakers" :key="speaker.id">
-          {{ speaker.displayName }} · {{ speaker.id }} · 已解码
-          {{ speaker.receivedFrames }} 帧
+          {{ speaker.displayName }} · {{ speaker.id }} · Decoded
+          {{ speaker.receivedFrames }} frames
         </li>
       </ul>
     </template>

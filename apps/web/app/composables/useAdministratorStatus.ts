@@ -17,7 +17,8 @@ export function useAdministratorStatus() {
       error.value = ''
     } catch {
       status.value = null
-      error.value = '管理会话不可用。请重新建立会话，或通过 Access 入口重新登录。'
+      error.value =
+        'Administrator session unavailable. Reconnect or sign in again through Access.'
     }
   }
 
@@ -34,7 +35,8 @@ export function useAdministratorStatus() {
         poll = setInterval(refresh, 10_000)
       }
     } catch {
-      error.value = '无法建立管理会话。请检查 Access、数据库和会话密钥配置后重试。'
+      error.value =
+        'Could not establish administrator session. Check Access, database and session key settings, then retry.'
     } finally {
       loading.value = false
     }

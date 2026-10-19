@@ -1,5 +1,5 @@
+import type { InterfaceMessageKey } from '~/locales'
 import {
-  REPLACEMENT_NOTICE,
   selectOutputLanguage,
   type ListenerSnapshot,
   type PlayerEvent,
@@ -19,13 +19,14 @@ import {
 } from '~/utils/listener-client'
 
 export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | null>) {
+  const { t } = useInterfaceLocale()
   const session = shallowRef<ListenerSnapshot | null>(null)
-  const restoring = ref(true)
+  const restoring = ref(false)
   const restoreFailed = ref(false)
   const submitting = ref(false)
   const changingLanguage = ref(false)
-  const error = ref('')
-  const notice = ref('')
+  const error = ref<InterfaceMessageKey | ''>('')
+  const notice = ref<InterfaceMessageKey | ''>('')
   const leavePending = ref(false)
   const active = computed(
     () =>
@@ -71,7 +72,7 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
     clearAccess()
     session.value = null
     leavePending.value = false
-    notice.value = '本页会话已失效，请手动重新进入。'
+    notice.value = 'sessionInvalid'
   }
 
   function accept(next: ListenerSnapshot) {
@@ -85,12 +86,12 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
       clearAccess()
       notice.value =
         next.terminalReason === 'DUPLICATE_NICKNAME_REPLACED'
-          ? REPLACEMENT_NOTICE
+          ? 'sessionReplaced'
           : next.terminalReason === 'ADMINISTRATOR_REMOVED'
-            ? '管理员已结束你的收听连接。'
+            ? 'sessionRemoved'
             : next.terminalReason === 'CONNECTION_EXPIRED'
-              ? '连接已过期，请手动重新进入。'
-              : '你已退出房间。'
+              ? 'sessionExpired'
+              : 'sessionLeft'
     }
   }
 
@@ -126,14 +127,14 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
       ) {
         const selected = chooseLanguage()
         notice.value = !selected
-          ? '所有字幕语言已停用，原声继续播放。'
+          ? 'allLanguagesDisabled'
           : current
-            ? '原字幕语言已停用，已按你的语言偏好重新选择。'
-            : '字幕已启用，已按你的语言偏好选择语言。'
+            ? 'languageReselected'
+            : 'languageEnabled'
         void changeLanguage(selected, false)
       }
     } else if (event.type === 'error' && event.code === 'UNAVAILABLE') {
-      error.value = '连接暂时不可用，正在恢复本页会话。'
+      error.value = 'sessionRecovering'
     }
   }
 
@@ -175,7 +176,7 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
       }
     } catch {
       if (!disposed && currentEpoch === epoch) {
-        error.value = '入场结果尚未确认，请重试。重试会继续同一次入场。'
+        error.value = 'entryUnconfirmed'
       }
     } finally {
       submitting.value = false
@@ -191,7 +192,7 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
     try {
       if (!access) {
         if (loadPendingEntry()) {
-          notice.value = '上次入场结果尚未确认，请手动重试。'
+          notice.value = 'previousEntryUnconfirmed'
         }
         return
       }
@@ -221,7 +222,7 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
         invalidSession()
       } else {
         restoreFailed.value = true
-        error.value = '暂时无法恢复本页会话，请重试。'
+        error.value = 'restoreFailed'
       }
     } finally {
       restoring.value = false
@@ -260,7 +261,7 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
       ) {
         invalidSession()
       } else {
-        error.value = '本页连接已停止，服务器尚未确认退出。请重试退出。'
+        error.value = 'leaveUnconfirmed'
       }
     } finally {
       submitting.value = false
@@ -290,7 +291,7 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
       error.value = ''
     } catch {
       if (!disposed && currentEpoch === epoch) {
-        error.value = '字幕语言未能切换，请重试。'
+        error.value = 'languageChangeFailed'
       }
     } finally {
       changingLanguage.value = false
@@ -311,8 +312,8 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
     restoreFailed,
     submitting,
     changingLanguage,
-    error,
-    notice,
+    error: computed(() => (error.value ? t(error.value) : '')),
+    notice: computed(() => (notice.value ? t(notice.value) : '')),
     active,
     leavePending,
     connectionState: connection.state,

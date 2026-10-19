@@ -6,7 +6,8 @@ export default defineNuxtRouteMiddleware(async () => {
     throw createError({
       statusCode: 403,
       statusMessage: 'Administrator access required',
-      message: '管理入口暂不可用。请通过已配置的 Cloudflare Access 入口重新登录。',
+      message:
+        'Administration is unavailable. Sign in again through the configured Cloudflare Access entry.',
     })
   }
 })

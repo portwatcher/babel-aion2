@@ -1,5 +1,27 @@
 # Validation
 
+## Interface localization — 2026-10-19
+
+Scope: local source and built-server checks for player interface localization and
+English-only administration. This change has not been released or deployed.
+
+| Check                                          | Result  | Evidence                                                                                                                                                                                                                                        |
+| ---------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local validation                               | PASS    | `npm run ci:local`: strict workspace types, formatting, source limits, 18 unit tests, all builds and HTTP smoke pass                                                                                                                            |
+| SSR detection and fallback                     | PASS    | Concurrent built-server requests render English, Simplified Chinese, Japanese and Korean entry forms; weighted preferences, q=0 exclusions, invalid/missing preferences and unsupported-language English fallback pass                          |
+| Saved SSR choice                               | PASS    | Cookie preference overrides browser headers; cn/jp/kr aliases normalize and invalid values fall back to detection                                                                                                                               |
+| Administrator and error boundaries             | PASS    | Korean 404 content is translated; protected /admin, nested and encoded administrator paths retain 401 and render English despite a Japanese cookie and Chinese browser preference                                                               |
+| Browser selection and persistence              | PASS    | Codex in-app browser selects all four locales, updates headings/metadata/accessibility text, preserves typed nickname across selection, retains Japanese after reload and restores it after returning from the English administrator error page |
+| Hydration and narrow layout                    | PASS    | Fresh public-page load has no browser warnings/errors; Korean view at 320px has a 320px document width with no horizontal overflow                                                                                                              |
+| Authenticated administrator forms              | NOT RUN | All administrator copy and feedback were translated and type-checked; this local browser check does not establish an authenticated Access session                                                                                               |
+| LocalStorage-only and blocked-storage recovery | NOT RUN | The code guards unavailable storage and restores preferences after hydration; browser checks covered ordinary persistence, not storage removal or denial                                                                                        |
+| Live listener and PiP locale changes           | NOT RUN | Translated reactive notices and PiP metadata compile; a live audio session was not exercised for this copy change                                                                                                                               |
+
+The new HTTP regression initially exposed an administrator error-page locale
+leak through Nuxt's internal error URL. Reading the original SSR context URL fixed
+the owner boundary, and the same regression now passes. Interface catalogs do not
+enable subtitle languages or validate provider translation quality.
+
 ## Current acceptance status — 2026-10-19
 
 The complete `design.md` delivery is unfinished. Production runs web, voice and

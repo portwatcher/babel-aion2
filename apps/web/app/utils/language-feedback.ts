@@ -3,21 +3,21 @@ import { providerFailure, providerTestLabel } from './provider-feedback'
 
 export function languageValidationLabel(language: ManagedLanguage) {
   return {
-    NOT_TESTED: '尚未验证样本路径',
-    CURRENT: '当前样本路径已验证',
-    STALE: '配置已变化，需重新验证',
+    NOT_TESTED: 'Sample path not validated',
+    CURRENT: 'Current sample path validated',
+    STALE: 'Configuration changed; validation required',
   }[language.validationState]
 }
 
 export function languageAttemptLabel(language: ManagedLanguage) {
   const code = language.lastAttempt?.code
   return code === 'PASS'
-    ? '样本路径通过'
+    ? 'Sample path passed'
     : code === 'NO_SPEECH'
-      ? '未识别出稳定语音'
+      ? 'No stable speech detected'
       : code
         ? providerTestLabel(code)
-        : '尚未测试'
+        : 'Not tested'
 }
 
 export function languageFailure(error: unknown) {
@@ -28,19 +28,19 @@ export function languageFailure(error: unknown) {
   if (data && typeof data === 'object' && 'code' in data) {
     switch (data.code) {
       case 'INVALID_LANGUAGE':
-        return '请检查语言代码、名称和必填配置。'
+        return 'Check the language code, name and required configurations.'
       case 'INVALID_PATH':
-        return '请选择仍存在的 Soniox 识别配置和 DeepL 翻译配置。'
+        return 'Select existing Soniox recognition and DeepL translation configurations.'
       case 'PATH_UNVALIDATED':
-        return '请先使用授权样本验证当前语言路径。'
+        return 'Validate the current language path with an authorized sample first.'
       case 'DELIVERY_UNAVAILABLE':
-        return '玩家字幕投递尚未接通，暂不能启用语言。'
+        return 'Player subtitle delivery is unavailable. Languages cannot be enabled yet.'
       case 'LANGUAGE_ENABLED':
-        return '请先停用此语言，再更换路径或删除。'
+        return 'Disable this language before changing its path or deleting it.'
       case 'VERSION_CONFLICT':
-        return '语言或服务配置已被更新，请重新载入后重试。'
+        return 'Language or provider configuration changed. Reload and retry.'
       case 'NOT_FOUND':
-        return '此语言或配置已不存在，请重新载入。'
+        return 'This language or configuration no longer exists. Reload the list.'
     }
   }
   return providerFailure(error)

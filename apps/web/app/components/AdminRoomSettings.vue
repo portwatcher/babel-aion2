@@ -15,8 +15,8 @@ const guildId = ref('')
 const voiceChannelId = ref('')
 const captureMode = ref<DiscordCaptureMode>('SELECTED_USERS')
 const captureModes = [
-  { label: '指定成员', value: 'SELECTED_USERS' },
-  { label: '频道全部成员', value: 'ALL_CHANNEL' },
+  { label: 'Selected members', value: 'SELECTED_USERS' },
+  { label: 'All channel members', value: 'ALL_CHANNEL' },
 ]
 const commanderText = ref('')
 const credentialAction = ref<'keep' | 'replace' | 'remove'>('keep')
@@ -27,13 +27,15 @@ const notice = ref('')
 let disposed = false
 const credentialActions = computed(() => [
   {
-    label: current.value?.credentialConfigured ? '保留已保存的凭据' : '暂不设置凭据',
+    label: current.value?.credentialConfigured
+      ? 'Keep saved credential'
+      : 'Leave credential unset',
     value: 'keep',
     disabled: false,
   },
-  { label: '保存新凭据', value: 'replace', disabled: !protectionReady.value },
+  { label: 'Save new credential', value: 'replace', disabled: !protectionReady.value },
   {
-    label: '删除已保存的凭据',
+    label: 'Remove saved credential',
     value: 'remove',
     disabled: !current.value?.credentialConfigured,
   },
@@ -92,7 +94,7 @@ async function save() {
   })
   if (!input.success) {
     error.value =
-      '请填写房间名称；服务器和语音频道 ID 需同时填写，成员 ID 不可重复。新凭据不能包含空格。'
+      'Enter a room name, provide both server and voice channel IDs, and use unique member IDs. New credentials cannot contain spaces.'
     return
   }
   busy.value = true
@@ -102,7 +104,7 @@ async function save() {
     )
     if (!disposed) {
       accept(next)
-      notice.value = '设置已保存。来源变更后需要重新启动。'
+      notice.value = 'Settings saved. Restart after changing the source.'
     }
   } catch (failure) {
     if (!disposed) {
@@ -133,8 +135,8 @@ async function setRunning(running: boolean) {
     if (!disposed) {
       accept(next)
       notice.value = running
-        ? '启动请求已保存，正在连接来源。'
-        : '停止请求已保存，正在关闭来源。'
+        ? 'Start requested. Connecting to the source.'
+        : 'Stop requested. Closing the source.'
     }
   } catch (failure) {
     if (!disposed) {
@@ -162,22 +164,23 @@ onBeforeUnmount(() => {
     :aria-busy="busy"
   >
     <div class="section-heading">
-      <h2 id="room-settings-title">房间与 Discord 来源</h2>
+      <h2 id="room-settings-title">Room and Discord source</h2>
       <Tag
         v-if="current"
-        :value="current.stopped ? '保持停止' : '已请求运行'"
+        :value="current.stopped ? 'Stopped' : 'Start requested'"
         severity="secondary"
       />
     </div>
     <p class="muted">
-      保存来源设置后启动房间。连接状态和实际收到的成员音源会显示在下方。
+      Save source settings, then start the room. Connection status and received member
+      audio appear below.
     </p>
     <AdminVoiceSource />
     <p v-if="notice" role="status">{{ notice }}</p>
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <form v-if="current" class="entry-form" @submit.prevent="save">
       <div class="field">
-        <label for="room-name">房间名称</label>
+        <label for="room-name">Room name</label>
         <InputText
           id="room-name"
           v-model="name"
@@ -188,7 +191,7 @@ onBeforeUnmount(() => {
       </div>
       <div class="management-fields">
         <div class="field">
-          <label for="discord-guild">Discord 服务器 ID</label>
+          <label for="discord-guild">Discord server ID</label>
           <InputText
             id="discord-guild"
             v-model="guildId"
@@ -198,7 +201,7 @@ onBeforeUnmount(() => {
           />
         </div>
         <div class="field">
-          <label for="discord-channel">语音频道 ID</label>
+          <label for="discord-channel">Voice channel ID</label>
           <InputText
             id="discord-channel"
             v-model="voiceChannelId"
@@ -209,7 +212,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div class="field">
-        <label for="capture-mode">收听范围</label>
+        <label for="capture-mode">Capture scope</label>
         <Select
           input-id="capture-mode"
           v-model="captureMode"
@@ -221,12 +224,12 @@ onBeforeUnmount(() => {
         />
         <small id="capture-mode-help" class="muted">{{
           captureMode === 'ALL_CHANNEL'
-            ? '自动接收该频道的发言成员，按 Discord 用户区分音源，无需填写成员 ID。'
-            : '只接收下方指定成员的语音。'
+            ? 'Receive speaking members automatically, with separate audio per Discord user. No member IDs are required.'
+            : 'Receive audio only from the members listed below.'
         }}</small>
       </div>
       <div v-if="captureMode === 'SELECTED_USERS'" class="field">
-        <label for="commanders">成员 Discord 用户 ID</label>
+        <label for="commanders">Member Discord user IDs</label>
         <Textarea
           id="commanders"
           v-model="commanderText"
@@ -235,11 +238,11 @@ onBeforeUnmount(() => {
           aria-describedby="commanders-help"
         />
         <small id="commanders-help" class="muted"
-          >每行一个 ID。只接收这些成员的语音。</small
+          >One ID per line. Receive audio only from these members.</small
         >
       </div>
       <div class="field">
-        <label for="credential-action">机器人凭据</label>
+        <label for="credential-action">Bot credential</label>
         <Select
           input-id="credential-action"
           v-model="credentialAction"
@@ -251,15 +254,15 @@ onBeforeUnmount(() => {
         />
         <small class="muted">{{
           current.credentialConfigured
-            ? '凭据已保存，不会在页面回显。'
-            : '尚未保存凭据。'
+            ? 'Credential saved. Its value is never returned to this page.'
+            : 'No credential saved.'
         }}</small>
         <p v-if="!protectionReady" class="muted">
-          服务器尚未配置凭据保护，暂不能保存新凭据。
+          Credential protection is not configured. New credentials cannot be saved yet.
         </p>
       </div>
       <div v-if="credentialAction === 'replace'" class="field">
-        <label for="discord-credential">新机器人 token</label>
+        <label for="discord-credential">New bot token</label>
         <InputText
           id="discord-credential"
           v-model="credential"
@@ -271,34 +274,36 @@ onBeforeUnmount(() => {
         />
       </div>
       <p v-if="credentialAction === 'remove'" class="form-error">
-        保存后将删除机器人凭据，并保持房间停止。
+        Saving removes the bot credential and keeps the room stopped.
       </p>
       <p class="muted">
-        更换凭据、语音频道、收听范围或成员名单会停止当前来源，需要重新验证后才能启动。
+        Changing credentials, voice channel, capture scope or members stops the current
+        source. Revalidate before restarting.
       </p>
       <div class="management-actions">
-        <Button type="submit" label="保存设置" :loading="busy" />
-        <Button label="重新载入" severity="secondary" :disabled="busy" @click="load" />
+        <Button type="submit" label="Save settings" :loading="busy" />
+        <Button label="Reload" severity="secondary" :disabled="busy" @click="load" />
         <Button
-          label="启动房间"
+          label="Start room"
           severity="secondary"
           :disabled="busy || !current.stopped || !current.sourceConfigured"
           @click="setRunning(true)"
         />
         <Button
-          label="停止房间"
+          label="Stop room"
           severity="danger"
           :disabled="busy || current.stopped"
           @click="setRunning(false)"
         />
       </div>
       <small class="muted"
-        >配置版本 {{ current.version }} · 重新载入会放弃本页未保存的修改。</small
+        >Configuration version {{ current.version }} · Reloading discards unsaved
+        changes on this page.</small
       >
     </form>
     <Button
       v-else
-      label="载入房间设置"
+      label="Load room settings"
       severity="secondary"
       :loading="busy"
       @click="load"

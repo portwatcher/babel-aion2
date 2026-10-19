@@ -2,6 +2,7 @@
 import type { ListenerSnapshot, PublicRoomConfiguration } from '@babel/contracts'
 import { audioStatus } from '~/utils/audio-status'
 import type { SubtitlePresentation } from '~/utils/subtitle-view'
+const { t } = useInterfaceLocale()
 const props = defineProps<{
   session: ListenerSnapshot
   configuration: PublicRoomConfiguration
@@ -24,11 +25,11 @@ const pip = useSubtitlePictureInPicture(
 )
 const { supported, opening, target, error: pipError } = pip
 const textSize = ref(1.25)
-const textSizes = [
-  { label: '标准', value: 1.25 },
-  { label: '大', value: 1.5 },
-  { label: '特大', value: 2 },
-]
+const textSizes = computed(() => [
+  { label: t('textStandard'), value: 1.25 },
+  { label: t('textLarge'), value: 1.5 },
+  { label: t('textExtraLarge'), value: 2 },
+])
 const languageName = computed(
   () =>
     props.configuration.outputLanguages.find(
@@ -42,31 +43,31 @@ const languageName = computed(
     <div class="section-heading">
       <h2 id="listener-title">{{ session.nickname }}</h2>
       <Tag
-        :value="connectionState === 'connected' ? '已进入房间' : '正在恢复连接'"
+        :value="connectionState === 'connected' ? t('joined') : t('reconnecting')"
         severity="secondary"
       />
     </div>
-    <p v-if="session.state === 'JOINING'" role="status">正在等待收听通道就绪。</p>
-    <p v-else role="status">会话已连接。</p>
-    <p class="muted">{{ audioStatus[configuration.room.audioState].description }}</p>
+    <p v-if="session.state === 'JOINING'" role="status">{{ t('waitingChannel') }}</p>
+    <p v-else role="status">{{ t('sessionConnected') }}</p>
+    <p class="muted">{{ t(audioStatus[configuration.room.audioState].description) }}</p>
     <p v-if="session.state === 'ACTIVE'" role="status">
       {{
         audioState === 'connected'
-          ? '原声通道已连接，等待指挥音频。'
+          ? t('audioConnected')
           : audioState === 'unavailable'
-            ? '原声通道暂不可用。'
-            : '正在连接原声通道。'
+            ? t('audioUnavailable')
+            : t('audioConnecting')
       }}
     </p>
     <Button
       v-if="audioBlocked"
-      label="播放原声"
+      :label="t('playAudio')"
       severity="secondary"
       @click="emit('playAudio')"
     />
     <Button
       v-if="audioState === 'connected'"
-      :label="muted ? '取消静音' : '静音'"
+      :label="muted ? t('unmute') : t('mute')"
       severity="secondary"
       :aria-pressed="muted"
       @click="emit('toggleMute')"
@@ -86,7 +87,7 @@ const languageName = computed(
       :subtitles="subtitles"
     />
     <div class="field">
-      <label for="subtitle-text-size">字幕字号</label>
+      <label for="subtitle-text-size">{{ t('subtitleTextSize') }}</label>
       <Select
         v-model="textSize"
         input-id="subtitle-text-size"
@@ -97,15 +98,13 @@ const languageName = computed(
     </div>
     <div v-if="supported" class="field">
       <Button
-        :label="target ? '关闭字幕小窗' : '打开字幕小窗'"
+        :label="target ? t('closePip') : t('openPip')"
         severity="secondary"
         :loading="opening"
         aria-describedby="pip-notice"
         @click="target ? pip.close() : pip.open()"
       />
-      <small id="pip-notice" class="muted">
-        小窗与本页同步。窗口大小由浏览器控制；全屏游戏中的显示效果需实际确认。
-      </small>
+      <small id="pip-notice" class="muted">{{ t('pipNotice') }}</small>
       <p v-if="pipError" class="form-error" role="alert">{{ pipError }}</p>
     </div>
     <Teleport v-if="target" :to="target">
@@ -120,7 +119,7 @@ const languageName = computed(
       />
     </Teleport>
     <Button
-      label="退出房间"
+      :label="t('leaveRoom')"
       severity="secondary"
       :loading="busy"
       @click="emit('leave')"

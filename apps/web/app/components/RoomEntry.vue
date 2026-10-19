@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import {
-  ENTRY_NOTICE,
+  NICKNAME_MAX_LENGTH,
   nicknameSchema,
   selectOutputLanguage,
   type PublicRoomConfiguration,
 } from '@babel/contracts'
 import { loadPendingEntry, savedLanguage, saveLanguage } from '~/utils/listener-client'
 
+const { t } = useInterfaceLocale()
 const props = defineProps<{
   configuration: PublicRoomConfiguration
   submitting: boolean
@@ -14,7 +15,12 @@ const props = defineProps<{
 const emit = defineEmits<{ enter: [nickname: string, outputLanguage: string | null] }>()
 const nickname = ref('')
 const outputLanguage = ref<string | null>(null)
-const validationError = ref('')
+const validationKey = ref<
+  'nicknameRequired' | 'nicknameControl' | 'nicknameTooLong' | null
+>(null)
+const validationError = computed(() =>
+  validationKey.value ? t(validationKey.value, { count: NICKNAME_MAX_LENGTH }) : '',
+)
 
 function selectLanguage() {
   outputLanguage.value = selectOutputLanguage(
@@ -39,9 +45,12 @@ watch(
 
 function enter() {
   const result = nicknameSchema.safeParse(nickname.value)
-  validationError.value = result.success
-    ? ''
-    : (result.error.issues[0]?.message ?? '请检查昵称')
+  const issue = result.success ? null : result.error.issues[0]?.message
+  validationKey.value = result.success
+    ? null
+    : issue === 'nicknameControl' || issue === 'nicknameTooLong'
+      ? issue
+      : 'nicknameRequired'
   if (result.success) {
     emit('enter', result.data, outputLanguage.value)
   }
@@ -54,20 +63,22 @@ function changeLanguage(value: string | null) {
 
 <template>
   <section class="entry-panel" aria-labelledby="entry-title">
-    <h2 id="entry-title">准备进入</h2>
+    <h2 id="entry-title">{{ t('prepareEntry') }}</h2>
     <form class="entry-form" @submit.prevent="enter">
       <div class="field">
-        <label for="nickname">游戏昵称</label>
+        <label for="nickname">{{ t('nickname') }}</label>
         <InputText
           id="nickname"
           v-model="nickname"
           autocomplete="off"
-          placeholder="输入你的角色名"
+          :placeholder="t('nicknamePlaceholder')"
           :invalid="Boolean(validationError)"
           :disabled="submitting"
           aria-describedby="nickname-limit nickname-notice nickname-error"
         />
-        <small id="nickname-limit" class="muted">最多 32 个字符，区分大小写。</small>
+        <small id="nickname-limit" class="muted">{{
+          t('nicknameLimit', { count: NICKNAME_MAX_LENGTH })
+        }}</small>
         <p id="nickname-error" class="form-error" role="alert">{{ validationError }}</p>
       </div>
       <OutputLanguageSelect
@@ -76,17 +87,15 @@ function changeLanguage(value: string | null) {
         :disabled="submitting"
         @update:model-value="changeLanguage"
       />
-      <p id="nickname-notice" class="entry-notice muted">{{ ENTRY_NOTICE }}</p>
+      <p id="nickname-notice" class="entry-notice muted">{{ t('entryNotice') }}</p>
       <Button
         type="submit"
-        :label="configuration.entryAvailable ? '进入房间' : '暂时无法进入'"
+        :label="configuration.entryAvailable ? t('joinRoom') : t('entryUnavailable')"
         :disabled="!configuration.entryAvailable"
         :loading="submitting"
         aria-describedby="availability-notice"
       />
-      <small id="availability-notice" class="muted"
-        >语音尚未接通。进入后可查看在线名单，并等待收听通道就绪。</small
-      >
+      <small id="availability-notice" class="muted">{{ t('entryAvailability') }}</small>
     </form>
   </section>
 </template>

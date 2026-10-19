@@ -82,7 +82,10 @@ function reload() {
   return load()
 }
 function providerName(id: string | null) {
-  return props.providers.find((provider) => provider.id === id)?.name ?? '配置不可用'
+  return (
+    props.providers.find((provider) => provider.id === id)?.name ??
+    'Configuration unavailable'
+  )
 }
 async function mutate(action: () => Promise<unknown>, message: string) {
   if (locked.value) {
@@ -114,7 +117,7 @@ function save(code: string, input: LanguageSave) {
         method: 'PUT',
         body: input,
       }),
-    '输出语言已保存。新语言需要验证路径后再启用。',
+    'Output language saved. Validate its path before enabling it.',
   )
 }
 function move(language: ManagedLanguage, direction: 'up' | 'down') {
@@ -124,7 +127,7 @@ function move(language: ManagedLanguage, direction: 'up' | 'down') {
         method: 'POST',
         body: { direction, expectedCatalogVersion: page.value?.version },
       }),
-    '语言顺序已保存。',
+    'Language order saved.',
   )
 }
 function setDefault(code: string | null) {
@@ -134,7 +137,7 @@ function setDefault(code: string | null) {
         method: 'POST',
         body: { code, expectedCatalogVersion: page.value?.version },
       }),
-    '默认语言设置已保存；语言开放后才会用于玩家选择。',
+    'Default language saved. It applies to player selection once the language is enabled.',
   )
 }
 function setState(language: ManagedLanguage) {
@@ -144,7 +147,7 @@ function setState(language: ManagedLanguage) {
         method: 'POST',
         body: { enabled: !language.enabled, expectedVersion: language.version },
       }),
-    '语言状态已更新。',
+    'Language state updated.',
   )
 }
 function remove() {
@@ -158,7 +161,7 @@ function remove() {
         method: 'DELETE',
         body: { expectedVersion: language.version },
       }),
-    '输出语言已删除。',
+    'Output language deleted.',
   )
 }
 function validated(language: ManagedLanguage) {
@@ -193,11 +196,15 @@ onBeforeUnmount(() => {
     :aria-busy="locked"
   >
     <div class="section-heading">
-      <h2 id="languages-title">输出语言</h2>
+      <h2 id="languages-title">Output languages</h2>
       <div class="management-actions">
-        <Button label="新增输出语言" :disabled="locked || !page" @click="edit(null)" />
         <Button
-          label="重新载入语言"
+          label="Add output language"
+          :disabled="locked || !page"
+          @click="edit(null)"
+        />
+        <Button
+          label="Reload languages"
           severity="secondary"
           :disabled="locked"
           @click="reload"
@@ -205,20 +212,22 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <p class="muted">
-      配置玩家的字幕语言、服务路径和显示顺序。样本验证记录对应的服务及词表版本，不代表实战翻译质量已通过验收。
+      Configure subtitle languages, provider paths and display order. Sample validation
+      records provider and terminology versions; it does not establish live translation
+      quality.
     </p>
     <p id="language-activation-help" class="muted">
       {{
         page?.activationAvailable
-          ? '通过当前版本的样本路径验证后，可以启用语言。只有已启用的语言会显示给玩家。'
-          : '字幕工作进程暂不可用。可以先保存并验证配置，恢复后再启用语言。'
+          ? 'Enable a language after validating its current sample path. Players see only enabled languages.'
+          : 'The subtitle worker is unavailable. Save and validate settings now, then enable languages when it recovers.'
       }}
     </p>
     <p v-if="page" class="muted">
-      默认语言：{{ page.defaultOutputLanguage ?? '尚未设置' }}
+      Default language: {{ page.defaultOutputLanguage ?? 'Not set' }}
       <Button
         v-if="page.defaultOutputLanguage"
-        label="清除默认语言"
+        label="Clear default language"
         severity="secondary"
         size="small"
         :disabled="locked"
@@ -228,7 +237,7 @@ onBeforeUnmount(() => {
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
     <p v-if="page && !languages.length" class="muted">
-      尚无输出语言。先添加字幕服务配置，再创建语言路径。
+      No output languages. Add provider configurations, then create a language path.
     </p>
     <ul v-else class="configuration-list">
       <li v-for="(language, index) in languages" :key="language.code">
@@ -242,46 +251,45 @@ onBeforeUnmount(() => {
           />
         </div>
         <p class="muted">
-          识别：{{ providerName(language.recognitionConfigurationId) }} · 翻译：{{
-            providerName(language.translationConfigurationId)
-          }}
+          Recognition: {{ providerName(language.recognitionConfigurationId) }} ·
+          Translation: {{ providerName(language.translationConfigurationId) }}
         </p>
         <p class="muted">
-          {{ language.enabled ? '已启用' : '未开放' }} ·
-          {{ language.includeTerms ? '使用游戏术语' : '不使用游戏术语'
+          {{ language.enabled ? 'Enabled' : 'Disabled' }} ·
+          {{ language.includeTerms ? 'Use game terms' : 'No game terms'
           }}<template v-if="page?.defaultOutputLanguage === language.code">
-            · 默认语言</template
+            · Default language</template
           >
         </p>
         <p v-if="language.lastAttempt" class="muted">
-          最近测试：{{ languageAttemptLabel(language) }} ·
-          {{ new Date(language.lastAttempt.checkedAt).toLocaleString() }}
+          Latest test: {{ languageAttemptLabel(language) }} ·
+          {{ new Date(language.lastAttempt.checkedAt).toLocaleString('en') }}
         </p>
         <div class="management-actions">
           <Button
-            label="编辑"
-            :aria-label="`编辑语言 ${language.name}`"
+            label="Edit"
+            :aria-label="`Edit language ${language.name}`"
             severity="secondary"
             :disabled="locked"
             @click="edit(language)"
           />
           <Button
-            label="验证样本路径"
-            :aria-label="`验证 ${language.name} 的样本路径`"
+            label="Validate sample path"
+            :aria-label="`Validate ${language.name} sample path`"
             severity="secondary"
             :disabled="locked"
             @click="showSample(language)"
           />
           <Button
-            label="上移"
-            :aria-label="`上移 ${language.name}`"
+            label="Move up"
+            :aria-label="`Move up ${language.name}`"
             severity="secondary"
             :disabled="locked || index === 0"
             @click="move(language, 'up')"
           />
           <Button
-            label="下移"
-            :aria-label="`下移 ${language.name}`"
+            label="Move down"
+            :aria-label="`Move down ${language.name}`"
             severity="secondary"
             :disabled="
               locked || (index === languages.length - 1 && page?.nextOffset === null)
@@ -289,15 +297,15 @@ onBeforeUnmount(() => {
             @click="move(language, 'down')"
           />
           <Button
-            label="设为默认"
-            :aria-label="`将 ${language.name} 设为默认`"
+            label="Set as default"
+            :aria-label="`Set ${language.name} as default`"
             severity="secondary"
             :disabled="locked || page?.defaultOutputLanguage === language.code"
             @click="setDefault(language.code)"
           />
           <Button
-            :label="language.enabled ? '停用' : '启用'"
-            :aria-label="`${language.enabled ? '停用' : '启用'} ${language.name}`"
+            :label="language.enabled ? 'Disable' : 'Enable'"
+            :aria-label="`${language.enabled ? 'Disable' : 'Enable'} ${language.name}`"
             aria-describedby="language-activation-help"
             severity="secondary"
             :disabled="
@@ -308,8 +316,8 @@ onBeforeUnmount(() => {
             @click="setState(language)"
           />
           <Button
-            label="删除"
-            :aria-label="`删除语言 ${language.name}`"
+            label="Delete"
+            :aria-label="`Delete language ${language.name}`"
             severity="danger"
             :disabled="locked || language.enabled"
             @click="removing = language"
@@ -319,7 +327,7 @@ onBeforeUnmount(() => {
     </ul>
     <Button
       v-if="page?.nextOffset !== null && page?.nextOffset !== undefined"
-      label="载入更多语言"
+      label="Load more languages"
       severity="secondary"
       :disabled="locked"
       @click="load(true)"
@@ -346,22 +354,21 @@ onBeforeUnmount(() => {
       v-if="removing"
       class="management-confirmation"
       role="group"
-      aria-label="确认删除输出语言"
+      aria-label="Confirm output language deletion"
     >
       <p>
-        删除「{{
-          removing.name
-        }}」的配置和验证记录？如果它是默认语言，默认选择也会清除。
+        Delete “{{ removing.name }}” configuration and validation records? The default
+        selection will also be cleared if it uses this language.
       </p>
       <div class="management-actions">
         <Button
-          label="确认删除语言"
+          label="Confirm language deletion"
           severity="danger"
           :disabled="locked"
           @click="remove"
         />
         <Button
-          label="取消删除语言"
+          label="Cancel language deletion"
           severity="secondary"
           :disabled="locked"
           @click="removing = null"
