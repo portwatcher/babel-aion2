@@ -2,7 +2,10 @@
 
 The administrator enters one **OpenAI API Key**. Model names and destinations
 are fixed in server code. No region, endpoint, second key or model selection is
-required. Newly installed applications still have no languages or credentials.
+required. Administration contains only the website-wide key and game terms.
+Production setup provisions and validates Simplified Chinese (`zh-Hans`),
+Japanese (`ja`) and Korean (`ko`) with that key; no manual language setup is
+required in administration. Missing credentials never produce fabricated paths.
 
 | Purpose                   | Model                                   | Connection                                               |
 | ------------------------- | --------------------------------------- | -------------------------------------------------------- |

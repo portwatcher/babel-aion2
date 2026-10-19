@@ -14,6 +14,23 @@ channel-status block into one status line; moved subtitles above settings.
 | Reflow at 320, 375, 768 and desktop | PASS    | Local in-app browser: room list, entry and creation pages, and the joined-room components rendered with fixture props, show no horizontal scroll at any width. |
 | Joined room with a live session     | NOT RUN | The joined view was checked with fixture props on a temporary local page; no live Discord audio or subtitle stream was connected.                              |
 
+## Website administration scope and requested languages — 2026-10-19
+
+| Check                                | Result  | Evidence                                                                                                                                                                                                                   |
+| ------------------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source and runtime gate              | PASS    | `npm run ci:local`: 19 tests, strict types, formatting, all runtime builds and built HTTP smoke                                                                                                                            |
+| Website-wide administration          | PASS    | `npm run test:community:db`: authenticated status succeeds without rooms even with an obsolete room ID; reads create no room. The same regression returned 404 before the repair                                           |
+| Existing room workflows              | PASS    | Community HTTP/PostgreSQL checks preserve installation, admission, room isolation, map synchronization, nickname revocation and automatic empty-room disbanding                                                            |
+| Requested production languages       | PASS    | The saved key configured both actual OpenAI models. A clearly synthetic 4.507-second English command passed real path validation for `zh-Hans`, `ja` and `ko`; all three were enabled through the existing domain services |
+| Credential preservation              | PASS    | The operator checked the encrypted key envelope before and after language setup; it was unchanged and plaintext stayed inside the production pod                                                                           |
+| Battle quality and game display mode | NOT RUN | Functional sample validation does not establish real PVP accuracy, mixed-language command quality or AION2/PiP acceptance                                                                                                  |
+
+Administration contains only the website OpenAI API Key and game terms. The room
+selector, Discord fields, members, language editor, audio sample UI, service
+dashboard and room start/stop controls were removed. No rename feature was added.
+Production output languages are actual configured paths; no players, subtitles
+or validation results were fabricated.
+
 ## Numbered room links · 2026-10-19
 
 | Check                             | Status  | Evidence                                                                                                                                                                                                                                                                                                          |
@@ -1087,6 +1104,20 @@ was applied. This is not a claim that the entire dependency graph is vulnerabili
 Werift has already been selected and local revocation/relay checks passed. These
 inputs concern the remaining production and live acceptance work; the shipped
 web application can keep its language list empty until paths are validated.
+
+## Discord source flapping (2026-10-19)
+
+Production `voice_source_run` rows showed two community rooms each retiring their
+Discord source about 3.2 seconds after every claim and reclaiming 5 seconds later
+(one room advanced from generation 11 to 25 in four minutes); players saw the bot
+repeatedly join and leave. The worker previously treated any member Opus decode
+error, member receive-stream error or informational voice-connection error as a
+fatal source failure, and logged nothing.
+
+| Check                                                   | Result  | Evidence                                                                               |
+| ------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------- |
+| Member packet errors are non-fatal; failures are logged | PASS    | `npm run ci:local` passed                                                              |
+| Production stops flapping after rollout                 | WAITING | Requires the new voice image and observation of run durations and `source-failed` logs |
 
 ## Git and task cleanup
 

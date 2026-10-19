@@ -73,15 +73,22 @@ and owns its playback/mute control; PiP adds no audio element. Entry returns 503
 without database configuration. A separately configured and started Discord
 source supplies original audio and independently feeds per-member recognition.
 
-Administration uses separate `/api/management/*` HTTP routes. Server middleware
-protects those routes, `/admin` and its descendants, and `/api/auth/*`.
+Administration uses separate `/api/management/*` HTTP routes.
+The administrator page is website-wide and contains only the saved OpenAI API Key
+and game terminology. It never selects a room or loads Discord, listener or
+language management panels. Its authenticated status endpoint depends only on
+the administrator session, including when no rooms exist or an old room query
+is present. Legacy room operations remain server-side compatibility APIs.
+
+Server middleware protects those routes, `/admin` and its descendants, and `/api/auth/*`.
 Each management handler repeats its required authorization check. Access proves
 identity; Better Auth persists the administrator session in PostgreSQL. Status
 polling uses HTTP every ten seconds. There is no administrator WebSocket.
-The room form saves a configuration version and encrypted Discord credential;
+The legacy room API saves a configuration version and encrypted Discord credential;
 stale edits receive 409. Source changes persist a stopped room and advance the
-source generation. The administrator list shares the player list component and
-removes the selected session/generation through the revocation coordinator.
+source generation. Its listener endpoint removes a selected session/generation
+through the revocation coordinator. These compatibility controls have no website
+administration interface.
 Capture scope is either selected member IDs or all channel speakers. Existing
 rooms retain selected mode; switching scope advances the source generation and
 persists stopped state. The separate start action requests reception and source
@@ -110,7 +117,12 @@ registers negotiations before creating peers, closes obsolete peers and persists
 the actual close acknowledgement. A PostgreSQL ownership session and durable
 source receipt exclude duplicate bot/guild controllers. The source controller
 connects Discord with DAVE, maintains separate member decoders and bounded PCM
-queues, and publishes mixed original audio independently of subtitle work. Source
+queues, and publishes mixed original audio independently of subtitle work. An
+undecodable packet (for example during a DAVE transition) is dropped, and a failed
+member receive stream is closed and resubscribed on that member's next speaking
+event; neither disconnects the bot. Only gateway/voice disconnection, the bot
+leaving the channel, or lost ownership retires the source, and each retirement
+writes a `source-failed` JSON line with the room and reason. Source
 retirement closes old browser peers before acknowledging shutdown. Separate
 member timelines feed shared provider jobs only while language demand exists.
 Version-checked private HTTP streams feed actual registered player sockets.

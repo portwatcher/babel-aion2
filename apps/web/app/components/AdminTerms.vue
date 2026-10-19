@@ -8,7 +8,6 @@ import {
 } from '@babel/contracts'
 import { termFailure } from '~/utils/term-feedback'
 
-const emit = defineEmits<{ version: [value: number] }>()
 const page = shallowRef<TermPage | null>(null)
 const query = ref('')
 const appliedQuery = ref('')
@@ -39,7 +38,6 @@ async function readPage(offset: number) {
     editing.value = false
     selected.value = null
     removing.value = null
-    emit('version', result.version)
   }
 }
 async function load(offset = 0) {
@@ -75,18 +73,16 @@ async function save(input: TermSave) {
   error.value = ''
   notice.value = ''
   try {
-    const term = termRecordSchema.parse(
+    termRecordSchema.parse(
       await $fetch<unknown, string>(`/api/management/terms/${candidateId.value}`, {
         method: 'PUT',
         body: input,
       }),
     )
     if (!disposed) {
-      emit('version', term.version)
       query.value = ''
       await readPage(0)
-      notice.value =
-        'Term saved. Future sample tests use the updated catalog. Check actual translations separately.'
+      notice.value = 'Term saved. Live recognition will use the updated catalog.'
     }
   } catch (failure) {
     if (!disposed) {
