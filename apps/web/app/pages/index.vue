@@ -1,128 +1,86 @@
 <script setup lang="ts">
-import type { PublicRoomConfiguration } from '@babel/contracts'
-import { audioStatus } from '~/utils/audio-status'
+import type { RoomDirectory } from '@babel/contracts'
+
 const { t } = useInterfaceLocale()
-const {
-  data,
-  error: configurationError,
-  refresh,
-} = await useFetch<PublicRoomConfiguration>('/api/player/config')
-const configuration = shallowRef<PublicRoomConfiguration | null>(data.value ?? null)
-watch(data, (value) => {
-  configuration.value = value ?? null
-})
-const {
-  session,
-  players,
-  playersCurrent,
-  restoring,
-  restoreFailed,
-  submitting,
-  changingLanguage,
-  error,
-  notice,
-  active,
-  leavePending,
-  connectionState,
-  subtitles,
-  audioState,
-  audioBlocked,
-  muted,
-  playAudio,
-  toggleMute,
-  enter,
-  restore,
-  leave,
-  changeLanguage,
-} = usePlayerSession(configuration)
-let configurationTimer: ReturnType<typeof setInterval> | undefined
+const { data, error, refresh } = await useFetch<RoomDirectory>('/api/player/rooms')
+const search = ref('')
+const rooms = computed(() =>
+  (data.value?.rooms ?? []).filter((room) =>
+    `${room.name} ${room.server}`
+      .toLocaleLowerCase()
+      .includes(search.value.trim().toLocaleLowerCase()),
+  ),
+)
+let timer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
-  configurationTimer = setInterval(() => void refresh(), 5_000)
+  timer = setInterval(() => void refresh(), 5_000)
 })
-onBeforeUnmount(() => clearInterval(configurationTimer))
+onBeforeUnmount(() => clearInterval(timer))
 </script>
 
 <template>
   <main id="main" tabindex="-1" class="main-content">
-    <div class="page-heading">
-      <p class="eyebrow">{{ t('roomEyebrow') }}</p>
-      <h1>
-        {{
-          !configuration?.room.name || configuration.room.name === 'AION2 深渊站'
-            ? t('roomFallback')
-            : configuration.room.name
-        }}
-      </h1>
-      <p class="muted">{{ t('roomTagline') }}</p>
+    <div class="page-heading directory-heading">
+      <div class="page-heading-copy">
+        <p class="eyebrow">{{ t('directoryEyebrow') }}</p>
+        <h1>{{ t('chooseRoom') }}</h1>
+        <p class="muted">{{ t('lobbyTagline') }}</p>
+      </div>
+      <Button as="a" href="/rooms/create" :label="t('createRoom')" />
     </div>
-    <section v-if="configurationError" class="empty-state" aria-live="polite">
-      <h2>{{ t('configurationUnavailable') }}</h2>
-      <p>{{ t('checkConnection') }}</p>
+    <section v-if="error || !data?.available" class="empty-state" role="status">
+      <h2>{{ t('roomsUnavailableTitle') }}</h2>
+      <p class="muted">{{ t('roomsUnavailable') }}</p>
       <Button :label="t('reload')" severity="secondary" @click="refresh()" />
     </section>
-    <template v-else-if="configuration">
-      <p v-if="notice" class="session-notice" role="status">{{ notice }}</p>
-      <div v-if="error" class="session-feedback" role="alert">
-        <p class="form-error">{{ error }}</p>
-        <Button
-          v-if="restoreFailed"
-          :label="t('retryRestore')"
-          severity="secondary"
-          @click="restore"
+    <section v-else aria-labelledby="rooms-title" class="room-directory">
+      <div class="section-heading">
+        <h2 id="rooms-title">
+          {{ t('broadcastRooms') }} <span class="muted">{{ data.rooms.length }}</span>
+        </h2>
+        <InputText
+          v-if="data.rooms.length"
+          v-model="search"
+          type="search"
+          :aria-label="t('searchRooms')"
+          :placeholder="t('searchRooms')"
         />
       </div>
-      <div class="room-layout">
-        <section v-if="restoring" class="entry-panel" aria-busy="true">
-          <p>{{ t('restoring') }}</p>
-        </section>
-        <section v-else-if="leavePending" class="entry-panel">
-          <p>{{ t('connectionStopped') }}</p>
-          <Button
-            :label="t('retryLeave')"
-            severity="secondary"
-            :loading="submitting"
-            @click="leave"
-          />
-        </section>
-        <ListenerPanel
-          v-else-if="active && session"
-          :session="session"
-          :configuration="configuration"
-          :connection-state="connectionState"
-          :subtitles="subtitles"
-          :audio-state="audioState"
-          :audio-blocked="audioBlocked"
-          :muted="muted"
-          :busy="submitting"
-          :changing-language="changingLanguage"
-          @leave="leave"
-          @language="changeLanguage"
-          @play-audio="playAudio"
-          @toggle-mute="toggleMute"
-        />
-        <RoomEntry
-          v-else
-          :configuration="configuration"
-          :submitting="submitting"
-          @enter="enter"
-        />
-        <div class="room-detail">
-          <section class="room-detail" aria-labelledby="room-status-title">
-            <div class="section-heading">
-              <h2 id="room-status-title">{{ t('channelStatus') }}</h2>
-              <Tag
-                :value="t(audioStatus[configuration.room.audioState].label)"
-                severity="secondary"
-              />
-            </div>
+      <div v-if="!data.rooms.length" class="empty-state lobby-empty">
+        <h2>{{ t('noRoomsTitle') }}</h2>
+        <p class="muted">{{ t('noRoomsHelp') }}</p>
+      </div>
+      <p v-else-if="!rooms.length" class="muted lobby-empty" role="status">
+        {{ t('noMatchingRooms') }}
+      </p>
+      <ul v-else class="room-directory-list">
+        <li v-for="room in rooms" :key="room.id">
+          <div class="room-directory-identity">
+            <h2>
+              <NuxtLink :to="`/rooms/${room.id}`">{{ room.name }}</NuxtLink>
+            </h2>
             <p class="muted">
-              {{ t(audioStatus[configuration.room.audioState].description) }}
+              Asia / {{ room.server }} ·
+              {{ room.restricted ? t('restrictedCharacters') : t('allCharacters') }}
             </p>
-          </section>
-          <div class="detail-divider" />
-          <PlayerList :players="players" :current="playersCurrent" />
-        </div>
-      </div>
-    </template>
+          </div>
+          <div class="room-directory-status">
+            <Tag
+              :value="room.stopped ? t('broadcastStopped') : t('roomOpen')"
+              severity="secondary"
+            />
+            <span class="muted">{{
+              t('roomMemberCount', { count: room.memberCount })
+            }}</span>
+            <Button
+              as="a"
+              :href="`/rooms/${room.id}`"
+              :label="t('joinRoomLink')"
+              severity="secondary"
+            />
+          </div>
+        </li>
+      </ul>
+    </section>
   </main>
 </template>

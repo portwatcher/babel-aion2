@@ -1,7 +1,23 @@
 <script setup lang="ts">
-import type { ProviderSummary } from '@babel/contracts'
+import { DEFAULT_ROOM_ID, type ProviderSummary } from '@babel/contracts'
 
-definePageMeta({ middleware: 'administrator' })
+definePageMeta({
+  middleware: 'administrator',
+  key: (route) => String(route.query.roomId ?? 'default'),
+})
+const route = useRoute()
+const { data: directory, refresh: refreshDirectory } =
+  await useFetch('/api/player/rooms')
+const selectedRoomId = computed(() =>
+  typeof route.query.roomId === 'string' ? route.query.roomId : null,
+)
+const roomChoices = computed(() => [
+  { id: null, name: 'Original listening room' },
+  ...(directory.value?.rooms ?? []).filter((room) => room.id !== DEFAULT_ROOM_ID),
+])
+async function selectRoom(id: string | null) {
+  await navigateTo({ path: '/admin', query: id ? { roomId: id } : {} })
+}
 useHead({ title: 'Administration · Babel' })
 const { status, loading, error, connect } = useAdministratorStatus()
 const terminologyVersion = ref<number | null>(null)
@@ -23,7 +39,19 @@ const providers = shallowRef<ProviderSummary[]>([])
       <Button label="Retry" severity="secondary" :loading="loading" @click="connect" />
     </section>
     <template v-else-if="status">
+      <div class="field management-section">
+        <label for="management-room">Managed room</label>
+        <Select
+          input-id="management-room"
+          :model-value="selectedRoomId"
+          :options="roomChoices"
+          option-label="name"
+          option-value="id"
+          @update:model-value="selectRoom"
+        />
+      </div>
       <AdminRoomSettings />
+      <AdminRoomAdmission @published="refreshDirectory" />
       <AdminListeners />
       <AdminProviders
         :terminology-version="terminologyVersion"

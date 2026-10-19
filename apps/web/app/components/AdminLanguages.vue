@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const roomQuery = useManagementRoomQuery()
 import {
   languagePageSchema,
   type LanguagePage,
@@ -39,10 +40,12 @@ async function load(append = false) {
   try {
     const result = languagePageSchema.parse(
       await $fetch('/api/management/languages', {
-        query:
-          append && page.value
+        query: {
+          ...roomQuery.value,
+          ...(append && page.value
             ? { offset: page.value.nextOffset, expectedVersion: page.value.version }
-            : {},
+            : {}),
+        },
       }),
     )
     if (!disposed && ticket === request) {
@@ -114,6 +117,7 @@ function save(code: string, input: LanguageSave) {
   return mutate(
     () =>
       $fetch<unknown, string>(`/api/management/languages/${code}`, {
+        query: roomQuery.value,
         method: 'PUT',
         body: input,
       }),
@@ -124,6 +128,7 @@ function move(language: ManagedLanguage, direction: 'up' | 'down') {
   return mutate(
     () =>
       $fetch<unknown, string>(`/api/management/languages/${language.code}/move`, {
+        query: roomQuery.value,
         method: 'POST',
         body: { direction, expectedCatalogVersion: page.value?.version },
       }),
@@ -134,6 +139,7 @@ function setDefault(code: string | null) {
   return mutate(
     () =>
       $fetch<unknown, string>('/api/management/languages/default', {
+        query: roomQuery.value,
         method: 'POST',
         body: { code, expectedCatalogVersion: page.value?.version },
       }),
@@ -144,6 +150,7 @@ function setState(language: ManagedLanguage) {
   return mutate(
     () =>
       $fetch<unknown, string>(`/api/management/languages/${language.code}/state`, {
+        query: roomQuery.value,
         method: 'POST',
         body: { enabled: !language.enabled, expectedVersion: language.version },
       }),
@@ -158,6 +165,7 @@ function remove() {
   return mutate(
     () =>
       $fetch<unknown, string>(`/api/management/languages/${language.code}`, {
+        query: roomQuery.value,
         method: 'DELETE',
         body: { expectedVersion: language.version },
       }),

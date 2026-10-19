@@ -15,7 +15,9 @@
   Keep source and Git history free of real credentials, private network addresses,
   production database names, Access application identities, and deployment keys.
   Development-only `.env.example` files are allowed. Production configuration and
-  release automation belong in the separate private infra repository.
+  deployment-specific release tooling belong in the separate private infra
+  repository. The generic source CI/release workflow may use repository secrets
+  and variables to call that tooling; never inline production values.
 - Respond in clear, direct language. State actual test results and limitations.
 
 ## Worktree management
@@ -28,6 +30,11 @@
 - Never create a task worktree in an operating-system temporary directory.
 - Before integration, fetch the remote and incorporate the latest integration
   branch. Run `npm run ci:local`. Never force-push an integration branch.
+- When the requested work is complete, automatically commit, push the task
+  branch, open a pull request, wait for required checks, and merge into `main`.
+  Do not stop at a local commit or ask for another push/merge confirmation.
+  Respect an explicit user instruction to keep work unmerged. Resolve failures
+  before merging and never bypass a required check or force-push `main`.
 - Before removal, verify task commits are contained in the latest remote
   integration branch, the worktree has no uncommitted or valuable untracked
   files, and no unfinished task is using it. If no remote exists, preserve the
@@ -109,9 +116,12 @@
   contracts and credible failure modes; do not mirror source or add test-only seams.
 - Update the README and relevant docs when behavior, commands, or limits change.
   Record PASS, FAIL, NOT RUN, or WAITING FOR CONFIGURATION with evidence.
-- Use conventional commits and a coding-agent coauthor trailer. Publish releases
-  or deploy only when requested. Build and publish production images through the
-  established GitHub Actions release workflow in the private infra repository.
+- Use conventional commits and a coding-agent coauthor trailer. Every update to
+  `main` automatically runs ser7 checks, builds and publishes immutable web and
+  voice images to DigitalOcean, then updates the existing infra ArgoCD image
+  tags. This continuous deployment is authorized; verify the workflow and rollout
+  and report actual failures. Keep production manifests and deployment-specific
+  tooling in private infra. Never publish production images from a local build.
 - If GitHub Actions are added, follow Perohub's runner policy:
   `[self-hosted, Linux, X64, ser7-homelab]`. Keep local/CI checks equivalent.
 - Production manifests belong in `../infra`; reuse public-edge, Access policy,

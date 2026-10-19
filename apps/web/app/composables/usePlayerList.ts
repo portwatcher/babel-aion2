@@ -1,6 +1,6 @@
 import { publicListenerSchema, type PublicListener } from '@babel/contracts'
 
-export function usePlayerList(connectionState: Ref<string>) {
+export function usePlayerList(connectionState: Ref<string>, roomId?: string) {
   const players = shallowRef<PublicListener[]>([])
   const current = ref(false)
   let version = 0
@@ -21,10 +21,13 @@ export function usePlayerList(connectionState: Ref<string>) {
     const requestVersion = version
     reading = true
     try {
-      const response = await fetch('/api/player/players', {
-        cache: 'no-store',
-        signal: AbortSignal.timeout(5_000),
-      })
+      const response = await fetch(
+        roomId ? `/api/player/rooms/${roomId}/players` : '/api/player/players',
+        {
+          cache: 'no-store',
+          signal: AbortSignal.timeout(5_000),
+        },
+      )
       if (!response.ok) {
         throw new Error('List unavailable')
       }

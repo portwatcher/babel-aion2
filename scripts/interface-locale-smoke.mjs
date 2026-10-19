@@ -4,15 +4,15 @@ import assert from 'node:assert/strict'
 // translated error pages and the administrator boundary all run through Nuxt SSR.
 export async function checkInterfaceLocales(origin) {
   const cases = [
-    ['en-US,en;q=0.9', 'en', 'Commander listening room', 'Game nickname'],
-    ['zh-CN,zh;q=0.9', 'zh-CN', '指挥收听室', '游戏昵称'],
-    ['ja-JP,ja;q=0.9', 'ja', '指揮リスニングルーム', 'ゲーム内のニックネーム'],
-    ['ko-KR,ko;q=0.9', 'ko', '지휘 청취실', '게임 닉네임'],
-    ['fr-FR,de;q=0.8', 'en', 'Commander listening room', 'Game nickname'],
-    ['', 'en', 'Commander listening room', 'Game nickname'],
-    ['en;q=0.2,ko-KR;q=0.9', 'ko', '지휘 청취실', '게임 닉네임'],
-    ['ja;q=0,zh-Hant;q=0.8', 'zh-CN', '指挥收听室', '游戏昵称'],
-    ['ja;q=invalid,ko;q=2,en;q=0', 'en', 'Commander listening room', 'Game nickname'],
+    ['en-US,en;q=0.9', 'en', 'Choose your broadcast room', 'Room name'],
+    ['zh-CN,zh;q=0.9', 'zh-CN', '选择你的转播房间', '房间名称'],
+    ['ja-JP,ja;q=0.9', 'ja', '配信ルームを選択', 'ルーム名'],
+    ['ko-KR,ko;q=0.9', 'ko', '중계 방 선택', '방 이름'],
+    ['fr-FR,de;q=0.8', 'en', 'Choose your broadcast room', 'Room name'],
+    ['', 'en', 'Choose your broadcast room', 'Room name'],
+    ['en;q=0.2,ko-KR;q=0.9', 'ko', '중계 방 선택', '방 이름'],
+    ['ja;q=0,zh-Hant;q=0.8', 'zh-CN', '选择你的转播房间', '房间名称'],
+    ['ja;q=invalid,ko;q=2,en;q=0', 'en', 'Choose your broadcast room', 'Room name'],
   ]
   await Promise.all(
     cases.map(async ([header, locale, heading, label]) => {
@@ -21,7 +21,17 @@ export async function checkInterfaceLocales(origin) {
       const html = await response.text()
       assert.match(html, new RegExp(`<html[^>]*lang="${locale}"`))
       assert.ok(html.includes(heading), `${header}: translated heading in SSR HTML`)
-      assert.ok(html.includes(label), `${header}: translated entry form in SSR HTML`)
+      const creation = await fetch(`${origin}/rooms/create`, {
+        headers: { 'accept-language': header },
+      })
+      assert.equal(creation.status, 200)
+      const creationHtml = await creation.text()
+      assert.match(creationHtml, new RegExp(`<html[^>]*lang="${locale}"`))
+      assert.ok(
+        creationHtml.includes(label),
+        `${header}: translated creation form in SSR HTML`,
+      )
+      assert.doesNotMatch(html, /href="\/admin"/)
       assert.match(response.headers.get('vary') ?? '', /accept-language/i)
       assert.match(response.headers.get('vary') ?? '', /cookie/i)
     }),

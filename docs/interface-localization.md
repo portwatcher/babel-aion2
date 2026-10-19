@@ -26,7 +26,7 @@ Changing the interface language preserves nickname input, the listener session,
 original audio, selected subtitle language, and PiP. Existing notices and PiP
 metadata update with the interface. Administrator-configured room/language names,
 player nicknames, recognized speech and translated subtitles remain content in
-their original language. The built-in room heading has localized equivalents.
+their original language. The lobby, room creation and map controls share the same interface preference.
 
 ## English-only administration
 
@@ -45,7 +45,9 @@ keys instead of display text. Reuse the shared PrimeVue controls and translate
 visible text, accessibility names and metadata when adding player features.
 
 `npm run ci:local` runs strict types, source limits, formatting, unit tests, builds
-and built-server HTTP tests. The HTTP suite checks translated SSR forms, weighted
+and built-server HTTP tests. The HTTP suite checks translated SSR lobby and creation forms, weighted
 and unsupported detection, cookie overrides, concurrent locale isolation,
-translated 404s and English-only protected administrator errors. Browser checks
+translated 404s and English-only protected administrator errors. The community
+HTTP suite also checks Japanese room/map rendering and an authenticated
+English-only administrator response using a migrated disposable database. Browser checks
 separately cover hydration, selector changes, storage recovery and narrow layouts.

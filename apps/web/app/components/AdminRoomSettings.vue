@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const roomQuery = useManagementRoomQuery()
 import {
   managementRoomResponseSchema,
   managementRoomSchema,
@@ -58,7 +59,7 @@ async function load() {
   notice.value = ''
   try {
     const result = managementRoomResponseSchema.parse(
-      await $fetch('/api/management/room'),
+      await $fetch('/api/management/room', { query: roomQuery.value }),
     )
     if (!disposed) {
       accept(result.room)
@@ -100,7 +101,11 @@ async function save() {
   busy.value = true
   try {
     const next = managementRoomSchema.parse(
-      await $fetch('/api/management/room', { method: 'PATCH', body: input.data }),
+      await $fetch('/api/management/room', {
+        query: roomQuery.value,
+        method: 'PATCH',
+        body: input.data,
+      }),
     )
     if (!disposed) {
       accept(next)
@@ -127,6 +132,7 @@ async function setRunning(running: boolean) {
       await $fetch(
         running ? '/api/management/room/start' : '/api/management/room/stop',
         {
+          query: roomQuery.value,
           method: 'POST',
           body: { expectedVersion: current.value.version },
         },

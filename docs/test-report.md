@@ -3,12 +3,14 @@
 ## Interface localization — 2026-10-19
 
 Scope: local source and built-server checks for player interface localization and
-English-only administration. This change has not been released or deployed.
+English-only administration. Before merging, the change was reconciled with the
+new community-room and tactical-map implementation on `origin/main`. The first
+local browser evidence below describes the earlier listening-room screen.
 
 | Check                                          | Result  | Evidence                                                                                                                                                                                                                                        |
 | ---------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Local validation                               | PASS    | `npm run ci:local`: strict workspace types, formatting, source limits, 18 unit tests, all builds and HTTP smoke pass                                                                                                                            |
-| SSR detection and fallback                     | PASS    | Concurrent built-server requests render English, Simplified Chinese, Japanese and Korean entry forms; weighted preferences, q=0 exclusions, invalid/missing preferences and unsupported-language English fallback pass                          |
+| SSR detection and fallback                     | PASS    | Concurrent built-server requests render English, Simplified Chinese, Japanese and Korean lobby and room-creation forms; weighted preferences, q=0 exclusions, invalid/missing preferences and unsupported-language English fallback pass        |
 | Saved SSR choice                               | PASS    | Cookie preference overrides browser headers; cn/jp/kr aliases normalize and invalid values fall back to detection                                                                                                                               |
 | Administrator and error boundaries             | PASS    | Korean 404 content is translated; protected /admin, nested and encoded administrator paths retain 401 and render English despite a Japanese cookie and Chinese browser preference                                                               |
 | Browser selection and persistence              | PASS    | Codex in-app browser selects all four locales, updates headings/metadata/accessibility text, preserves typed nickname across selection, retains Japanese after reload and restores it after returning from the English administrator error page |
@@ -17,10 +19,58 @@ English-only administration. This change has not been released or deployed.
 | LocalStorage-only and blocked-storage recovery | NOT RUN | The code guards unavailable storage and restores preferences after hydration; browser checks covered ordinary persistence, not storage removal or denial                                                                                        |
 | Live listener and PiP locale changes           | NOT RUN | Translated reactive notices and PiP metadata compile; a live audio session was not exercised for this copy change                                                                                                                               |
 
+Community-room reconciliation: **PASS**. `node scripts/community-smoke.mjs`
+ran against a migrated, isolated local PostgreSQL database after the main merge.
+It verifies Japanese room-entry and map SSR plus an authenticated administrator
+response forced to English despite Japanese browser and Korean saved preferences.
+Existing room isolation, admission, map persistence and revocation checks also pass.
+
 The new HTTP regression initially exposed an administrator error-page locale
 leak through Nuxt's internal error URL. Reading the original SSR context URL fixed
 the owner boundary, and the same regression now passes. Interface catalogs do not
 enable subtitle languages or validate provider translation quality.
+
+## Automatic delivery pre-merge validation — 2026-10-19
+
+These results describe validation before the first automatic main release.
+The [CI and release runs](https://github.com/portwatcher/babel-aion2/actions/workflows/ci.yml)
+record the tested source SHA, runtime image probes, publication and GitOps update.
+ArgoCD health and workload readiness independently establish deployment success.
+
+| Check                             | Result | Evidence                                                                                                                              |
+| --------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Workflow syntax and shell checks  | PASS   | `actionlint .github/workflows/ci.yml`, including ser7 runner labels and expression validation                                         |
+| Full local source gate            | PASS   | `npm run ci:local`: 267 source files, maximum 495 lines, formatting, strict types, 18 tests, all runtime builds and built HTTP smoke  |
+| Database and room workflow parity | PASS   | The workflow sequence passed locally on a new disposable PostgreSQL database: migrations twice, 12 DB tests, management and room HTTP |
+| Complete Git history scan         | PASS   | Gitleaks with redacted output: no findings in the implementation history                                                              |
+
+The workflow performs publication only for a current `main` commit after these
+checks and packaged image probes pass. Registry destinations and credentials are
+configured through GitHub settings; production manifests and the image updater
+remain in private infra. See [release setup](deployment.md#automatic-main-releases).
+
+## Multi-room and map source validation — 2026-10-19
+
+This feature is implemented on top of `d6b66f3` and has not been deployed. The
+production evidence below still describes the earlier release. Configuration and
+limits are documented in [multi-room setup](multi-room-and-map.md).
+
+| Check                                             | Result                    | Evidence                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Full local gate                                   | PASS                      | `npm run ci:local`: source limits, formatting, strict type checks, 18 tests, complete web/worker/recovery build and built HTTP smoke                                                                                                                                                           |
+| Existing database contracts                       | PASS                      | `npm run test:db`: 12 tests on the disposable task-local PostgreSQL database                                                                                                                                                                                                                   |
+| Multi-room HTTP and storage                       | PASS                      | `npm run test:community:db`: two real built web replicas and an isolated migrated database; required server, optional IDs, exact region/server/case admission, upstream outage/schema rejection, independent sessions, idempotency, selected-room administration and existing-room publication |
+| Installation guards                               | PASS                      | The same HTTP suite verifies browser/state binding, replay denial, skipped-install denial, bot application identity, effective channel-overwrite permissions, wrong-channel rejection and one room per guild                                                                                   |
+| Collaborative map                                 | PASS                      | The same suite verifies authenticated author metadata, room isolation, bounds, retry deduplication, own-only erasure, cross-replica reads/deletes, old-generation denial and restart persistence                                                                                               |
+| Real Index API                                    | PASS                      | The production adapter returned an exact indexed Asia/Siel character from the public live API; no mocked response was used for this probe                                                                                                                                                      |
+| Desktop browser                                   | PASS                      | Local in-app browser: join, freehand stroke, visible ID signature, aligned zoom, original JPEG tiles through native level 7, map eraser and refresh restoration                                                                                                                                |
+| Narrow layout                                     | PASS                      | 390 × 844 viewport: controls wrap, map remains usable, ID list follows the map, and the same stroke stays aligned after resize                                                                                                                                                                 |
+| Live Discord installation and multi-guild receipt | WAITING FOR CONFIGURATION | OAuth application credentials/redirect and a real authorized installation are needed. HTTP fixture evidence does not establish live Discord authorization or simultaneous DAVE receipt                                                                                                         |
+| Physical touch gesture and deployment capacity    | NOT RUN                   | Leaflet pinch support is enabled; a real touch device and production concurrency measurements were not part of this run                                                                                                                                                                        |
+
+The initial cross-origin tile load failed in the browser. The implemented fixed
+site resource endpoint fetches and caches original public JPEG tiles; the final
+browser run loaded those resources and retained the source watermark/attribution.
 
 ## Current acceptance status — 2026-10-19
 

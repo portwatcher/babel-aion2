@@ -31,7 +31,7 @@ function selectLanguage() {
   )
 }
 onMounted(() => {
-  nickname.value = loadPendingEntry()?.request.nickname ?? ''
+  nickname.value = loadPendingEntry(props.configuration.room.id)?.request.nickname ?? ''
   selectLanguage()
 })
 watch(
@@ -64,20 +64,28 @@ function changeLanguage(value: string | null) {
 <template>
   <section class="entry-panel" aria-labelledby="entry-title">
     <h2 id="entry-title">{{ t('prepareEntry') }}</h2>
+    <p v-if="configuration.admission" class="admission-notice muted">
+      Asia / {{ configuration.admission.server }} ·
+      {{
+        configuration.admission.restricted
+          ? t('roomEntryRestricted')
+          : t('allCharacters')
+      }}
+    </p>
     <form class="entry-form" @submit.prevent="enter">
       <div class="field">
-        <label for="nickname">{{ t('nickname') }}</label>
+        <label for="nickname">{{ t('characterId') }}</label>
         <InputText
           id="nickname"
           v-model="nickname"
           autocomplete="off"
-          :placeholder="t('nicknamePlaceholder')"
+          :placeholder="t('characterPlaceholder')"
           :invalid="Boolean(validationError)"
           :disabled="submitting"
           aria-describedby="nickname-limit nickname-notice nickname-error"
         />
         <small id="nickname-limit" class="muted">{{
-          t('nicknameLimit', { count: NICKNAME_MAX_LENGTH })
+          t('characterLimit', { count: NICKNAME_MAX_LENGTH })
         }}</small>
         <p id="nickname-error" class="form-error" role="alert">{{ validationError }}</p>
       </div>
@@ -87,10 +95,14 @@ function changeLanguage(value: string | null) {
         :disabled="submitting"
         @update:model-value="changeLanguage"
       />
-      <p id="nickname-notice" class="entry-notice muted">{{ t('entryNotice') }}</p>
+      <p id="nickname-notice" class="entry-notice muted">
+        {{ configuration.admission ? t('characterEntryNotice') : t('entryNotice') }}
+      </p>
       <Button
         type="submit"
-        :label="configuration.entryAvailable ? t('joinRoom') : t('entryUnavailable')"
+        :label="
+          configuration.entryAvailable ? t('verifyAndJoin') : t('entryUnavailable')
+        "
         :disabled="!configuration.entryAvailable"
         :loading="submitting"
         aria-describedby="availability-notice"

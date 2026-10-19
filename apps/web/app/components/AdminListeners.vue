@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const roomQuery = useManagementRoomQuery()
 import {
   managementListenerSchema,
   type ManagementListener,
@@ -22,7 +23,9 @@ async function refresh() {
   }
   reading = true
   try {
-    const result = await $fetch<{ players: unknown }>('/api/management/listeners')
+    const result = await $fetch<{ players: unknown }>('/api/management/listeners', {
+      query: roomQuery.value,
+    })
     const next = managementListenerSchema.array().parse(result.players)
     if (!disposed) {
       players.value = next
@@ -50,6 +53,7 @@ async function remove() {
   removing.value = true
   try {
     await $fetch(`/api/management/listeners/${target.sessionId}`, {
+      query: roomQuery.value,
       method: 'DELETE',
       body: { nicknameGeneration: target.nicknameGeneration },
     })

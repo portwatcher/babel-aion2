@@ -9,9 +9,8 @@ useInterfaceControlLocale()
     <header class="site-header">
       <NuxtLink to="/" class="site-title" :aria-label="t('home')">Babel</NuxtLink>
       <span class="site-context">AION2 · Global / Asia</span>
-      <nav :aria-label="t('navigation')">
-        <InterfaceLocaleSelect v-if="!administrator" />
-        <a href="/admin">{{ t('administration') }}</a>
+      <nav v-if="!administrator" :aria-label="t('navigation')">
+        <InterfaceLocaleSelect />
       </nav>
     </header>
     <NuxtPage />

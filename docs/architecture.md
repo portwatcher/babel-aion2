@@ -1,5 +1,31 @@
 # Architecture
 
+## Community rooms and tactical map
+
+`/` lists only installed community rooms. Room creation uses a short-lived,
+HTTP-only browser binding and one-use OAuth2 state; Discord's token response
+supplies the guild identity. User guild permissions and effective bot channel
+permissions are verified before a transaction creates the room, its admission
+policy and an audit event. A guild lock prevents duplicate rooms; retries return
+the original creation. Shared bot credentials use the existing room-bound cipher.
+
+Room-specific entry checks the immutable server/allowlist and then AION2 Index's
+fixed public search endpoint. The returned exact character ID is the display
+name. Community nickname keys include the room UUID; legacy default-room keys
+retain compatibility. Session storage is scoped by tab and room. Player lists,
+configuration and voice sources use the listener's actual room. Discord voice
+state handling ignores other guilds and voice adapters use room-specific groups.
+
+The client loads Leaflet only on room pages. Original public tiles span zoom 0–7;
+map-space coordinates are shared by rendering, freehand input and eraser hit tests.
+Authenticated map polling repairs the full snapshot every two seconds. Writes
+share nickname locks with revocation and a room lock for bounded, idempotent
+insertion. Author metadata is derived from the session. Reads and writes reject
+old generations and cross-room credentials. Only the original session can delete
+its stroke. PostgreSQL provides persistence and cross-replica synchronization.
+
+See [multi-room setup, upstream dependencies and limits](multi-room-and-map.md).
+
 ## Current foundation
 
 `apps/web` uses Nuxt 4 and Nitro's Node server preset. The player page reads public
@@ -110,7 +136,9 @@ read APIs expose only credential presence. See [room settings](room-configuratio
 The partial unique index
 allows at most one ACTIVE session per nickname key across rooms. The schema is
 backed by transactional listener operations. Request IDs bind to the original
-payload and credential. Nickname rows serialize generations globally, and a new
+payload and credential. Legacy nickname rows serialize generations globally; community keys serialize
+within each room. Publication of the original room also fences legacy same-ID
+delivery while changing namespaces. A new
 session cannot become ACTIVE until all older deliveries have acknowledged shutdown.
 Player socket registration shares the nickname transaction lock. Only a physical
 socket close acknowledges that registration, including across web replicas.
