@@ -4,13 +4,13 @@ import type { createDatabase } from '@babel/database'
 import type { CredentialCipher } from '@babel/database/credentials'
 import {
   claimVoiceSource,
-  readVoiceSources,
+  readVoiceSourceGroups,
   voiceSourceConfigured,
   VoiceSourceOwnershipError,
   type VoiceSourceConfiguration,
 } from '@babel/database/voice-sources'
 import { DiscordSource } from './discord-source.ts'
-import { RoomAudio } from './room-audio.ts'
+import { GuildBroadcast } from './guild-broadcast.ts'
 import type { MediaPeers } from './media-peers.ts'
 import type { SubtitleService } from './subtitle-service.ts'
 
@@ -18,8 +18,8 @@ interface Source {
   configuration: VoiceSourceConfiguration
   lease: Awaited<ReturnType<typeof claimVoiceSource>> | null
   discord: DiscordSource | null
-  audio: RoomAudio | null
-  subtitles: ReturnType<SubtitleService['source']> | null
+  broadcast: GuildBroadcast | null
+  rooms: VoiceSourceConfiguration[]
   starting: Promise<void> | null
   closing: boolean
   closingTask: Promise<void> | null
@@ -37,6 +37,7 @@ export class VoiceSources {
     }
   >()
   private readonly configurations = new Map<string, VoiceSourceConfiguration>()
+  private readonly sourceIds = new Map<string, string>()
   private readonly timer: ReturnType<typeof setInterval>
   private checking: Promise<void> | null = null
   private stopped = false
@@ -54,21 +55,23 @@ export class VoiceSources {
   }
 
   status(roomId: string): VoiceSourceStatus {
-    const source = this.sources.get(roomId)
-    const configuration = source?.configuration ?? this.configurations.get(roomId)
-    const failure = this.failures.get(roomId)
+    const sourceId = this.sourceIds.get(roomId) ?? roomId
+    const source = this.sources.get(sourceId)
+    const configuration = this.configurations.get(roomId)
+    const failure = this.failures.get(sourceId)
     return {
       roomId,
       sourceGeneration: configuration?.sourceGeneration ?? 0,
-      state: source
-        ? source.closing
-          ? 'STOPPING'
-          : source.discord?.ready() && performance.now() < source.validUntil
-            ? 'LISTENING'
-            : 'CONNECTING'
-        : configuration?.stopped !== false
+      state:
+        configuration?.stopped !== false
           ? 'STOPPED'
-          : 'UNAVAILABLE',
+          : source
+            ? source.closing
+              ? 'STOPPING'
+              : source.discord?.ready() && performance.now() < source.validUntil
+                ? 'LISTENING'
+                : 'CONNECTING'
+            : 'UNAVAILABLE',
       reason: failure?.reason ?? null,
       speakers: source?.closing ? [] : (source?.discord?.status() ?? []),
     }
@@ -90,31 +93,46 @@ export class VoiceSources {
   }
 
   private async reconcile() {
-    const configurations = await readVoiceSources(this.database.db)
+    const groups = await readVoiceSourceGroups(this.database.db)
     if (this.stopped) {
       return
     }
-    const roomIds = new Set(configurations.map((room) => room.id))
+    const roomIds = new Set(groups.map((group) => group.configuration.id))
+    this.configurations.clear()
+    this.sourceIds.clear()
+    for (const group of groups) {
+      for (const room of group.rooms) {
+        this.configurations.set(room.id, room)
+        this.sourceIds.set(room.id, group.configuration.id)
+      }
+    }
     for (const [id, source] of this.sources) {
       if (!roomIds.has(id)) {
         void this.close(source).catch(() => {})
       }
     }
-    for (const configuration of configurations) {
-      this.configurations.set(configuration.id, configuration)
+    for (const { configuration, rooms } of groups) {
       const source = this.sources.get(configuration.id)
       if (source) {
         if (
           source.closing ||
           configuration.stopped ||
-          configuration.sourceGeneration > source.configuration.sourceGeneration
+          (rooms.length === 1 &&
+            configuration.sourceGeneration > source.configuration.sourceGeneration) ||
+          configuration.discordVoiceChannelId !==
+            source.configuration.discordVoiceChannelId ||
+          configuration.captureMode !== source.configuration.captureMode ||
+          JSON.stringify(configuration.commanderIds) !==
+            JSON.stringify(source.configuration.commanderIds) ||
+          configuration.encryptedDiscordCredential !==
+            source.configuration.encryptedDiscordCredential
         ) {
           void this.close(source).catch(() => {})
-        } else if (
-          configuration.sourceGeneration === source.configuration.sourceGeneration
-        ) {
+        } else {
           // Publication fails closed when configuration reads stop completing.
           source.validUntil = performance.now() + 1_500
+          source.rooms = rooms
+          await source.broadcast?.reconcile(rooms)
         }
         continue
       }
@@ -133,8 +151,8 @@ export class VoiceSources {
         configuration,
         lease: null,
         discord: null,
-        audio: null,
-        subtitles: null,
+        broadcast: null,
+        rooms,
         starting: null,
         closing: false,
         closingTask: null,
@@ -225,25 +243,26 @@ export class VoiceSources {
       source.lease?.valid() === true &&
       performance.now() < source.validUntil &&
       source.discord?.ready() === true
-    source.audio = new RoomAudio(
-      allowed,
-      (packet) => this.peers.publish(configuration.id, packet),
-      () => this.fail(source, 'DISCORD'),
+    source.broadcast = new GuildBroadcast(allowed, this.peers, this.subtitles, () =>
+      this.fail(source, 'DISCORD'),
     )
-    source.subtitles = this.subtitles.source(
-      configuration.id,
-      source.configuration.sourceGeneration,
-      allowed,
+    await source.broadcast.reconcile(
+      source.rooms.map((room) =>
+        room.id === source.configuration.id
+          ? { ...room, sourceGeneration: source.configuration.sourceGeneration }
+          : room,
+      ),
     )
+    if (source.closing) {
+      return
+    }
     source.discord = new DiscordSource(
       source.configuration,
       (id, pcm, name) => {
-        source.audio?.receive(id, pcm)
-        source.subtitles?.receive(id, name, pcm)
+        source.broadcast?.receive(id, name, pcm)
       },
       (id) => {
-        source.audio?.remove(id)
-        source.subtitles?.remove(id)
+        source.broadcast?.remove(id)
       },
       () => this.fail(source, 'DISCORD'),
     )
@@ -252,20 +271,15 @@ export class VoiceSources {
 
   private close(source: Source): Promise<void> {
     source.closing = true
-    source.audio?.close()
-    source.subtitles?.close()
     if (source.closingTask) {
       return source.closingTask
     }
+    const broadcastClosed = source.broadcast?.close()
     source.closingTask = (async () => {
       // Retire browser playout immediately, independently of Discord shutdown.
-      await Promise.all([
-        this.peers.closeRoom(source.configuration.id),
-        source.discord?.close(),
-      ])
+      await Promise.all([broadcastClosed, source.discord?.close()])
       await source.starting
-      source.audio?.close()
-      source.subtitles?.close()
+      await source.broadcast?.close()
       await source.discord?.close()
       // Closing old peers discards browser decoder/jitter state as well as the
       // worker's PCM queues. New negotiation is fenced by the room epoch.

@@ -1,9 +1,11 @@
+import { seedLegacyRoom } from './fixtures/legacy-room.mjs'
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { startTestServer } from './test-server.mjs'
 
 const databaseUrl = process.env.DATABASE_URL
+await seedLegacyRoom(databaseUrl)
 assert.ok(databaseUrl, 'Set DATABASE_URL to the disposable local PostgreSQL service')
 assert.ok(
   ['localhost', '127.0.0.1', '[::1]'].includes(new URL(databaseUrl).hostname),

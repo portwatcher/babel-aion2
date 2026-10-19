@@ -114,8 +114,8 @@ The new listener session still replaces the previous listener session.
 ### Multi-room amendment · 2026-10-19
 
 This amendment takes precedence over the original single-room entry and global
-nickname requirements below for community rooms. The original administrator room
-and its legacy API remain available for compatibility.
+nickname requirements below for community rooms. Previously stored rooms and legacy APIs remain available for compatibility;
+new rooms are created only through Discord installation.
 
 - `/` lists community rooms; `/rooms/:roomId` is one independent broadcast room.
 - A creator must choose an Asia game server. An optional list of up to 200 exact
@@ -124,7 +124,14 @@ and its legacy API remain available for compatibility.
 - Creation requires Discord's full bot-installation OAuth2 flow. Request View
   Channel, Connect and Speak permissions automatically. Verify the creator can
   manage that guild and the installed bot can access the chosen voice channel,
-  including channel permission overwrites. One guild has one community room.
+  including channel permission overwrites. One guild can have multiple community
+  rooms, including repeated installations of the same bot. Each installation
+  creates a distinct room; retrying that same installation remains idempotent.
+  Obtain the guild identity from Discord OAuth, never from a fixed server setting.
+  Receive the guild's selected voice channel once, then distribute its audio to
+  the guild's active rooms. Their admission policies, sessions and maps remain
+  independent. Additional rooms use the guild's existing source channel.
+  Read operations and administration must not create a default room.
 - Verify entry server-side with AION2 Index's character-search API. Require an
   exact region, server and case-sensitive NFC character ID match. Use that
   returned ID as the session display name. Existence is not ownership proof.

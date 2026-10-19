@@ -1,3 +1,4 @@
+import { seedLegacyRoom } from './fixtures/legacy-room.mjs'
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { test } from 'node:test'
@@ -14,6 +15,7 @@ import {
 
 test('a killed runtime releases real media, persists only its closure and reconnects the same listener automatically', async (t) => {
   const database = await isolatedDatabase()
+  await seedLegacyRoom(database.url)
   const secret = randomBytes(32).toString('base64url')
   const peers = []
   let worker, other, web, held

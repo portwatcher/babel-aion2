@@ -10,6 +10,7 @@ export async function communityService() {
   const creator = '100000000000000010'
   const bot = '100000000000000020'
   const channel = '100000000000000030'
+  const alternateChannel = '100000000000000032'
   const forbiddenChannel = '100000000000000031'
   const server = createServer(async (request, response) => {
     const url = new URL(request.url, 'http://127.0.0.1')
@@ -142,6 +143,13 @@ export async function communityService() {
             permission_overwrites: [],
           },
           {
+            id: alternateChannel,
+            guild_id: id,
+            name: '备用频道',
+            type: 2,
+            permission_overwrites: [],
+          },
+          {
             id: forbiddenChannel,
             guild_id: id,
             name: '受限频道',
@@ -163,6 +171,7 @@ export async function communityService() {
     origin: `http://127.0.0.1:${server.address().port}`,
     channel,
     forbiddenChannel,
+    alternateChannel,
     close: () =>
       new Promise((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve())),

@@ -1,3 +1,4 @@
+import { seedLegacyRoom } from './fixtures/legacy-room.mjs'
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
@@ -7,6 +8,7 @@ import WebSocket from 'ws'
 import { startTestServer } from './test-server.mjs'
 
 const databaseUrl = process.env.DATABASE_URL
+await seedLegacyRoom(databaseUrl)
 assert.ok(databaseUrl, 'Use the disposable local database')
 assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(new URL(databaseUrl).hostname))
 const pool = new Pool({ connectionString: databaseUrl, max: 2 })

@@ -1,3 +1,4 @@
+import { seedLegacyRoom } from './fixtures/legacy-room.mjs'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
@@ -10,6 +11,7 @@ import { startTestServer } from './test-server.mjs'
 
 test('configured process pool budgets bound real PostgreSQL connections while concurrent requests queue and recover', async (t) => {
   const database = await isolatedDatabase()
+  await seedLegacyRoom(database.url)
   const prefix = `pool-${randomUUID().slice(0, 8)}`
   function labeled(component) {
     const url = new URL(database.url)
@@ -105,6 +107,7 @@ test('configured process pool budgets bound real PostgreSQL connections while co
 
 test('invalid pool settings fail configured web and worker startup before serving traffic', async () => {
   const database = await isolatedDatabase()
+  await seedLegacyRoom(database.url)
   try {
     for (const [component, key, value] of [
       ['web', 'NUXT_DATABASE_POOL_MAX', '0'],

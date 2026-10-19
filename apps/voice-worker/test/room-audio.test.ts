@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { test, type TestContext } from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
 import opus from '@discordjs/opus'
+import { GuildBroadcast } from '../src/guild-broadcast.ts'
+import type { VoiceSourceConfiguration } from '@babel/database/voice-sources'
 import { RoomAudio } from '../src/room-audio.ts'
 
 function tone(frequency: number, durationMs: number, channel?: number) {
@@ -97,4 +99,91 @@ test('backlog drops old sound, retains only 100 ms, and no output survives loss 
   r.audio.receive('one', tone(400, 100))
   await delay(60)
   assert.equal(r.frames.length, closedCount)
+})
+
+test('one guild broadcast delivers real Opus to independent rooms and retires only stopped destinations', async (t) => {
+  const frames = new Map<string, Buffer[]>()
+  const decoders = new Map<string, InstanceType<typeof opus.OpusEncoder>>()
+  const retired = new Set<string>()
+  const captions = new Map<string, string[]>()
+  const room = (id: string, stopped = false): VoiceSourceConfiguration => ({
+    id,
+    stopped,
+    name: id,
+    discordGuildId: '10000000000000001',
+    discordVoiceChannelId: '10000000000000002',
+    encryptedDiscordCredential: 'fixture',
+    captureMode: 'ALL_CHANNEL',
+    commanderIds: [],
+    sourceGeneration: 1,
+    configurationVersion: 1,
+    defaultOutputLanguage: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  })
+  let allowed = true
+  const broadcast = new GuildBroadcast(
+    () => allowed,
+    {
+      publish(roomId, packet) {
+        let decoder = decoders.get(roomId)
+        if (!decoder) {
+          decoder = new opus.OpusEncoder(48_000, 2)
+          decoders.set(roomId, decoder)
+        }
+        const received = frames.get(roomId) ?? []
+        received.push(Buffer.from(decoder.decode(packet)))
+        frames.set(roomId, received)
+      },
+      async closeRoom(roomId) {
+        retired.add(roomId)
+      },
+    },
+    {
+      source(roomId, _generation, permitted) {
+        const received: string[] = []
+        captions.set(roomId, received)
+        return {
+          receive(_id, name) {
+            if (permitted()) {
+              received.push(name)
+            }
+          },
+          remove() {},
+          close() {},
+        }
+      },
+    },
+    () => assert.fail('audio encoding failed'),
+  )
+  t.after(() => broadcast.close())
+  await broadcast.reconcile([room('one'), room('two')])
+  broadcast.receive('commander', 'Commander', tone(1_000, 60))
+  const wait = async (count: number) => {
+    const deadline = Date.now() + 2_000
+    while ((frames.get('two')?.length ?? 0) < count && Date.now() < deadline) {
+      await delay(5)
+    }
+    assert.ok((frames.get('two')?.length ?? 0) >= count)
+  }
+  await wait(3)
+  for (const roomId of ['one', 'two']) {
+    assert.ok(energy(Buffer.concat(frames.get(roomId)!.slice(0, 3)), 1_000, 0) > 1_000)
+    assert.deepEqual(captions.get(roomId), ['Commander'])
+  }
+  await broadcast.reconcile([room('one', true), room('two')])
+  const count = frames.get('one')!.length
+  const next = frames.get('two')!.length + 3
+  broadcast.receive('commander', 'Still live', tone(2_000, 60))
+  await wait(next)
+  assert.equal(frames.get('one')!.length, count)
+  assert.deepEqual([...retired], ['one'])
+  assert.deepEqual(captions.get('one'), ['Commander'])
+  assert.deepEqual(captions.get('two'), ['Commander', 'Still live'])
+  assert.ok(energy(Buffer.concat(frames.get('two')!.slice(-3)), 2_000, 0) > 1_000)
+  allowed = false
+  const ended = frames.get('two')!.length
+  broadcast.receive('commander', 'Obsolete', tone(400, 60))
+  await delay(60)
+  assert.equal(frames.get('two')!.length, ended)
 })

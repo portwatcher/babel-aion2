@@ -8,9 +8,16 @@ import { useListenerRoom } from '../../utils/room-configuration'
 
 export default defineEventHandler(async (event) => {
   const { identity } = await requireAdministratorSession(event)
-  const { roomId } = await useListenerRoom(event)
+  let roomId: string | null = null
+  try {
+    roomId = (await useListenerRoom(event)).roomId
+  } catch (error) {
+    if (!isError(error) || error.statusCode !== 404 || getQuery(event).roomId) {
+      throw error
+    }
+  }
   const [source, media, subtitles] = await Promise.all([
-    voiceSourceStatus(roomId),
+    roomId ? voiceSourceStatus(roomId) : null,
     mediaReady(),
     subtitlesReady(),
   ])

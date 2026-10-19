@@ -1,3 +1,4 @@
+import { seedLegacyRoom } from './fixtures/legacy-room.mjs'
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
@@ -14,6 +15,7 @@ import {
 } from './fixtures/media-worker.mjs'
 
 const databaseUrl = process.env.DATABASE_URL
+await seedLegacyRoom(databaseUrl)
 assert.ok(databaseUrl, 'Use disposable PostgreSQL')
 assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(new URL(databaseUrl).hostname))
 const pool = new Pool({ connectionString: databaseUrl, max: 4 })

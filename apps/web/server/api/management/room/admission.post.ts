@@ -34,7 +34,6 @@ export default defineEventHandler(async (event) => {
         NOT_FOUND: '房间不存在',
         SOURCE_UNCONFIGURED: '请先保存完整的 Discord 房间来源',
         ALREADY_PUBLISHED: '加入规则已确定，请重新加载',
-        GUILD_IN_USE: '此 Discord 服务器已有其他房间',
       }
       throw createError({
         statusCode: error.code === 'NOT_FOUND' ? 404 : 409,
