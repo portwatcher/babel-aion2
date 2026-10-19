@@ -7,12 +7,12 @@ import {
 
 const { t } = useInterfaceLocale()
 const props = defineProps<{
-  roomId: string
+  roomNumber: string
   session: ListenerSnapshot | null
   credential: string | null
 }>()
 const { strokes, current, busy, error, enabled, refresh, save, remove } = useRoomMap(
-  props.roomId,
+  props.roomNumber,
   toRef(props, 'session'),
   toRef(props, 'credential'),
 )

@@ -1,4 +1,12 @@
-import { index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import {
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core'
 import type { CharacterProfile, MapPoint, MapStrokeInput } from '@babel/contracts'
 import { listenerSession, room } from './rooms.ts'
 
@@ -20,6 +28,7 @@ export const communityRoom = pgTable('community_room', {
   roomId: uuid('room_id')
     .primaryKey()
     .references(() => room.id, { onDelete: 'cascade' }),
+  number: integer('number').notNull().generatedAlwaysAsIdentity().unique(),
   guildId: text('guild_id').notNull(),
   creatorId: text('creator_id').notNull(),
   server: text('server').notNull(),

@@ -21,7 +21,7 @@ import {
 
 export function usePlayerSession(
   configuration: Ref<PublicRoomConfiguration | null>,
-  roomId: string,
+  roomNumber: string,
 ) {
   const { t } = useInterfaceLocale()
   const credential = ref<string | null>(null)
@@ -43,7 +43,7 @@ export function usePlayerSession(
   let epoch = 0
   let disposed = false
   const connection = usePlayerConnection(receive, invalidSession)
-  const playerList = usePlayerList(connection.state, roomId)
+  const playerList = usePlayerList(connection.state, roomNumber)
   const subtitles = usePlayerSubtitles(session, connection.state, changingLanguage)
   const audio = useListenerAudio((reference) => {
     if (
@@ -54,7 +54,7 @@ export function usePlayerSession(
       throw new Error('Listener has ended')
     }
     access = { ...access, mediaAttempt: Math.max(access.mediaAttempt, Date.now()) + 1 }
-    saveListener(access, roomId)
+    saveListener(access, roomNumber)
     return access.mediaAttempt
   })
 
@@ -65,8 +65,8 @@ export function usePlayerSession(
     credential.value = null
     restoreFailed.value = false
     try {
-      saveListener(null, roomId)
-      savePendingEntry(null, roomId)
+      saveListener(null, roomNumber)
+      savePendingEntry(null, roomNumber)
     } catch {
       /* Already unusable in this page. */
     }
@@ -82,7 +82,7 @@ export function usePlayerSession(
   }
 
   function accept(next: ListenerSnapshot) {
-    if (next.roomId !== roomId) {
+    if (next.roomId !== configuration.value?.room.id) {
       invalidSession()
       return
     }
@@ -154,16 +154,18 @@ export function usePlayerSession(
     error.value = ''
     notice.value = ''
     try {
-      let pending = loadPendingEntry(roomId)
+      let pending = loadPendingEntry(roomNumber)
       if (
         pending?.request.nickname !== nickname ||
         pending.request.outputLanguage !== outputLanguage
       ) {
         pending = createPendingEntry(nickname, outputLanguage)
-        savePendingEntry(pending, roomId)
+        savePendingEntry(pending, roomNumber)
       }
       const next = await listenerRequest(
-        roomId ? `/api/player/rooms/${roomId}/sessions` : '/api/player/sessions',
+        roomNumber
+          ? `/api/player/rooms/${roomNumber}/sessions`
+          : '/api/player/sessions',
         pending.credential,
         'POST',
         pending.request,
@@ -179,8 +181,8 @@ export function usePlayerSession(
         mediaAttempt: 0,
       }
       credential.value = access.credential
-      saveListener(access, roomId)
-      savePendingEntry(null, roomId)
+      saveListener(access, roomNumber)
+      savePendingEntry(null, roomNumber)
       accept(next)
       if (access && active.value) {
         connection.connect(access)
@@ -202,12 +204,12 @@ export function usePlayerSession(
     restoring.value = true
     restoreFailed.value = false
     error.value = ''
-    access = loadListener(roomId)
+    access = loadListener(roomNumber)
     credential.value = access?.credential ?? null
     const currentEpoch = ++epoch
     try {
       if (!access) {
-        if (loadPendingEntry(roomId)) {
+        if (loadPendingEntry(roomNumber)) {
           notice.value = 'previousEntryUnconfirmed'
         }
         return
@@ -256,7 +258,7 @@ export function usePlayerSession(
     audio.stop()
     submitting.value = true
     try {
-      saveListener({ ...leaving, leaving: true }, roomId)
+      saveListener({ ...leaving, leaving: true }, roomNumber)
       const next = await listenerRequest(
         `/api/player/sessions/${leaving.sessionId}`,
         leaving.credential,

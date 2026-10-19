@@ -21,6 +21,7 @@ export default defineEventHandler(async (event) => {
       server: installation.server,
       allowedIds: installation.allowedIds,
       roomId: installation.consumedRoomId,
+      roomNumber: installation.consumedRoomNumber,
       channels: (
         await installationChannels(
           installation.guildId,

@@ -2,7 +2,7 @@
 import { audioStatus } from '~/utils/audio-status'
 const { t } = useInterfaceLocale()
 const {
-  roomId,
+  roomNumber,
   configuration,
   session,
   credential,
@@ -59,7 +59,11 @@ const {
         <PlayerList :players="players" :current="playersCurrent" />
       </div>
     </div>
-    <TacticalMap :room-id="roomId" :session="session" :credential="credential" />
+    <TacticalMap
+      :room-number="roomNumber"
+      :session="session"
+      :credential="credential"
+    />
   </template>
   <section v-else-if="restoring" class="entry-panel" aria-busy="true" role="status">
     <p>{{ t('restoring') }}</p>

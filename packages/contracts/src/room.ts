@@ -1,6 +1,7 @@
 import type { OutputLanguage } from './languages.ts'
 import { z } from 'zod'
 import { voiceSourceStateSchema } from './voice-source.ts'
+import { roomNumberSchema } from './lobby.ts'
 
 const publicAudioStateSchema = voiceSourceStateSchema.or(z.literal('UNCONFIGURED'))
 
@@ -8,6 +9,7 @@ export const publicRoomConfigurationSchema: z.ZodType<PublicRoomConfiguration> =
   z.object({
     room: z.object({
       id: z.uuid(),
+      number: roomNumberSchema.optional(),
       name: z.string(),
       audioState: publicAudioStateSchema,
     }),
@@ -18,7 +20,12 @@ export const publicRoomConfigurationSchema: z.ZodType<PublicRoomConfiguration> =
   })
 
 export interface PublicRoomConfiguration {
-  room: { id: string; name: string; audioState: z.infer<typeof publicAudioStateSchema> }
+  room: {
+    id: string
+    number?: number
+    name: string
+    audioState: z.infer<typeof publicAudioStateSchema>
+  }
   outputLanguages: OutputLanguage[]
   defaultOutputLanguage: string | null
   entryAvailable: boolean

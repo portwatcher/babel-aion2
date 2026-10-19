@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { roomNumberParameterSchema } from '@babel/contracts'
 import { and, eq, isNull } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import { communityRoom, room } from '@babel/database/schema'
@@ -6,25 +7,25 @@ import { CommunityRoomError } from '@babel/database/community-rooms'
 import { useDatabase } from './database'
 import { readBoundedJson, BodyInputError } from './bounded-json'
 
-export function publicRoomId(event: H3Event) {
-  const result = z.uuid().safeParse(getRouterParam(event, 'roomId'))
+function publicRoomNumber(event: H3Event) {
+  const result = roomNumberParameterSchema.safeParse(getRouterParam(event, 'roomId'))
   if (!result.success) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid room ID' })
+    throw createError({ statusCode: 400, statusMessage: 'Invalid room number' })
   }
   return result.data
 }
 export async function requireCommunityRoom(event: H3Event) {
-  const roomId = publicRoomId(event)
+  const roomNumber = publicRoomNumber(event)
   const database = useDatabase(event)
   const [record] = await database
     .select({ room, admission: communityRoom })
     .from(room)
     .innerJoin(communityRoom, eq(room.id, communityRoom.roomId))
-    .where(and(eq(room.id, roomId), isNull(room.disbandedAt)))
+    .where(and(eq(communityRoom.number, roomNumber), isNull(room.disbandedAt)))
   if (!record) {
     throw createError({ statusCode: 404, statusMessage: '房间不存在' })
   }
-  return { database, roomId, ...record }
+  return { database, roomId: record.room.id, ...record }
 }
 export function installationConfiguration(event: H3Event) {
   const config = useRuntimeConfig(event)
