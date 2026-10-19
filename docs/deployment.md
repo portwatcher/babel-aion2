@@ -103,8 +103,16 @@ The earlier local preview is no longer running, so it does not compete for the b
 The first start temporarily retried; the next start connected without an image,
 permission or network-policy change. That transient failure remains unexplained.
 
+The first human playback attempt produced no sound while the human Discord
+account was outside the voice channel. After joining the configured channel,
+the production source reported that member's correct identity and 282 decoded
+frames at 02:03 UTC, still on generation 9 with no failure reason. No recording
+was retained. The browser reports a connected audio channel, but the subsequent
+audible-playback check still awaits human confirmation; multiple members were
+not tested.
+
 Provider/language lists remain empty. These checks prove administrator setup,
-Discord connection and media connectivity, not live speech, provider
+single-member Discord receipt and media connectivity, not audible playback, provider
 quality, TURN TLS/restricted-network compatibility, mainland-China performance,
 native game-window behavior, host-loss fencing or production disaster recovery.
 

@@ -14,7 +14,8 @@ PASS applies only to that named check, not automatically to production.
 | Local listener, media and subtitle contracts | PASS                      | Built application suites cover nickname replacement, actual peer closure, per-member PCM, shared subtitle transport and child-process recovery; live provider responses are not part of these proofs |
 | Production voice infrastructure              | PASS                      | One ready worker, authenticated private control, configured pool budgets, actual pod/public TURN forwarding and normal Chrome media connection/exit passed; see the current deployment report        |
 | Production Discord configuration             | PASS                      | Human Access login, normal encrypted-credential save and separate start succeeded. ALL_CHANNEL reports LISTENING with no failure reason; a real browser listener connected while the source was live |
-| Integrated real speech                       | NOT RUN                   | Production observed zero speakers at 01:59 UTC. Isolated single-member DAVE receipt/re-entry passed earlier, but fresh production speech, audible playback and simultaneous members are still needed |
+| Production single-member receipt             | PASS                      | After the human joined the configured voice channel, the actual worker reported the correct member identity and 282 decoded frames at 02:03 UTC, generation 9, with no failure reason                |
+| Audible playback and multiple members        | NOT RUN                   | The browser audio channel is connected. Human playback confirmation after receipt, simultaneous speakers and production member re-entry remain outstanding                                           |
 | Live subtitle quality                        | WAITING FOR CONFIGURATION | Soniox/DeepL settings and validation are implemented. Authorized credentials and representative commands are needed to validate each chosen output language                                          |
 | Native window and game use                   | NOT RUN                   | Browser controls and shared subtitle state passed; earlier native inspection was blocked by the locked Mac. Background audio and the actual AION2 display mode still need direct device validation   |
 | Deployed latency and capacity                | NOT RUN                   | Production transport now connects, but actual source/playback timing, load and player networks including mainland China remain unmeasured; connection success is not end-to-end latency evidence     |
@@ -54,7 +55,15 @@ returning it; a new normal browser listener established its audio connection.
 The first start temporarily retried and the next start connected without code,
 permission or network changes; the initial failure cause was not established.
 
-NOT RUN: live production speech, provider quality, restricted/TLS relay paths,
+PASS: one real member's audio reached the production worker after the human
+joined the configured Discord channel. At 02:03 UTC the source still reported
+LISTENING, generation 9, no failure reason, the correct member identity and 282
+decoded frames. The first human attempt had no audible output while that account
+was outside the voice channel. Subsequent audible playback has not yet been
+confirmed. No voice recording was retained.
+
+NOT RUN: confirmed audible production playback, multiple-member behavior,
+provider quality, restricted/TLS relay paths,
 mainland-China latency, capacity, native game behavior and disaster recovery.
 
 ## Optional character source probe — 2026-10-19
@@ -794,8 +803,8 @@ was applied. This is not a claim that the entire dependency graph is vulnerabili
 
 ## External inputs for later live checks
 
-- Fresh speech after starting a receiver for the configured Discord test channel,
-  including a second speaking member for source separation. The existing all-channel mode
+- Human playback confirmation after the verified single-member receipt, followed
+  by a second speaking member for source separation. The existing all-channel mode
   does not require a commander-ID list; the production bot credential is saved
   and the source is connected. Orchestration recovery evidence is still pending.
 - Selected provider credentials and authorized battle-command samples for
