@@ -270,18 +270,38 @@ try {
   )
   assert.notEqual(sibling.roomId, first.roomId)
   assert.notEqual(sibling.roomId, second.roomId)
+  const localizedVerification = await fetch(
+    `${a.origin}/rooms/${first.roomId}/verify`,
+    {
+      headers: { 'accept-language': 'ja-JP' },
+    },
+  )
+  assert.equal(
+    localizedVerification.status,
+    200,
+    'direct room links have a dedicated character verification page',
+  )
+  const verificationHtml = await localizedVerification.text()
+  assert.ok(
+    verificationHtml.includes('ゲームのキャラクター ID'),
+    'verification is translated during SSR',
+  )
+  assert.ok(
+    !verificationHtml.includes('id="tactical-title"'),
+    'verification does not mount the room map',
+  )
   const localizedRoom = await fetch(`${a.origin}/rooms/${first.roomId}`, {
     headers: { 'accept-language': 'ja-JP' },
   })
   assert.equal(localizedRoom.status, 200)
   const roomHtml = await localizedRoom.text()
   assert.ok(
-    roomHtml.includes('ゲームのキャラクター ID'),
-    'room entry is translated during SSR',
+    !roomHtml.includes('id="nickname"'),
+    'the room no longer embeds the verification form',
   )
   assert.ok(
-    roomHtml.includes('共有戦術マップ'),
-    'map controls are translated during SSR',
+    !roomHtml.includes('id="tactical-title"'),
+    'room content waits for session restoration',
   )
   const administrator = await management.signIn(a)
   async function manage(path, body, method = body ? 'POST' : 'GET', expected = 200) {

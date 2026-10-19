@@ -1,5 +1,17 @@
 # Validation
 
+## Direct room links and character verification · 2026-10-19
+
+| Check                                                    | Status  | Evidence                                                                                                                                                                                                                            |
+| -------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dedicated verification route and server rendering        | PASS    | The extended `test:community:db` check fails with 404 on the preceding runtime and passes on `/rooms/:roomId/verify`. Japanese SSR includes the verification form; neither verification nor un-restored room HTML includes the map. |
+| Missing session and rejected character                   | PASS    | Local in-app browser opens a direct room URL and reaches `/verify`; a disallowed fixture character stays there with an admission error.                                                                                             |
+| Successful entry, refresh and verification bypass        | PASS    | The same browser verifies an allowed fixture character, returns to its original room, refreshes and visits `/verify` again. PostgreSQL still contains one generation-1 session throughout those actions.                            |
+| Temporary restoration failure                            | PASS    | An exclusive lock on the isolated fixture's listener table causes recovery to time out. The URL stays on the room and offers Retry; releasing the lock restores the existing session without a new generation.                      |
+| Leave and ended-session handling                         | PASS    | Explicit leave returns to verification. A second explicit fixture entry later receives a persisted terminal state and returns with its removal notice, without automatic re-entry.                                                  |
+| Source checks and built runtime                          | PASS    | `npm run ci:local` and `npm run test:community:db` pass.                                                                                                                                                                            |
+| Live character data and live audio in this browser check | NOT RUN | Browser acceptance uses the existing local AION2 Index response fixture, PostgreSQL and the actual built web runtime. It starts no production listener, provider or Discord connection.                                             |
+
 ## Subscriber-driven provider lifetime — 2026-10-19
 
 | Check                          | Result  | Evidence                                                                                                                                                                                                            |

@@ -12,6 +12,15 @@ The worker groups those rooms into one receiver and encoder and distributes
 packets to active room destinations; subtitle delivery keeps room authorization.
 No read operation creates a default room. Shared bot credentials use the existing room-bound cipher.
 
+`/rooms/:roomId` and its nested `/verify` page share a parent listener controller.
+The browser restores its saved room credential before selecting the destination:
+valid sessions open the room, missing/ended sessions open verification, and
+transient restore errors keep a retry action. Successful verification returns to
+the room through client navigation without replacing the controller or session.
+Because credentials are per-tab storage, server-rendered room HTML waits for
+restoration and contains no entry form or tactical map. Verification has its own
+localized form and never mounts room-only controls.
+
 Room-specific entry checks the immutable server/allowlist and then AION2 Index's
 fixed public search endpoint. The returned exact character ID is the display
 name. Community nickname keys include the room UUID; legacy default-room keys

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { PublicRoomConfiguration } from '@babel/contracts'
-import { audioStatus } from '~/utils/audio-status'
 const { t } = useInterfaceLocale()
 definePageMeta({ key: (route) => String(route.params.roomId) })
 const route = useRoute()
 const roomId = String(route.params.roomId)
+const roomPath = `/rooms/${encodeURIComponent(roomId)}`
+const verificationPath = `${roomPath}/verify`
+const verifying = computed(() => route.path.replace(/\/$/, '') === verificationPath)
 const {
   data,
   error: configurationError,
@@ -15,30 +17,38 @@ watch(data, (value) => {
   configuration.value = value ?? null
 })
 const {
-  session,
-  credential,
-  players,
-  playersCurrent,
+  active,
   restoring,
   restoreFailed,
   submitting,
-  changingLanguage,
   error,
   notice,
-  active,
   leavePending,
-  connectionState,
-  subtitles,
-  audioState,
-  audioBlocked,
-  muted,
-  playAudio,
-  toggleMute,
-  enter,
   restore,
   leave,
-  changeLanguage,
-} = usePlayerSession(configuration, roomId)
+} = provideRoomSession(configuration, roomId)
+
+watch(
+  [active, restoring, restoreFailed, leavePending, configuration, () => route.path],
+  () => {
+    if (
+      !import.meta.client ||
+      !configuration.value ||
+      restoring.value ||
+      restoreFailed.value ||
+      leavePending.value
+    ) {
+      return
+    }
+    if (active.value && verifying.value) {
+      void navigateTo(roomPath, { replace: true })
+    } else if (!active.value && !verifying.value) {
+      void navigateTo(verificationPath, { replace: true })
+    }
+  },
+  { immediate: true },
+)
+
 let configurationTimer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   configurationTimer = setInterval(() => void refresh(), 5_000)
@@ -52,7 +62,9 @@ onBeforeUnmount(() => clearInterval(configurationTimer))
       <NuxtLink to="/" class="muted">{{ t('backRooms') }}</NuxtLink>
       <p class="eyebrow">{{ t('roomEyebrow') }}</p>
       <h1>{{ configuration?.room.name ?? t('directoryEyebrow') }}</h1>
-      <p class="muted">{{ t('roomTagline') }}</p>
+      <p class="muted">
+        {{ t(verifying ? 'characterVerificationHelp' : 'roomTagline') }}
+      </p>
     </div>
     <section v-if="configurationError" class="empty-state" aria-live="polite">
       <h2>{{ t('configurationUnavailable') }}</h2>
@@ -70,63 +82,16 @@ onBeforeUnmount(() => clearInterval(configurationTimer))
           @click="restore"
         />
       </div>
-      <div class="room-layout">
-        <section v-if="restoring" class="entry-panel" aria-busy="true">
-          <p>{{ t('restoring') }}</p>
-        </section>
-        <section v-else-if="leavePending" class="entry-panel">
-          <p>{{ t('connectionStopped') }}</p>
-          <Button
-            :label="t('retryLeave')"
-            severity="secondary"
-            :loading="submitting"
-            @click="leave"
-          />
-        </section>
-        <ListenerPanel
-          v-else-if="active && session"
-          :session="session"
-          :configuration="configuration"
-          :connection-state="connectionState"
-          :subtitles="subtitles"
-          :audio-state="audioState"
-          :audio-blocked="audioBlocked"
-          :muted="muted"
-          :busy="submitting"
-          :changing-language="changingLanguage"
-          @leave="leave"
-          @language="changeLanguage"
-          @play-audio="playAudio"
-          @toggle-mute="toggleMute"
+      <section v-if="leavePending" class="entry-panel">
+        <p>{{ t('connectionStopped') }}</p>
+        <Button
+          :label="t('retryLeave')"
+          severity="secondary"
+          :loading="submitting"
+          @click="leave"
         />
-        <RoomEntry
-          v-else
-          :configuration="configuration"
-          :submitting="submitting"
-          @enter="enter"
-        />
-        <div class="room-detail">
-          <section class="room-detail" aria-labelledby="room-status-title">
-            <div class="section-heading">
-              <h2 id="room-status-title">{{ t('channelStatus') }}</h2>
-              <Tag
-                :value="t(audioStatus[configuration.room.audioState].label)"
-                severity="secondary"
-              />
-            </div>
-            <p class="muted">
-              {{ t(audioStatus[configuration.room.audioState].description) }}
-            </p>
-          </section>
-          <div class="detail-divider" />
-          <PlayerList :players="players" :current="playersCurrent" />
-        </div>
-      </div>
-      <TacticalMap
-        :room-id="roomId"
-        :session="active ? session : null"
-        :credential="credential"
-      />
+      </section>
+      <NuxtPage v-else :page-key="route.path" />
     </template>
   </main>
 </template>
