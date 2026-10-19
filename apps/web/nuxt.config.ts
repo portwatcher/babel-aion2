@@ -16,6 +16,7 @@ export default defineNuxtConfig({
         '@babel/database',
         '@babel/contracts',
         '@babel/providers',
+        '@babel/telemetry',
       ],
     },
   },

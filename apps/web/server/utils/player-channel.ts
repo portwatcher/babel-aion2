@@ -20,6 +20,7 @@ import { useDatabase } from './database'
 import { publicRoomConfiguration } from './room-configuration'
 import { mediaReady, revokeMedia } from './media-control'
 import { createSubtitleRelay } from './subtitle-relay'
+import { SubtitleLatencyProbes } from './subtitle-latency'
 import { playerRuntimeOwner, playerRuntimeReady } from './runtime-owner'
 
 interface Connection {
@@ -34,6 +35,8 @@ interface Connection {
   nonce: string | null
   pingAt: number
   pongAt: number
+  rttMs: number | null
+  probes: SubtitleLatencyProbes
   timeout: ReturnType<typeof setTimeout>
   acknowledgeClose: () => void
   closedPromise: Promise<void>
@@ -62,6 +65,7 @@ function end(connection: Connection, code: number, reason: string) {
   }
   connection.closing = true
   connection.subtitles?.stop()
+  connection.probes.clear()
   clearTimeout(connection.timeout)
   connection.peer.close(code, reason)
   connection.timeout = setTimeout(() => connection.peer.terminate(), 1_500)
@@ -231,6 +235,8 @@ export const playerWebSocketHooks: Partial<Hooks> = {
       nonce: null,
       pingAt: 0,
       pongAt: Date.now(),
+      rttMs: null,
+      probes: new SubtitleLatencyProbes(),
       acknowledgeClose,
       closedPromise,
       subtitles: null,
@@ -240,9 +246,18 @@ export const playerWebSocketHooks: Partial<Hooks> = {
       ),
     }
     connection.timeout.unref()
-    connection.subtitles = createSubtitleRelay(peer.id, (event) =>
-      send(connection, event),
-    )
+    connection.subtitles = createSubtitleRelay(peer.id, (event, latency) => {
+      if (!latency || event.type !== 'subtitles') {
+        send(connection, event)
+        return
+      }
+      connection.probes.relay(
+        latency.value,
+        event.outputLanguage,
+        latency.receivedAt,
+        (probe) => send(connection, { ...event, probe }),
+      )
+    })
     connections.set(peer.id, connection)
   },
   async message(peer, message) {
@@ -289,12 +304,24 @@ export const playerWebSocketHooks: Partial<Hooks> = {
           return
         }
         await refresh(connection)
+      } else if (input.data.type === 'subtitle-displayed') {
+        if (!connection.session) {
+          throw new PlayerProtocolError('Invalid message')
+        }
+        // Unknown, repeated or expired probes are ignored rather than trusted.
+        connection.probes.displayed(
+          input.data.probe,
+          input.data.renderDelayMs,
+          input.data.visible,
+          connection.rttMs,
+        )
       } else {
         if (!connection.session || input.data.nonce !== connection.nonce) {
           throw new PlayerProtocolError('Invalid heartbeat')
         }
         connection.nonce = null
         connection.pongAt = Date.now()
+        connection.rttMs = connection.pongAt - connection.pingAt
         await renewPlayerConnection(useDatabase(), peer.id, playerRuntimeOwner())
       }
     } catch (error) {

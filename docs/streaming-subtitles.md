@@ -85,3 +85,5 @@ ended and drained successfully. Cold handshake preparation took 1,080 ms. This i
 one sample, not a percentile benchmark, quality evaluation or full Discord-to-screen
 latency measurement. Model lookahead, network distance, cold starts and browser
 render scheduling remain real latency contributors. See [validation](test-report.md).
+Production speech-to-screen latency is traced per speech turn; see
+[latency tracing](latency-tracing.md).

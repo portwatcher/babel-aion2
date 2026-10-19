@@ -2,12 +2,16 @@ import {
   subtitleMessageSchema,
   type ListenerSnapshot,
   type PlayerEvent,
+  type SubtitleLatency,
 } from '@babel/contracts'
 
 /** A private streaming connection backs the player's existing revocable socket. */
 export function createSubtitleRelay(
   connectionId: string,
-  emit: (event: PlayerEvent) => void,
+  emit: (
+    event: PlayerEvent,
+    latency?: { value: SubtitleLatency; receivedAt: number },
+  ) => void,
 ) {
   let session: ListenerSnapshot | null = null
   let key = ''
@@ -98,6 +102,7 @@ export function createSubtitleRelay(
         }
         clearTimeout(deadline)
         deadline = setTimeout(() => cancellation.abort(), 25_000)
+        const receivedAt = Date.now()
         pending += decoder.decode(chunk, { stream: true })
         let newline: number
         while ((newline = pending.indexOf('\n')) >= 0) {
@@ -118,12 +123,23 @@ export function createSubtitleRelay(
             throw new Error('Wrong subscription')
           }
           sourceGeneration = Math.max(sourceGeneration, value.sourceGeneration)
-          emit({
-            type: 'subtitles',
-            subscriptionVersion: target.subscriptionVersion,
-            outputLanguage: target.outputLanguage,
-            event: message,
-          })
+          // Trace context is private to servers; browsers receive only a probe ID.
+          let latency: SubtitleLatency | undefined
+          let event = message
+          if (message.type === 'subtitle' && message.value.latency) {
+            const { latency: marker, ...visible } = message.value
+            latency = marker
+            event = { type: 'subtitle', value: visible }
+          }
+          emit(
+            {
+              type: 'subtitles',
+              subscriptionVersion: target.subscriptionVersion,
+              outputLanguage: target.outputLanguage,
+              event,
+            },
+            latency ? { value: latency, receivedAt } : undefined,
+          )
         }
         if (Buffer.byteLength(pending) > 128 * 1024) {
           throw new Error('Frame too large')

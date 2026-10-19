@@ -1,4 +1,8 @@
-import { playerEventSchema, type PlayerEvent } from '@babel/contracts'
+import {
+  playerEventSchema,
+  type PlayerEvent,
+  type PlayerMessage,
+} from '@babel/contracts'
 import type { SavedListener } from '~/utils/listener-client'
 
 export function usePlayerConnection(
@@ -101,6 +105,12 @@ export function usePlayerConnection(
     }
   }
 
+  function send(message: PlayerMessage) {
+    if (socket?.readyState === WebSocket.OPEN && state.value === 'connected') {
+      socket.send(JSON.stringify(message))
+    }
+  }
+
   function connect(saved: SavedListener) {
     stop()
     access = saved
@@ -110,5 +120,5 @@ export function usePlayerConnection(
   }
 
   onBeforeUnmount(stop)
-  return { state, connect, stop }
+  return { state, connect, stop, send }
 }

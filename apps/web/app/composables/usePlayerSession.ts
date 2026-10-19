@@ -44,7 +44,12 @@ export function usePlayerSession(
   let disposed = false
   const connection = usePlayerConnection(receive, invalidSession)
   const playerList = usePlayerList(connection.state, roomNumber)
-  const subtitles = usePlayerSubtitles(session, connection.state, changingLanguage)
+  const subtitles = usePlayerSubtitles(
+    session,
+    connection.state,
+    changingLanguage,
+    connection.send,
+  )
   const audio = useListenerAudio((reference) => {
     if (
       !access ||
