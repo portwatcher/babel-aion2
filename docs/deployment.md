@@ -116,6 +116,20 @@ single-member Discord receipt and media connectivity, not audible playback, prov
 quality, TURN TLS/restricted-network compatibility, mainland-China performance,
 native game-window behavior, host-loss fencing or production disaster recovery.
 
+Subsequent production checks passed real Chrome nickname replacement, persistent
+same-session refresh, administrator removal and PiP closure. A graceful worker
+rollout exposed a cross-node TURN problem: the node-public TCP endpoint timed out
+from the new node. The existing cluster Service passed authenticated bidirectional
+relay traffic from that same pod, so private infra now uses it for the worker's
+TURN endpoint while browsers keep the public endpoints.
+
+After that correction and normal GitOps replacement, the browser reconnected
+without manual refresh or a new listener. Stored settings and encrypted
+credentials remained identical; old owners and transports have closure receipts.
+The new Discord source reported 29 decoded frames at generation 11. See the
+[production lifecycle report](test-report.md#production-sessions-and-graceful-worker-recovery--2026-10-19)
+for the evidence and remaining audible-playback, game and abrupt-loss limits.
+
 ## Earlier web release verification — 2026-10-19
 
 Source `bbe9fc204d61b37a46284581416504bc172cb46e` was released through the
