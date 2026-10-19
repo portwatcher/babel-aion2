@@ -198,5 +198,12 @@
   "botPermissionsMissing": "The bot cannot access this channel. Check its channel permissions.",
   "credentialProtectionUnavailable": "Unavailable right now. Try again later.",
   "entryClosed": "This room is not accepting listeners right now. Try again later.",
-  "characterHelp": "Case-sensitive. Must exist on {server}."
+  "characterHelp": "Case-sensitive. Must exist on {server}.",
+  "closeRoom": "Close room",
+  "confirmCloseRoom": "Close for everyone",
+  "cancel": "Cancel",
+  "roomClosed": "Room closed.",
+  "roomClosedByHost": "The host closed the room.",
+  "closeRoomFailed": "Couldn't close the room. Try again.",
+  "hostCharacterDiscordHelp": "This character can close the room."
 }

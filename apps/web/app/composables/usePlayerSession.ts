@@ -33,6 +33,10 @@ export function usePlayerSession(
   const error = ref<InterfaceMessageKey | ''>('')
   const notice = ref<InterfaceMessageKey | ''>('')
   const leavePending = ref(false)
+  // Set once this room is gone; the page leaves for the lobby instead of
+  // returning to character verification.
+  const roomClosed = ref(false)
+  const toast = useToast()
   const active = computed(
     () =>
       !leavePending.value &&
@@ -99,6 +103,10 @@ export function usePlayerSession(
       leavePending.value = false
       epoch += 1
       clearAccess()
+      if (next.terminalReason === 'ROOM_CLOSED') {
+        closedRoom(next)
+        return
+      }
       notice.value =
         next.terminalReason === 'DUPLICATE_NICKNAME_REPLACED'
           ? 'sessionReplaced'
@@ -108,6 +116,18 @@ export function usePlayerSession(
               ? 'sessionExpired'
               : 'sessionLeft'
     }
+  }
+
+  function closedRoom(next: ListenerSnapshot) {
+    roomClosed.value = true
+    const host = configuration.value?.room.hostId
+    const closedByMe = Boolean(host) && host === next.nickname
+    toast.add({
+      severity: closedByMe ? 'info' : 'warn',
+      summary: t(closedByMe ? 'roomClosed' : 'roomClosedByHost'),
+      life: 6_000,
+    })
+    void navigateTo('/', { replace: true })
   }
 
   function chooseLanguage() {
@@ -291,6 +311,38 @@ export function usePlayerSession(
     }
   }
 
+  async function closeRoom() {
+    if (!access || !active.value) {
+      return
+    }
+    const closing = access
+    const currentEpoch = epoch
+    submitting.value = true
+    error.value = ''
+    try {
+      const next = await listenerRequest(
+        `/api/player/sessions/${closing.sessionId}/room`,
+        closing.credential,
+        'DELETE',
+      )
+      if (disposed || currentEpoch !== epoch) {
+        return
+      }
+      accept(next)
+    } catch (failure) {
+      if (disposed || currentEpoch !== epoch) {
+        return
+      }
+      if (failure instanceof PlayerApiError && [401, 410].includes(failure.status)) {
+        invalidSession()
+      } else {
+        error.value = 'closeRoomFailed'
+      }
+    } finally {
+      submitting.value = false
+    }
+  }
+
   async function changeLanguage(language: string | null, explicit = true) {
     if (!access || !active.value || changingLanguage.value) {
       return
@@ -341,6 +393,7 @@ export function usePlayerSession(
     notice: computed(() => (notice.value ? t(notice.value) : '')),
     active,
     leavePending,
+    roomClosed,
     connectionState: connection.state,
     subtitles: subtitles.presentation,
     audioState: audio.state,
@@ -355,6 +408,7 @@ export function usePlayerSession(
     enter,
     restore,
     leave,
+    closeRoom,
     changeLanguage,
   }
 }

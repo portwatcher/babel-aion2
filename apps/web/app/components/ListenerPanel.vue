@@ -18,6 +18,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   leave: []
+  closeRoom: []
   language: [language: string | null]
   playAudio: []
   toggleMute: []
@@ -28,6 +29,10 @@ const pip = useSubtitlePictureInPicture(
   () => `${props.session.sessionId}:${props.session.nicknameGeneration}`,
 )
 const { supported, opening, target, error: pipError } = pip
+const isHost = computed(
+  () => props.configuration.room.hostId === props.session.nickname,
+)
+const confirmingClose = ref(false)
 const textSize = ref(1.25)
 const textSizes = computed(() => [
   { label: t('textStandard'), value: 1.25 },
@@ -139,13 +144,38 @@ const languageName = computed(
         :loading="opening"
         @click="target ? pip.close() : pip.open()"
       />
-      <Button
-        :label="t('leaveRoom')"
-        severity="secondary"
-        variant="outlined"
-        :loading="busy"
-        @click="emit('leave')"
-      />
+      <template v-if="isHost && confirmingClose">
+        <Button
+          :label="t('confirmCloseRoom')"
+          severity="danger"
+          :loading="busy"
+          @click="emit('closeRoom')"
+        />
+        <Button
+          :label="t('cancel')"
+          severity="secondary"
+          variant="text"
+          :disabled="busy"
+          @click="confirmingClose = false"
+        />
+      </template>
+      <template v-else>
+        <Button
+          v-if="isHost"
+          :label="t('closeRoom')"
+          severity="danger"
+          variant="outlined"
+          :disabled="busy"
+          @click="confirmingClose = true"
+        />
+        <Button
+          :label="t('leaveRoom')"
+          severity="secondary"
+          variant="outlined"
+          :loading="busy"
+          @click="emit('leave')"
+        />
+      </template>
     </div>
     <Teleport v-if="target" :to="target">
       <ListenerSubtitleStatus

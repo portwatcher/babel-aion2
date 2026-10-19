@@ -40,6 +40,7 @@ const error = computed(() => (errorKey.value ? t(errorKey.value) : ''))
 function roomSettings() {
   return {
     name: name.value,
+    hostId: hostId.value,
     server: server.value,
     allowedIds: allowed.value
       .split(/\r?\n/)
@@ -51,10 +52,7 @@ function submit() {
   return audioSource.value === 'PLAYER' ? createHosted() : install()
 }
 async function createHosted() {
-  const parsed = playerRoomCreationSchema.safeParse({
-    ...roomSettings(),
-    hostId: hostId.value,
-  })
+  const parsed = playerRoomCreationSchema.safeParse(roomSettings())
   if (!parsed.success) {
     errorKey.value = !server.value ? 'serverMissing' : 'roomSettingsInvalid'
     return
@@ -181,7 +179,7 @@ onMounted(() => {
               :placeholder="t('chooseServer')"
             />
           </div>
-          <div v-if="audioSource === 'PLAYER'" class="field">
+          <div class="field">
             <label for="host-id">{{ t('hostCharacter') }}</label>
             <InputText
               id="host-id"
@@ -192,7 +190,13 @@ onMounted(() => {
               :disabled="busy"
               aria-describedby="host-id-help"
             />
-            <small id="host-id-help" class="muted">{{ t('hostCharacterHelp') }}</small>
+            <small id="host-id-help" class="muted">{{
+              t(
+                audioSource === 'PLAYER'
+                  ? 'hostCharacterHelp'
+                  : 'hostCharacterDiscordHelp',
+              )
+            }}</small>
           </div>
           <div class="field">
             <label for="allowed-ids">{{ t('allowedCharacters') }}</label>

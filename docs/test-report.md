@@ -82,6 +82,16 @@ five-minute grace window. Newly published legacy rooms also start a full window.
 | Built HTTP timer and access      | PASS    | `npm run test:community:db` triggers the built web timer and verifies directory removal and 404 responses for configuration, players, entry and administrator settings across two replicas. `npm run test:management:db` also passes after repairing H3 error mapping. |
 | Live five-minute waiting / audio | NOT RUN | Local time-boundary fixtures backdate persisted timestamps; they do not establish human playback or a five-minute production wall-clock observation.                                                                                                                   |
 
+## Host room closing · 2026-10-19
+
+| Check                      | Result  | Evidence                                                                                                                                                                                                                                                  |
+| -------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PostgreSQL close semantics | PASS    | `room-close.test.ts` on a freshly migrated database: member 403, wrong credential 401, replaced host 410, host close tombstones the room, ends both sessions with `ROOM_CLOSED`, revokes delivery, keeps sibling rooms. `npm run test:db`: 18 tests pass. |
+| HTTP across replicas       | PASS    | `npm run test:community:db`: host ID exposed in config, member and cross-origin close rejected, host close returns `ROOM_CLOSED`, guest snapshot on the other replica reports it, directory/config drop the room on both.                                 |
+| Browser flow               | PASS    | Local built server with fixture character index: a guest is returned to the room list with "The host closed the room." when the host closes; the host sees Close room, confirms, and returns with "Room closed."                                          |
+| Full source validation     | PASS    | `npm run ci:local`: formatting, line limits, strict types, unit tests, builds and built HTTP smoke.                                                                                                                                                       |
+| Production / live audio    | NOT RUN | Not observed against a live Discord or player-audio broadcast.                                                                                                                                                                                            |
+
 ## Direct room links and character verification · 2026-10-19
 
 | Check                                                    | Status  | Evidence                                                                                                                                                                                                                            |

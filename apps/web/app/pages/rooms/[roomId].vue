@@ -30,6 +30,7 @@ const {
   error,
   notice,
   leavePending,
+  roomClosed,
   restore,
   leave,
 } = provideRoomSession(configuration, roomNumber)
@@ -39,6 +40,7 @@ watch(
   () => {
     if (
       !import.meta.client ||
+      roomClosed.value ||
       !configuration.value ||
       restoring.value ||
       restoreFailed.value ||

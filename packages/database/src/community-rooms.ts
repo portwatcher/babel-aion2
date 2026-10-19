@@ -39,15 +39,27 @@ async function creationResult(db: Pick<Database, 'select'>, roomId: string) {
   return { roomId, roomNumber: record.roomNumber }
 }
 
+// A restricted room always admits its own host character.
+function hostAdmission(request: { hostId: string; allowedIds: string[] }) {
+  const hostId = request.hostId.normalize('NFC')
+  const allowedIds = [...new Set(request.allowedIds.map((id) => id.normalize('NFC')))]
+  if (allowedIds.length && !allowedIds.includes(hostId)) {
+    allowedIds.push(hostId)
+  }
+  return { hostId, allowedIds }
+}
+
 export async function beginInstallation(db: Database, input: unknown) {
   const request = roomInstallSchema.parse(input)
+  const { hostId, allowedIds } = hostAdmission(request)
   const state = randomBytes(32).toString('base64url')
   const browser = randomBytes(32).toString('base64url')
   const [record] = await db
     .insert(roomInstallation)
     .values({
       ...request,
-      allowedIds: [...new Set(request.allowedIds.map((id) => id.normalize('NFC')))],
+      hostId,
+      allowedIds,
       stateHash: hashInstallationSecret(state),
       browserHash: hashInstallationSecret(browser),
       expiresAt: new Date(Date.now() + 15 * 60_000),
@@ -161,6 +173,7 @@ export async function createCommunityRoom(
       discordVoiceChannelId: voiceChannelId,
       captureMode: existing?.captureMode ?? 'ALL_CHANNEL',
       commanderIds: existing?.commanderIds ?? [],
+      hostCharacterId: installation.hostId,
       stopped: false,
       sourceGeneration: 1,
       encryptedDiscordCredential: cipher.encrypt(botToken, `room:${roomId}:discord`),
@@ -195,11 +208,7 @@ export async function createCommunityRoom(
  */
 export async function createPlayerRoom(db: Database, input: unknown) {
   const request = playerRoomCreationSchema.parse(input)
-  const hostId = request.hostId.normalize('NFC')
-  const allowedIds = [...new Set(request.allowedIds.map((id) => id.normalize('NFC')))]
-  if (allowedIds.length && !allowedIds.includes(hostId)) {
-    allowedIds.push(hostId)
-  }
+  const { hostId, allowedIds } = hostAdmission(request)
   return db.transaction(async (tx) => {
     const roomId = randomUUID()
     await tx.insert(room).values({

@@ -15,4 +15,5 @@ useInterfaceControlLocale()
     </header>
     <NuxtPage />
   </div>
+  <Toast position="top-center" />
 </template>

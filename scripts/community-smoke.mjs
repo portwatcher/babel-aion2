@@ -6,7 +6,7 @@ import { communityService } from './fixtures/community-service.mjs'
 import { call, map } from './fixtures/community-client.mjs'
 import { startTestServer } from './test-server.mjs'
 import { createManagementFixture } from './management-fixture.mjs'
-import { verifyRoomDisband } from './fixtures/room-lifecycle.mjs'
+import { verifyHostClose, verifyRoomDisband } from './fixtures/room-lifecycle.mjs'
 
 // Primary proof for public room admission and collaborative map persistence.
 // Real HTTP and PostgreSQL detect cross-replica leakage, permission bypasses,
@@ -34,7 +34,7 @@ let mismatchedApplication
 async function create(name, server, allowedIds, code, shared = false) {
   const response = await call(a, '/api/player/rooms/install', {
     method: 'POST',
-    body: { name, server, allowedIds },
+    body: { name, server, allowedIds, hostId: 'Pilot' },
   })
   assert.equal(response.status, 200, 'installation starts')
   const cookie = response.headers
@@ -171,7 +171,7 @@ try {
   })
   const mismatchStart = await call(mismatchedApplication, '/api/player/rooms/install', {
     method: 'POST',
-    body: { name: 'Mismatched application', server: 'siel' },
+    body: { name: 'Mismatched application', server: 'siel', hostId: 'Pilot' },
   })
   assert.equal(mismatchStart.status, 200)
   const mismatchCookie = mismatchStart.headers
@@ -593,6 +593,7 @@ try {
     b,
     administrator,
   })
+  await verifyHostClose({ create, join, call, a, b })
   console.log(
     'PASS multi-room HTTP + PostgreSQL: repeated same-guild installations create independent rooms, no implicit room seeding, required realm, OAuth state/browser binding, bot/channel permissions, optional ID allowlist, API admission, independent sessions, cross-replica strokes and erasure, replacement fencing and restart persistence.',
   )

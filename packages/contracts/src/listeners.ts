@@ -26,6 +26,7 @@ export const listenerSnapshotSchema: z.ZodType<ListenerSnapshot> = z.object({
       'ADMINISTRATOR_REMOVED',
       'PLAYER_LEFT',
       'CONNECTION_EXPIRED',
+      'ROOM_CLOSED',
     ])
     .nullable(),
   outputLanguage: z.string().nullable(),
@@ -45,6 +46,7 @@ export type TerminalReason =
   | 'ADMINISTRATOR_REMOVED'
   | 'PLAYER_LEFT'
   | 'CONNECTION_EXPIRED'
+  | 'ROOM_CLOSED'
 
 export interface ListenerReference {
   sessionId: string
