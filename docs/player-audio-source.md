@@ -2,10 +2,10 @@
 
 A room's audio comes from one of two sources, chosen when the room is created:
 
-| Source          | Setup                                                    | Input                                 |
-| --------------- | -------------------------------------------------------- | ------------------------------------- |
-| `PLAYER` (host) | Room name, server, host character ID, optional allowlist | The host character's browser mic      |
-| `DISCORD`       | Discord bot installation and voice-channel choice        | Speaking members of the voice channel |
+| Source            | Setup                                                    | Input                                 |
+| ----------------- | -------------------------------------------------------- | ------------------------------------- |
+| `PLAYER` (player) | Room name, server, host character ID, optional allowlist | An input the host chooses in the room |
+| `DISCORD`         | Discord bot installation and voice-channel choice        | Speaking members of the voice channel |
 
 A player-source room needs no Discord application, bot, guild or channel. It is
 available whenever the database is configured; `GET /api/player/rooms` reports
@@ -37,10 +37,29 @@ When a listener requests a media offer, the worker reads the room's running host
 (`readUplinkHost`). If the listener's exact nickname matches, its peer gets one
 `recvonly` audio transceiver instead of the usual `sendonly` playback track, and
 the offer carries that transceiver's `uplinkMid`. Every other listener gets
-`uplinkMid: null` and cannot publish. The browser fills the uplink transceiver
-with a `getUserMedia` microphone track (echo cancellation, noise suppression and
-automatic gain control on). Denied permission keeps the host joined, shows a
-retry action and sends no track.
+`uplinkMid: null` and cannot publish.
+
+## Choosing the input
+
+The host picks the broadcast input in the room and can change it at any time:
+
+- **Computer audio** uses the browser's screen-share picker
+  (`getDisplayMedia`). Share a screen or tab with audio sharing on; the video
+  track is stopped immediately. Echo cancellation, noise suppression and gain
+  control are off so game audio is not treated as voice. Whole-screen system audio
+  depends on the browser and operating system (Chrome on Windows offers it);
+  otherwise share the tab or window that plays the audio. A share without audio
+  shows a retry prompt, and ending the share returns to choosing an input.
+- **Any audio input device** (microphone, Stereo Mix, a virtual cable) uses
+  `getUserMedia` with voice processing on. Device names appear after the first
+  permission grant; before that one default input is offered.
+
+The uplink transceiver is always negotiated as `sendonly`, so switching inputs
+replaces the sender track without renegotiation and stops the previous capture.
+The capture belongs to the page, not to one peer: media reconnects reuse it
+without asking again. A chosen device is remembered in local storage and starts
+automatically on the next visit; computer audio always needs a click. Mute
+disables the track. Leaving the room stops the capture.
 
 The worker decodes the host's Opus RTP to 48 kHz stereo PCM and feeds the same
 `GuildBroadcast` used for Discord: one Opus mix for room playback and an
@@ -50,9 +69,6 @@ current, its room epoch is current and the attached source still names that
 host. Closing the host peer removes the speaker; stopping or disbanding the room
 retires the source and closes all of its peers.
 
-The host can mute the microphone (the track is disabled, not removed) and
-re-acquire it with **Retry**.
-
 ## Limits
 
 - The host is identified by character ID, the same trust model as entry. Anyone
@@ -61,7 +77,6 @@ re-acquire it with **Retry**.
 - Creating a player-source room needs no Discord authorization; the only check is
   the AION2 Index host lookup. There is no rate limit. Unused rooms disband after
   five empty minutes. A repeated submission creates another room.
-- Only microphone input is captured; game or system audio is not.
 - The automated test uses real Werift peers and real Opus in both directions. A
   real browser microphone, permission prompt and production TURN path have not
   been exercised; see [validation](test-report.md).

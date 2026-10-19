@@ -6,9 +6,9 @@ private today and prepared for eventual open source.
 The player interface is a dark, low-distraction battle panel. The original
 requirements are kept in sync in [design.md](design.md) and [GOAL.md](GOAL.md).
 
-Create a room with one of two audio sources. **Host microphone** needs no
-Discord: enter the host character ID, and that character's browser publishes its
-microphone after joining. See [player audio source](docs/player-audio-source.md).
+Create a room with one of two audio sources. **Host capture** needs no
+Discord: enter the host character ID; after joining, that character chooses what
+to broadcast (computer audio or any audio input) and can switch it in the room. See [player audio source](docs/player-audio-source.md).
 **Discord** creates rooms by installing the bot. Server identity comes from
 the OAuth grant. The same Discord server can host multiple independent rooms;
 they share one voice-channel audio receiver. No administrator room setup is

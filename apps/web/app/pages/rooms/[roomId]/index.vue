@@ -18,10 +18,7 @@ const {
   muted,
   playAudio,
   toggleMute,
-  microphone,
-  microphoneMuted,
-  toggleMicrophone,
-  reconnectAudio,
+  capture,
   leave,
   closeRoom,
   changeLanguage,
@@ -39,8 +36,7 @@ const {
         :audio-state="audioState"
         :audio-blocked="audioBlocked"
         :muted="muted"
-        :microphone="microphone"
-        :microphone-muted="microphoneMuted"
+        :capture="capture"
         :busy="submitting"
         :changing-language="changingLanguage"
         @leave="leave"
@@ -48,8 +44,6 @@ const {
         @language="changeLanguage"
         @play-audio="playAudio"
         @toggle-mute="toggleMute"
-        @toggle-microphone="toggleMicrophone"
-        @reconnect-audio="reconnectAudio"
       />
       <PlayerList :players="players" :current="playersCurrent" />
     </div>

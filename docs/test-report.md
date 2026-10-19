@@ -1,5 +1,17 @@
 # Validation
 
+## Player capture input selection · 2026-10-19
+
+Scope: the player-source option is named player capture; the host chooses and
+switches the broadcast input (computer audio or any audio input) inside the room.
+
+| Check                    | Status  | Evidence                                                                                                                                                                                                                                                                                                                          |
+| ------------------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source and built runtime | PASS    | `npm run ci:local`.                                                                                                                                                                                                                                                                                                               |
+| Input switching logic    | PASS    | Local dev server, in-app browser, with the input switcher mounted on a temporary page and synthetic oscillator tracks: device → computer audio replaced the sender track without renegotiation and stopped the old one; mute disabled the track; a share without audio reported no audio; ending the share returned to selection. |
+| Layout                   | PASS    | Switcher at 375 px has no horizontal scroll.                                                                                                                                                                                                                                                                                      |
+| Real capture             | NOT RUN | The browser pane blocks devices; no real microphone, screen-share audio, permission prompt or production room was exercised.                                                                                                                                                                                                      |
+
 ## Player audio source · 2026-10-19
 
 Scope: room creation chooses a host-microphone or Discord source; a host-microphone
