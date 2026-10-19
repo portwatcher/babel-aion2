@@ -2,22 +2,23 @@
 
 ## Current acceptance status — 2026-10-19
 
-The complete `design.md` delivery is unfinished. Production runs web source
-`bbe9fc204d61b37a46284581416504bc172cb46e`; the later documentation and
-rollback-rehearsal changes through `91f1374` do not change that runtime.
+The complete `design.md` delivery is unfinished. Production runs web and voice
+source `4b763079b5c07261ce64845d8c4c58121eb1edb6`. Its application runtime is
+unchanged from `bbe9fc2`; private infra now deploys the worker and relay policies.
 The dated reports below retain the conditions of each run. A local or isolated
 PASS applies only to that named check, not automatically to production.
 
-| Acceptance area                              | Result                    | Evidence and remaining dependency                                                                                                                                                                                           |
-| -------------------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Web release and access boundaries            | PASS                      | Two production web replicas, 12 migrations, public browser/assets and direct-origin rejection checks passed; see the production release report below                                                                        |
-| Local listener, media and subtitle contracts | PASS                      | Built application suites cover nickname replacement, actual peer closure, per-member PCM, shared subtitle transport and child-process recovery; live provider responses are not part of these proofs                        |
-| Production voice delivery                    | WAITING FOR CONFIGURATION | Private infra still needs the long-running voice worker, authenticated control routing, public TURN/firewall configuration and database pool budgets                                                                        |
-| Integrated real speech                       | NOT RUN                   | Isolated single-member DAVE receipt/re-entry passed. The integrated preview is connected but its current run has zero received frames and zero browser audio energy; fresh speech and simultaneous members are still needed |
-| Live subtitle quality                        | WAITING FOR CONFIGURATION | Soniox/DeepL settings and validation are implemented. Authorized credentials and representative commands are needed to validate each chosen output language                                                                 |
-| Native window and game use                   | NOT RUN                   | Browser controls and shared subtitle state passed; the Mac is locked for native inspection. Background audio and the actual AION2 display mode need an accessible test device                                               |
-| Deployed latency and capacity                | NOT RUN                   | Requires production voice transport, actual source/playback devices and player networks, including the intended mainland-China connection; synthetic loopback timing is not end-to-end evidence                             |
-| Production disaster recovery                 | NOT RUN                   | Child-process recovery, isolated database restore and published-image rollback passed. Supervisor/container/host-loss fencing and actual production restore/rollback remain outstanding                                     |
+| Acceptance area                              | Result                    | Evidence and remaining dependency                                                                                                                                                                                   |
+| -------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web release and access boundaries            | PASS                      | Two production web replicas, 12 migrations, public browser/assets and direct-origin rejection checks passed; see the production release report below                                                                |
+| Local listener, media and subtitle contracts | PASS                      | Built application suites cover nickname replacement, actual peer closure, per-member PCM, shared subtitle transport and child-process recovery; live provider responses are not part of these proofs                |
+| Production voice infrastructure              | PASS                      | One ready worker, authenticated private control, configured pool budgets, actual pod/public TURN forwarding and normal Chrome media connection/exit passed; see the current deployment report                       |
+| Production voice delivery                    | WAITING FOR CONFIGURATION | The production room remains UNCONFIGURED. Its administrator Access login and Discord source setup are pending; the local test configuration is retained                                                             |
+| Integrated real speech                       | NOT RUN                   | Isolated single-member DAVE receipt/re-entry passed. The last recorded integrated preview connected with zero received frames and zero browser audio energy; fresh speech and simultaneous members are still needed |
+| Live subtitle quality                        | WAITING FOR CONFIGURATION | Soniox/DeepL settings and validation are implemented. Authorized credentials and representative commands are needed to validate each chosen output language                                                         |
+| Native window and game use                   | NOT RUN                   | Browser controls and shared subtitle state passed; earlier native inspection was blocked by the locked Mac. Background audio and the actual AION2 display mode still need direct device validation                  |
+| Deployed latency and capacity                | NOT RUN                   | Production transport now connects, but actual source/playback timing, load and player networks including mainland China remain unmeasured; connection success is not end-to-end latency evidence                    |
+| Production disaster recovery                 | NOT RUN                   | Child-process recovery, isolated database restore and published-image rollback passed. Supervisor/container/host-loss fencing and actual production restore/rollback remain outstanding                             |
 
 Empty production provider and language lists are intentional and do not block
 the web release or original-audio deployment. Optional character enrichment is
@@ -28,6 +29,26 @@ PASS: 217 first-party sources, maximum 495 lines, formatting, strict types,
 18 tests, builds and built HTTP smoke. Documentation targets resolve and the
 changed text contains no configured local secrets. `design.md` and `GOAL.md`
 remain identical.
+
+## Production voice rollout — 2026-10-19
+
+PASS: [current web and voice deployment](deployment.md#current-web-and-voice-verification--2026-10-19)
+records the published/running image digests, healthy two-web/one-worker rollout,
+authenticated and unauthorized control results, public responses/assets, and
+successful relay-only browser entry/exit. The real worker exchanged ten packets
+in each direction with an external TURN allocation. The one real browser test
+session is REMOVED and both transport types have persistent closure receipts;
+no synthetic player, provider, language or subtitle was seeded.
+
+The release first exposed a missing ephemeral encryption key in its disposable
+image test, then a Buildx lifecycle conflict. Private infra fixed both before
+publication. The production probe exposed the host-network TURN identity rule;
+its narrow policy correction was verified with actual traffic. Configuration,
+secret values, addresses and operational release automation remain in infra.
+
+WAITING FOR CONFIGURATION: administrator login and production Discord source.
+NOT RUN: live production speech, provider quality, restricted/TLS relay paths,
+mainland-China latency, capacity, native game behavior and disaster recovery.
 
 ## Optional character source probe — 2026-10-19
 
@@ -766,10 +787,10 @@ was applied. This is not a claim that the entire dependency graph is vulnerabili
 
 ## External inputs for later live checks
 
-- Private infra configuration for the production voice worker, existing TURN
-  service, network rules, database budgets and orchestration recovery evidence.
-- Fresh speech in the already configured Discord test channel, including a
-  second speaking member for source separation. The existing all-channel mode
+- Authenticated administrator login and production Discord source configuration.
+  Worker/relay deployment is verified; orchestration recovery evidence is pending.
+- Fresh speech after starting a receiver for the configured Discord test channel,
+  including a second speaking member for source separation. The existing all-channel mode
   does not require a commander-ID list; the local bot credential is already saved.
 - Selected provider credentials and authorized battle-command samples for
   language-specific quality checks after configuration.
@@ -782,18 +803,20 @@ web application can keep its language list empty until paths are validated.
 
 ## Git and task cleanup
 
-The implementation, web-release evidence and published-image rollback rehearsal
-are merged in application PRs #1–#3. The existing private release workflow made
-the production web/migration image update. Voice infrastructure changes remain
-pending; the infra primary checkout has not been edited by this implementation.
+The implementation, web-release evidence, published-image rollback rehearsal
+and status reconciliation are merged in application PRs #1–#4. The private
+release workflow published the verified web and voice images. At the user's
+request, infra changes were made in its primary checkout and pushed directly;
+ArgoCD then deployed both runtimes and the relay policies.
 
-The Codex-managed `babel-implementation` worktree remains in use by the unfinished
-live-audio preview. Its local credential and test evidence are ignored by Git.
+The Codex-managed `babel-implementation` worktree is retained for unfinished
+live-audio work. Its local credential, preview configuration and test evidence
+are ignored by Git; the earlier preview process is no longer serving its port.
 Rehearsal containers, databases, temporary registry credentials and downloaded
 images were removed. Final preview/worktree cleanup follows completion of the
 remaining live work and remote integration verification; other tasks are preserved.
 
-The current local directory check covered 75 unarchived task records and found
+The latest local directory check covered 72 unarchived task records and found
 no missing paths or lookup errors. The accessible app task list reported no
 unavailable host or source. Remote-host path existence was not independently
 verified by a remote filesystem probe.
