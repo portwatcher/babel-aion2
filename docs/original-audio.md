@@ -103,9 +103,10 @@ It verifies room isolation, decoder output, source retirement, OS UDP socket
 release, and a real database-lock race against a pending negotiation. No test-only
 publication endpoint or simulated close receipt is installed in production.
 
-Isolated single-member Discord receipt and re-entry have passed. The integrated
-application still needs real Discord-to-browser receipt, simultaneous members,
-member re-entry and DAVE changes, Linux live reception, background/game use and
-latency/capacity evidence. Synthetic PCM and a connected browser alone do not
-prove those requirements. See the [current acceptance status](test-report.md#current-acceptance-status--2026-10-19)
+Isolated single-member Discord receipt and re-entry have passed. The production
+Linux AMD64 worker has decoded one real member, and the human confirmed audible
+playback through Babel. Simultaneous members, integrated member re-entry and DAVE
+changes, background/game use and latency/capacity still need live evidence.
+Synthetic PCM and a connected browser alone do not prove those requirements.
+See the [current acceptance status](test-report.md#current-acceptance-status--2026-10-19)
 for the distinction between implementation, isolated checks and production use.
