@@ -183,8 +183,8 @@ key/term configuration must work without any room being present or selected.
 
 ### Player audio source · 2026-10-19
 
-Room creation offers a choice of audio source: player capture or Discord
-capture. Player capture needs no Discord server, channel or bot installation.
+Room creation offers a choice of audio source: host capture or a Discord voice
+channel. Host capture needs no Discord server, channel or bot installation.
 The creator supplies the host character ID; when that character joins the room,
 its own browser client publishes the room's original audio, feeding both
 playback and subtitles. The host chooses the input in the room and can change it
