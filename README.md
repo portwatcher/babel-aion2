@@ -220,8 +220,12 @@ See [AGENTS.md](AGENTS.md) for worktree, cleanup, security, and interface rules.
 - [Interface skill installation](docs/interface-skills.md)
 
 The deployed web URLs are `https://babel.juryquinn.com` and
-`https://babel.juryquinn.com/admin`. Releases and production configuration live in
-the separate private infra repository. The current web and voice release passed
+`https://babel.juryquinn.com/admin`. Pull requests run CI on ser7; every `main`
+update automatically validates and publishes web/voice images to DigitalOcean,
+then updates the existing infra ArgoCD image tags. Production configuration and
+deployment-specific tooling live in the separate private infra repository.
+See the [automatic release setup](docs/deployment.md#automatic-main-releases).
+The current web and voice release passed
 production migrations, replica readiness, private control authentication, public
 TURN forwarding and actual browser media connection/exit checks. The production
 Discord source now connects after authenticated administrator setup and has

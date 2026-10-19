@@ -1,5 +1,24 @@
 # Validation
 
+## Automatic delivery pre-merge validation — 2026-10-19
+
+These results describe validation before the first automatic main release.
+The [CI and release runs](https://github.com/portwatcher/babel-aion2/actions/workflows/ci.yml)
+record the tested source SHA, runtime image probes, publication and GitOps update.
+ArgoCD health and workload readiness independently establish deployment success.
+
+| Check                             | Result | Evidence                                                                                                                              |
+| --------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Workflow syntax and shell checks  | PASS   | `actionlint .github/workflows/ci.yml`, including ser7 runner labels and expression validation                                         |
+| Full local source gate            | PASS   | `npm run ci:local`: 267 source files, maximum 495 lines, formatting, strict types, 18 tests, all runtime builds and built HTTP smoke  |
+| Database and room workflow parity | PASS   | The workflow sequence passed locally on a new disposable PostgreSQL database: migrations twice, 12 DB tests, management and room HTTP |
+| Complete Git history scan         | PASS   | Gitleaks with redacted output: no findings in the implementation history                                                              |
+
+The workflow performs publication only for a current `main` commit after these
+checks and packaged image probes pass. Registry destinations and credentials are
+configured through GitHub settings; production manifests and the image updater
+remain in private infra. See [release setup](deployment.md#automatic-main-releases).
+
 ## Multi-room and map source validation — 2026-10-19
 
 This feature is implemented on top of `d6b66f3` and has not been deployed. The

@@ -4,9 +4,11 @@ Target website: `https://babel.juryquinn.com`; administrator page: `/admin`.
 Application source: `https://github.com/portwatcher/babel-aion2` (private today,
 intended for future open source).
 
-Production infrastructure and the regular release workflow live in the separate
-private infra repository. Environment details, registry settings, database
-connections, Access configuration, and deployment credentials are kept there.
+Production infrastructure and deployment-specific tooling live in the separate
+private infra repository. The source repository has generic ser7 CI and automatic
+main releases; production destinations and credentials use repository variables
+and GitHub Secrets. Environment details, database connections and Access
+configuration remain in private infra.
 See [source and secret boundaries](source-and-secrets.md).
 
 ## Application package
@@ -35,8 +37,8 @@ policy. Public player access remains separate from administrator Access.
 
 ## Release contract
 
-The private infra workflow checks out an exact Babel commit through a read-only
-deploy key. It runs `npm run ci:local`, real PostgreSQL migrations and session
+The automatic workflow checks out an exact Babel commit and runs `npm run
+ci:local`, real PostgreSQL migrations, session, administrator and community-room
 tests, and container runtime checks before image publication. The actual worker
 image must pass native Opus encode/decode, non-root read-only startup,
 authenticated media/subtitle readiness, unauthorized rejection and graceful
@@ -49,6 +51,50 @@ Those resources are then committed in infra with the verified image reference.
 Subsequent releases update their image references through the same workflow,
 including the recovery controller's web-image reference.
 No production image is published from a local checkout.
+
+## Automatic main releases
+
+`.github/workflows/ci.yml` runs on pull requests targeting `main`, pushes to
+`main`, and manual dispatch. Its runner labels are
+`[self-hosted, Linux, X64, ser7-homelab]`. Fork pull requests do not execute on
+this private self-hosted machine; reviewed contributions must first move to a
+trusted repository branch. The runner uses the established shared admission,
+resource limits and managed `ci-builder` from private infra.
+
+Pull requests run `npm run ci:local`, repeatable migrations, `test:db`,
+`test:management:db` and `test:community:db` against disposable PostgreSQL.
+Only a current `main` commit can continue to production. The workflow builds
+Linux AMD64 web and voice images, verifies the packaged migration, non-root web
+startup and native voice runtime, then pushes both validated images. Tags contain
+the full source SHA, workflow run ID and attempt; OCI labels record source and
+revision. Source secrets are never Docker build arguments.
+
+Configure these repository values through GitHub settings:
+
+| Kind     | Name                 | Purpose                                                 |
+| -------- | -------------------- | ------------------------------------------------------- |
+| Variable | `IMAGE_REGISTRY`     | Existing DigitalOcean registry path, without image name |
+| Variable | `INFRA_REPOSITORY`   | Private infra repository, in `owner/repository` form    |
+| Secret   | `DOCR_DOCKER_CONFIG` | Write-capable registry Docker configuration JSON        |
+| Secret   | `INFRA_DEPLOY_KEY`   | Dedicated SSH write deploy key registered in infra      |
+
+The workflow reuses private infra's image updater and voice image probe. The
+updater atomically commits the web, migration, recovery and voice image references
+to infra `main`, with bounded fetch/rebase retries for concurrent infra commits.
+ArgoCD then applies migrations and reconciles the workloads. Workflow success
+confirms publication and the GitOps commit; check ArgoCD health and application
+readiness separately to establish deployment success.
+
+Main runs are serialized. Before publication and again before the GitOps update,
+the workflow checks the current remote `main` SHA; superseded runs stop without
+updating deployment tags. Registry files, temporary environment files and locally
+loaded release images are removed even after failures. Checkout removes its SSH
+key during post-job cleanup. Production runtime secrets stay in the existing
+secret store; adding a CI secret does not configure Discord OAuth for room creation.
+
+Completed coding work is automatically pushed through a checked pull request and
+merged into `main`, unless the user explicitly requests an unmerged change. This
+starts the automatic release; see `AGENTS.md` for integration requirements.
 
 ## Remaining product work
 
