@@ -20,17 +20,39 @@ interface Speaker {
 }
 
 // Diagnostics carry room identity and error text only; never configuration
-// values, credentials, or audio.
+// values, credentials, or audio. Connection failures keep the remote socket
+// code, address and port so blocked Discord endpoints are identifiable.
+export function describeError(error: unknown): unknown {
+  if (!(error instanceof Error)) {
+    return error
+  }
+  const text = `${error.name}: ${error.message}`.slice(0, 300)
+  if (!(error instanceof AggregateError)) {
+    return text
+  }
+  return {
+    text,
+    errors: error.errors.slice(0, 4).map((inner: unknown) => {
+      if (!(inner instanceof Error)) {
+        return String(inner).slice(0, 120)
+      }
+      return {
+        code: 'code' in inner ? inner.code : undefined,
+        address: 'address' in inner ? inner.address : undefined,
+        port: 'port' in inner ? inner.port : undefined,
+        message: inner.message.slice(0, 120),
+      }
+    }),
+  }
+}
+
 function report(roomId: string, event: string, detail?: unknown) {
   console.error(
     JSON.stringify({
       component: 'discord-source',
       roomId,
       event,
-      detail:
-        detail instanceof Error
-          ? `${detail.name}: ${detail.message}`.slice(0, 300)
-          : detail,
+      detail: describeError(detail),
     }),
   )
 }

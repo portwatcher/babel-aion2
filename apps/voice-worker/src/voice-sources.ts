@@ -9,7 +9,7 @@ import {
   VoiceSourceOwnershipError,
   type VoiceSourceConfiguration,
 } from '@babel/database/voice-sources'
-import { DiscordSource } from './discord-source.ts'
+import { DiscordSource, describeError } from './discord-source.ts'
 import { GuildBroadcast } from './guild-broadcast.ts'
 import type { MediaPeers } from './media-peers.ts'
 import type { SubtitleService } from './subtitle-service.ts'
@@ -184,10 +184,7 @@ export class VoiceSources {
         roomId: source.configuration.id,
         event: 'source-failed',
         reason,
-        detail:
-          error instanceof Error
-            ? `${error.name}: ${error.message}`.slice(0, 300)
-            : undefined,
+        detail: describeError(error),
       }),
     )
     this.failures.set(source.configuration.id, {
