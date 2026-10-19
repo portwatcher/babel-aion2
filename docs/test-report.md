@@ -1074,6 +1074,20 @@ Werift has already been selected and local revocation/relay checks passed. These
 inputs concern the remaining production and live acceptance work; the shipped
 web application can keep its language list empty until paths are validated.
 
+## Discord source flapping (2026-10-19)
+
+Production `voice_source_run` rows showed two community rooms each retiring their
+Discord source about 3.2 seconds after every claim and reclaiming 5 seconds later
+(one room advanced from generation 11 to 25 in four minutes); players saw the bot
+repeatedly join and leave. The worker previously treated any member Opus decode
+error, member receive-stream error or informational voice-connection error as a
+fatal source failure, and logged nothing.
+
+| Check                                                   | Result  | Evidence                                                                               |
+| ------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------- |
+| Member packet errors are non-fatal; failures are logged | PASS    | `npm run ci:local` passed                                                              |
+| Production stops flapping after rollout                 | WAITING | Requires the new voice image and observation of run durations and `source-failed` logs |
+
 ## Git and task cleanup
 
 The implementation, release evidence, published-image rollback rehearsal

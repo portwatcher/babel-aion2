@@ -15,7 +15,24 @@ interface Speaker {
   id: string
   displayName: string
   receivedFrames: number
+  droppedFrames: number
   stream: AudioReceiveStream
+}
+
+// Diagnostics carry room identity and error text only; never configuration
+// values, credentials, or audio.
+function report(roomId: string, event: string, detail?: unknown) {
+  console.error(
+    JSON.stringify({
+      component: 'discord-source',
+      roomId,
+      event,
+      detail:
+        detail instanceof Error
+          ? `${detail.name}: ${detail.message}`.slice(0, 300)
+          : detail,
+    }),
+  )
 }
 
 export class DiscordSource {
@@ -34,8 +51,10 @@ export class DiscordSource {
     private readonly removed: (id: string) => void,
     private readonly failed: () => void,
   ) {
-    this.client.on('error', () => this.fail())
-    this.client.on('shardDisconnect', () => this.fail())
+    this.client.on('error', (error) => this.fail('client-error', error))
+    this.client.on('shardDisconnect', (event) =>
+      this.fail('gateway-disconnect', event.code),
+    )
     this.client.on('voiceStateUpdate', (_, after) => {
       if (after.guild.id !== configuration.discordGuildId) {
         return
@@ -44,7 +63,7 @@ export class DiscordSource {
         after.id === this.client.user?.id &&
         after.channelId !== configuration.discordVoiceChannelId
       ) {
-        this.fail()
+        this.fail('bot-left-channel')
       }
       if (after.channelId !== configuration.discordVoiceChannelId) {
         this.remove(after.id)
@@ -112,14 +131,19 @@ export class DiscordSource {
       daveEncryption: true,
     })
     this.connection = connection
-    connection.on('error', () => this.fail())
+    // Voice networking errors (including DAVE transitions) are recovered by
+    // @discordjs/voice through state changes; only a disconnect is terminal.
+    connection.on('error', (error) => this.report('voice-error', error))
     connection.on('stateChange', (_, state) => {
       if (state.status === VoiceConnectionStatus.Ready) {
         this.connected = true
       } else {
         this.reset()
         if (state.status === VoiceConnectionStatus.Disconnected && !this.closed) {
-          this.fail()
+          this.fail('voice-disconnected', {
+            reason: state.reason,
+            closeCode: 'closeCode' in state ? state.closeCode : null,
+          })
         }
       }
     })
@@ -157,6 +181,7 @@ export class DiscordSource {
       id,
       displayName: voice.member?.displayName ?? id,
       receivedFrames: 0,
+      droppedFrames: 0,
       stream,
     }
     this.speakers.set(id, speaker)
@@ -164,15 +189,29 @@ export class DiscordSource {
       if (!this.ready() || this.speakers.get(id) !== speaker) {
         return
       }
+      let pcm: Buffer
       try {
-        const pcm = decoder.decode(packet)
-        speaker.receivedFrames += 1
-        this.frame(id, pcm, speaker.displayName)
-      } catch {
-        this.fail()
+        pcm = decoder.decode(packet)
+      } catch (error) {
+        // A packet still end-to-end encrypted during a DAVE transition, or a
+        // corrupt packet, is dropped. It must not disconnect the whole room.
+        speaker.droppedFrames += 1
+        if (speaker.droppedFrames === 1) {
+          this.report('opus-decode-dropped', error)
+        }
+        return
+      }
+      speaker.receivedFrames += 1
+      this.frame(id, pcm, speaker.displayName)
+    })
+    // A failed packet destroys only this speaker's receive stream. The next
+    // speaking event subscribes the speaker again.
+    stream.once('error', (error) => {
+      this.report('receive-stream-error', error)
+      if (this.speakers.get(id) === speaker) {
+        this.remove(id)
       }
     })
-    stream.once('error', () => this.fail())
     stream.once('close', () => {
       if (this.speakers.get(id) === speaker) {
         this.remove(id)
@@ -192,9 +231,13 @@ export class DiscordSource {
       this.remove(id)
     }
   }
-  private fail() {
+  private report(event: string, detail?: unknown) {
+    report(this.configuration.id, event, detail)
+  }
+  private fail(event: string, detail?: unknown) {
     this.reset()
     if (!this.closed) {
+      this.report(event, detail)
       this.failed()
     }
   }
