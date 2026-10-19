@@ -1,8 +1,8 @@
 # GOAL: BABEL
 
-Document version: 3.1
+Document version: 3.2
 Date: 2026-10-19
-Product: Babel · AION2 深渊站
+Product: Babel · AION2 深渊战
 Game: AION2, Steam Global, Asia
 Website: https://babel.juryquinn.com
 Administrator page: https://babel.juryquinn.com/admin
@@ -110,6 +110,41 @@ They do not need an additional broadcast program.
 A nickname does not prove a player's identity.
 A person can enter another person's nickname.
 The new listener session still replaces the previous listener session.
+
+### Multi-room amendment · 2026-10-19
+
+This amendment takes precedence over the original single-room entry and global
+nickname requirements below for community rooms. The original administrator room
+and its legacy API remain available for compatibility.
+
+- `/` lists community rooms; `/rooms/:roomId` is one independent broadcast room.
+- A creator must choose an Asia game server. An optional list of up to 200 exact
+  character IDs restricts admission. An empty list admits any indexed character
+  on the selected server.
+- Creation requires Discord's full bot-installation OAuth2 flow. Request View
+  Channel, Connect and Speak permissions automatically. Verify the creator can
+  manage that guild and the installed bot can access the chosen voice channel,
+  including channel permission overwrites. One guild has one community room.
+- Verify entry server-side with AION2 Index's character-search API. Require an
+  exact region, server and case-sensitive NFC character ID match. Use that
+  returned ID as the session display name. Existence is not ownership proof.
+- Community-room sessions replace duplicate IDs within that room. Different
+  rooms have independent nickname generations. Preserve confirmed audio/subtitle
+  revocation before authorizing replacement delivery.
+- Every room has the specified Abyss Lower Reshanta map, original native zoom
+  levels through 7, pan, wheel, pinch, keyboard and reset controls. Save strokes
+  in map coordinates so movement and zoom never change their locations.
+- Current room members can draw and erase their own complete strokes. Show line
+  color, number and game ID on the map and in the adjacent list. Persist and
+  synchronize changes across web replicas. Replacement, removal and expiry
+  immediately revoke map reads and mutations.
+- Keep administration at `/admin`, remove its public navigation link, and allow
+  the authenticated administrator to select the room being managed.
+- An administrator can publish the existing configured room by setting its
+  required server and optional IDs once. Preserve its Discord source, end old
+  unverified sessions and enforce the new admission policy on legacy entry too.
+  Do not skip old same-ID transport closure during the namespace transition.
+- The product name is “Babel · AION2 深渊战”.
 
 ## 4. Interface and API boundaries
 

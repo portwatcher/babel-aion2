@@ -3,7 +3,7 @@ import Aura from '@primeuix/themes/aura'
 export default defineNuxtConfig({
   compatibilityDate: '2026-10-18',
   modules: ['@primevue/nuxt-module'],
-  css: ['~/assets/main.css'],
+  css: ['~/assets/main.css', '~/assets/rooms.css'],
   devtools: { enabled: false },
   typescript: { strict: true },
   build: { transpile: ['@babel/contracts'] },
@@ -21,7 +21,7 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
-      title: 'Babel · AION2 深渊站',
+      title: 'Babel · AION2 深渊战',
       htmlAttrs: { lang: 'zh-CN', class: 'babel-dark' },
       meta: [
         { name: 'description', content: 'AION2 原声指挥与多语言字幕。' },
@@ -39,6 +39,9 @@ export default defineNuxtConfig({
     providerEncryptionKey: '',
     mediaControlUrl: '',
     mediaControlSecret: '',
+    discordClientId: '',
+    discordClientSecret: '',
+    discordBotToken: '',
   },
   primevue: {
     options: { theme: { preset: Aura, options: { darkModeSelector: '.babel-dark' } } },

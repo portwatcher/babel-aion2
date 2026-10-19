@@ -1,4 +1,7 @@
 import { entryRequestSchema } from '@babel/contracts'
+import { communityRoom } from '@babel/database/schema'
+import { eq } from 'drizzle-orm'
+import { verifyAdmissionCharacter } from '../../utils/room-admission'
 import {
   listenerOperation,
   requireListenerCredential,
@@ -19,8 +22,20 @@ export default defineEventHandler(async (event) => {
     })
   }
   return listenerOperation(async () => {
-    const { roomId } = await useListenerRoom(event)
-    const session = await useListeners(event).enter(roomId, request.data, credential)
+    const { database, roomId } = await useListenerRoom(event)
+    const [admission] = await database
+      .select()
+      .from(communityRoom)
+      .where(eq(communityRoom.roomId, roomId))
+    const character = admission
+      ? await verifyAdmissionCharacter(admission, request.data.nickname)
+      : undefined
+    const session = await useListeners(event).enter(
+      roomId,
+      request.data,
+      credential,
+      character,
+    )
     setResponseStatus(event, session.state === 'JOINING' ? 202 : 200)
     return session
   })

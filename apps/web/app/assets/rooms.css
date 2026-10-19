@@ -1,0 +1,249 @@
+.page-heading-copy,
+.room-directory,
+.tactical-section {
+  display: grid;
+  gap: 12px;
+}
+.directory-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+.directory-heading > a {
+  flex-shrink: 0;
+}
+a.p-button {
+  text-decoration: none;
+  min-height: 44px;
+}
+.room-directory {
+  gap: 24px;
+}
+.room-directory-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.room-directory-list > li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding-block: 28px;
+  border-bottom: 1px solid var(--babel-border);
+}
+.room-directory-identity {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.room-directory-identity h2 {
+  overflow-wrap: anywhere;
+}
+.room-directory-identity h2 a {
+  text-decoration: none;
+}
+.room-directory-identity h2 a:hover {
+  text-decoration: underline;
+}
+.room-directory-status {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.lobby-empty {
+  padding-block: 40px;
+}
+.admission-notice {
+  margin-bottom: 24px;
+}
+.tactical-section {
+  margin-top: 64px;
+  gap: 20px;
+}
+.tactical-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 24px;
+  align-items: start;
+}
+.map-frame {
+  position: relative;
+  min-width: 0;
+}
+.map-canvas {
+  width: 100%;
+  height: min(70svh, 680px);
+  min-height: 380px;
+  border: 1px solid var(--babel-border);
+  border-radius: 12px;
+  background: #0e1520;
+  isolation: isolate;
+}
+.map-loading {
+  display: grid;
+  place-items: center;
+  color: var(--babel-muted);
+}
+.map-toolbar,
+.map-colors {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.map-colors {
+  gap: 4px;
+}
+.map-color {
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.map-color::before {
+  content: '';
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--stroke-color);
+}
+.map-color[aria-pressed='true'] {
+  border-color: var(--babel-text);
+  background: var(--babel-surface);
+}
+.map-help,
+.map-attribution {
+  font-size: 0.875rem;
+}
+.map-zoom {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 500;
+  display: flex;
+  gap: 4px;
+  max-width: calc(100% - 24px);
+}
+.map-zoom .p-button {
+  min-height: 44px;
+}
+.map-legend {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+.map-legend h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.map-stroke-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 540px;
+  overflow-y: auto;
+}
+.map-stroke-list li {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--babel-border);
+  gap: 4px;
+}
+.map-stroke-focus {
+  min-width: 0;
+  flex: 1;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--babel-text);
+  text-align: left;
+  cursor: pointer;
+  padding: 8px 0;
+}
+.map-stroke-focus svg {
+  flex-shrink: 0;
+}
+.map-stroke-focus span {
+  overflow-wrap: anywhere;
+}
+.map-stroke-focus small {
+  margin-left: auto;
+}
+.map-is-drawing .map-canvas {
+  cursor: crosshair;
+}
+.map-canvas .leaflet-tooltip.map-author-label {
+  background: #182131;
+  color: #f3f4f6;
+  border: 1px solid #64748b;
+  box-shadow: none;
+  font:
+    12px/1.5 'PingFang SC',
+    'Microsoft YaHei',
+    sans-serif;
+  padding: 3px 6px;
+}
+.map-canvas .leaflet-tooltip-top::before {
+  border-top-color: #64748b;
+}
+.map-load-error {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 500;
+  background: var(--babel-surface);
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+.map-load-error button {
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--babel-border);
+  cursor: pointer;
+  padding: 6px 12px;
+  min-height: 44px;
+}
+@media (max-width: 900px) {
+  .tactical-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .map-stroke-list {
+    max-height: 240px;
+  }
+}
+@media (max-width: 720px) {
+  .room-directory-list > li {
+    align-items: start;
+  }
+  .room-directory-status {
+    width: 100%;
+  }
+  .room-directory-status > a {
+    margin-left: auto;
+  }
+  .map-canvas {
+    height: 60svh;
+    min-height: 340px;
+  }
+  .tactical-section {
+    margin-top: 40px;
+  }
+}
+.map-is-erasing .map-canvas {
+  cursor: cell;
+}

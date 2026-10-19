@@ -14,6 +14,7 @@ export const publicRoomConfigurationSchema: z.ZodType<PublicRoomConfiguration> =
     outputLanguages: z.array(z.object({ code: z.string(), name: z.string() })),
     defaultOutputLanguage: z.string().nullable(),
     entryAvailable: z.boolean(),
+    admission: z.object({ server: z.string(), restricted: z.boolean() }).optional(),
   })
 
 export interface PublicRoomConfiguration {
@@ -21,6 +22,7 @@ export interface PublicRoomConfiguration {
   outputLanguages: OutputLanguage[]
   defaultOutputLanguage: string | null
   entryAvailable: boolean
+  admission?: { server: string; restricted: boolean }
 }
 
 export type ListenerState =

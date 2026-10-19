@@ -24,6 +24,7 @@
     "primevue": "4.5.4",
     "vue": "3.5.44",
     "zod": "4.6.7",
-    "@babel/processes": "*"
+    "@babel/processes": "*",
+    "leaflet": "1.9.4"
   }
 }

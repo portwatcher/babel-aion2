@@ -4,12 +4,13 @@ import {
   subtitlesReady,
   voiceSourceStatus,
 } from '../../utils/media-control'
-import { DEFAULT_ROOM_ID } from '../../utils/room-configuration'
+import { useListenerRoom } from '../../utils/room-configuration'
 
 export default defineEventHandler(async (event) => {
   const { identity } = await requireAdministratorSession(event)
+  const { roomId } = await useListenerRoom(event)
   const [source, media, subtitles] = await Promise.all([
-    voiceSourceStatus(DEFAULT_ROOM_ID),
+    voiceSourceStatus(roomId),
     mediaReady(),
     subtitlesReady(),
   ])

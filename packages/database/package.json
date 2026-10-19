@@ -15,7 +15,10 @@
     "./subtitles": "./src/subtitles.ts",
     "./providers": "./src/providers/index.ts",
     "./terms": "./src/terms.ts",
-    "./languages": "./src/languages/index.ts"
+    "./languages": "./src/languages/index.ts",
+    "./community-rooms": "./src/community-rooms.ts",
+    "./tactical-map": "./src/tactical-map.ts",
+    "./room-publication": "./src/room-publication.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
