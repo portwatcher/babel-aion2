@@ -1,5 +1,28 @@
 # Validation
 
+## Multi-room and map source validation — 2026-10-19
+
+This feature is implemented on top of `d6b66f3` and has not been deployed. The
+production evidence below still describes the earlier release. Configuration and
+limits are documented in [multi-room setup](multi-room-and-map.md).
+
+| Check                                             | Result                    | Evidence                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Full local gate                                   | PASS                      | `npm run ci:local`: source limits, formatting, strict type checks, 18 tests, complete web/worker/recovery build and built HTTP smoke                                                                                                                                                           |
+| Existing database contracts                       | PASS                      | `npm run test:db`: 12 tests on the disposable task-local PostgreSQL database                                                                                                                                                                                                                   |
+| Multi-room HTTP and storage                       | PASS                      | `npm run test:community:db`: two real built web replicas and an isolated migrated database; required server, optional IDs, exact region/server/case admission, upstream outage/schema rejection, independent sessions, idempotency, selected-room administration and existing-room publication |
+| Installation guards                               | PASS                      | The same HTTP suite verifies browser/state binding, replay denial, skipped-install denial, bot application identity, effective channel-overwrite permissions, wrong-channel rejection and one room per guild                                                                                   |
+| Collaborative map                                 | PASS                      | The same suite verifies authenticated author metadata, room isolation, bounds, retry deduplication, own-only erasure, cross-replica reads/deletes, old-generation denial and restart persistence                                                                                               |
+| Real Index API                                    | PASS                      | The production adapter returned an exact indexed Asia/Siel character from the public live API; no mocked response was used for this probe                                                                                                                                                      |
+| Desktop browser                                   | PASS                      | Local in-app browser: join, freehand stroke, visible ID signature, aligned zoom, original JPEG tiles through native level 7, map eraser and refresh restoration                                                                                                                                |
+| Narrow layout                                     | PASS                      | 390 × 844 viewport: controls wrap, map remains usable, ID list follows the map, and the same stroke stays aligned after resize                                                                                                                                                                 |
+| Live Discord installation and multi-guild receipt | WAITING FOR CONFIGURATION | OAuth application credentials/redirect and a real authorized installation are needed. HTTP fixture evidence does not establish live Discord authorization or simultaneous DAVE receipt                                                                                                         |
+| Physical touch gesture and deployment capacity    | NOT RUN                   | Leaflet pinch support is enabled; a real touch device and production concurrency measurements were not part of this run                                                                                                                                                                        |
+
+The initial cross-origin tile load failed in the browser. The implemented fixed
+site resource endpoint fetches and caches original public JPEG tiles; the final
+browser run loaded those resources and retained the source watermark/attribution.
+
 ## Current acceptance status — 2026-10-19
 
 The complete `design.md` delivery is unfinished. Production runs web, voice and

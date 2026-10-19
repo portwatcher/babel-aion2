@@ -1,4 +1,4 @@
-import type { ListenerReference } from '@babel/contracts'
+import type { CharacterProfile, ListenerReference } from '@babel/contracts'
 import { and, eq } from 'drizzle-orm'
 import type { Database } from '../client.ts'
 import { listenerSession } from '../schema/rooms.ts'
@@ -86,8 +86,13 @@ export function createListenerService(db: Database, delivery: ListenerDelivery) 
   }
 
   return {
-    async enter(roomId: string, request: unknown, credential: string) {
-      return advance(await prepareEntry(db, roomId, request, credential))
+    async enter(
+      roomId: string,
+      request: unknown,
+      credential: string,
+      character?: CharacterProfile,
+    ) {
+      return advance(await prepareEntry(db, roomId, request, credential, character))
     },
     async restore(id: string, credential: string) {
       return advance(await readAuthenticated(db, id, credential))

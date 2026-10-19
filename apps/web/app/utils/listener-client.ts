@@ -22,39 +22,51 @@ export type PendingEntry = z.infer<typeof pendingEntrySchema>
 const sessionKey = 'babel.listener'
 const pendingKey = 'babel.pending-entry'
 
-export function loadListener() {
+export function loadListener(roomId?: string) {
   try {
     return savedSessionSchema.parse(
-      JSON.parse(sessionStorage.getItem(sessionKey) ?? 'null'),
+      JSON.parse(
+        sessionStorage.getItem(roomId ? `${sessionKey}.${roomId}` : sessionKey) ??
+          'null',
+      ),
     )
   } catch {
     return null
   }
 }
 
-export function loadPendingEntry() {
+export function loadPendingEntry(roomId?: string) {
   try {
     return pendingEntrySchema.parse(
-      JSON.parse(sessionStorage.getItem(pendingKey) ?? 'null'),
+      JSON.parse(
+        sessionStorage.getItem(roomId ? `${pendingKey}.${roomId}` : pendingKey) ??
+          'null',
+      ),
     )
   } catch {
     return null
   }
 }
 
-export function saveListener(listener: SavedListener | null) {
+export function saveListener(listener: SavedListener | null, roomId?: string) {
   if (listener) {
-    sessionStorage.setItem(sessionKey, JSON.stringify(listener))
+    sessionStorage.setItem(
+      roomId ? `${sessionKey}.${roomId}` : sessionKey,
+      JSON.stringify(listener),
+    )
   } else {
-    sessionStorage.removeItem(sessionKey)
+    sessionStorage.removeItem(roomId ? `${sessionKey}.${roomId}` : sessionKey)
   }
 }
 
-export function savePendingEntry(pending: PendingEntry | null) {
+export function savePendingEntry(pending: PendingEntry | null, roomId?: string) {
   if (pending) {
-    sessionStorage.setItem(pendingKey, JSON.stringify(pending))
+    sessionStorage.setItem(
+      roomId ? `${pendingKey}.${roomId}` : pendingKey,
+      JSON.stringify(pending),
+    )
   } else {
-    sessionStorage.removeItem(pendingKey)
+    sessionStorage.removeItem(roomId ? `${pendingKey}.${roomId}` : pendingKey)
   }
 }
 
@@ -94,8 +106,11 @@ export function saveLanguage(language: string | null) {
 }
 
 export class PlayerApiError extends Error {
-  constructor(readonly status: number) {
-    super('Player request failed')
+  constructor(
+    readonly status: number,
+    message = 'Player request failed',
+  ) {
+    super(message)
   }
 }
 
@@ -119,7 +134,15 @@ async function playerRequest(
       : AbortSignal.timeout(timeout),
   })
   if (!response.ok) {
-    throw new PlayerApiError(response.status)
+    const data: unknown = await response.json().catch(() => null)
+    const message =
+      data &&
+      typeof data === 'object' &&
+      'statusMessage' in data &&
+      typeof data.statusMessage === 'string'
+        ? data.statusMessage
+        : undefined
+    throw new PlayerApiError(response.status, message)
   }
   return response.json() as Promise<unknown>
 }

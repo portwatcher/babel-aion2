@@ -3,10 +3,12 @@ import {
   entryRequestSchema,
   listenerCredentialSchema,
   nicknameKey,
+  type CharacterProfile,
 } from '@babel/contracts'
-import { and, eq, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm'
 import type { Database } from '../client.ts'
 import { listenerSession, nickname, outputLanguage, room } from '../schema/rooms.ts'
+import { communityRoom, listenerCharacter } from '../schema/room-community.ts'
 import { digest, ListenerError, type Transaction, verifyCredential } from './model.ts'
 
 export async function requireOutputLanguage(tx: Transaction, code: string | null) {
@@ -34,10 +36,10 @@ export async function prepareEntry(
   roomId: string,
   body: unknown,
   credential: string,
+  character?: CharacterProfile,
 ) {
   const request = entryRequestSchema.parse(body)
   listenerCredentialSchema.parse(credential)
-  const key = nicknameKey(request.nickname)
   const fingerprint = digest(JSON.stringify({ roomId, ...request }))
   return db.transaction(async (tx) => {
     // Request lock precedes nickname lock: even retries that change the nickname
@@ -71,9 +73,27 @@ export async function prepareEntry(
       .select({ id: room.id })
       .from(room)
       .where(eq(room.id, roomId))
+      .for('share')
     if (!destination) {
       throw new ListenerError('ROOM_NOT_FOUND')
     }
+    const [community] = await tx
+      .select()
+      .from(communityRoom)
+      .where(eq(communityRoom.roomId, roomId))
+    const characterKey = nicknameKey(request.nickname)
+    if (
+      community &&
+      (!character ||
+        character.region !== 'as' ||
+        character.server !== community.server ||
+        nicknameKey(character.nickname) !== characterKey ||
+        (community.allowedIds.length > 0 &&
+          !community.allowedIds.includes(characterKey)))
+    ) {
+      throw new ListenerError('CHARACTER_CHECK_REQUIRED')
+    }
+    const key = community ? `room:${roomId}:${characterKey}` : characterKey
     await requireOutputLanguage(tx, request.outputLanguage)
     await tx.insert(nickname).values({ key }).onConflictDoNothing()
     const [current] = await tx
@@ -122,6 +142,9 @@ export async function prepareEntry(
     if (!created) {
       throw new Error('Listener entry was not persisted')
     }
+    if (character) {
+      await tx.insert(listenerCharacter).values({ sessionId: id, profile: character })
+    }
     return created
   })
 }
@@ -154,7 +177,13 @@ export async function activateCurrent(
       .from(listenerSession)
       .where(
         and(
-          eq(listenerSession.nicknameKey, record.nicknameKey),
+          or(
+            eq(listenerSession.nicknameKey, record.nicknameKey),
+            and(
+              eq(listenerSession.roomId, record.roomId),
+              eq(listenerSession.nicknameKey, nicknameKey(record.nickname)),
+            ),
+          ),
           ne(listenerSession.id, sessionId),
           isNull(listenerSession.deliveryStoppedAt),
         ),

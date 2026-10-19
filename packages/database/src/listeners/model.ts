@@ -13,7 +13,8 @@ export class ListenerError extends Error {
       | 'ENTRY_CONFLICT'
       | 'LANGUAGE_UNAVAILABLE'
       | 'SESSION_ENDED'
-      | 'ROOM_NOT_FOUND',
+      | 'ROOM_NOT_FOUND'
+      | 'CHARACTER_CHECK_REQUIRED',
   ) {
     super(code)
   }

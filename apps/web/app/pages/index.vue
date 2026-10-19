@@ -1,121 +1,83 @@
 <script setup lang="ts">
-import type { PublicRoomConfiguration } from '@babel/contracts'
-import { audioStatus } from '~/utils/audio-status'
-const {
-  data,
-  error: configurationError,
-  refresh,
-} = await useFetch<PublicRoomConfiguration>('/api/player/config')
-const configuration = shallowRef<PublicRoomConfiguration | null>(data.value ?? null)
-watch(data, (value) => {
-  configuration.value = value ?? null
-})
-const {
-  session,
-  players,
-  playersCurrent,
-  restoring,
-  restoreFailed,
-  submitting,
-  changingLanguage,
-  error,
-  notice,
-  active,
-  leavePending,
-  connectionState,
-  subtitles,
-  audioState,
-  audioBlocked,
-  muted,
-  playAudio,
-  toggleMute,
-  enter,
-  restore,
-  leave,
-  changeLanguage,
-} = usePlayerSession(configuration)
-let configurationTimer: ReturnType<typeof setInterval> | undefined
+import type { RoomDirectory } from '@babel/contracts'
+
+const { data, error, refresh } = await useFetch<RoomDirectory>('/api/player/rooms')
+const search = ref('')
+const rooms = computed(() =>
+  (data.value?.rooms ?? []).filter((room) =>
+    `${room.name} ${room.server}`
+      .toLocaleLowerCase()
+      .includes(search.value.trim().toLocaleLowerCase()),
+  ),
+)
+let timer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
-  configurationTimer = setInterval(() => void refresh(), 5_000)
+  timer = setInterval(() => void refresh(), 5_000)
 })
-onBeforeUnmount(() => clearInterval(configurationTimer))
+onBeforeUnmount(() => clearInterval(timer))
 </script>
 
 <template>
   <main id="main" tabindex="-1" class="main-content">
-    <div class="page-heading">
-      <p class="eyebrow">指挥收听室</p>
-      <h1>{{ configuration?.room.name ?? 'AION2 深渊站' }}</h1>
-      <p class="muted">听见原声，跟上每一道指令。</p>
+    <div class="page-heading directory-heading">
+      <div class="page-heading-copy">
+        <p class="eyebrow">AION2 深渊战</p>
+        <h1>选择你的转播房间</h1>
+        <p class="muted">听指挥、看字幕，在同一张地图上标出下一步。</p>
+      </div>
+      <Button as="a" href="/rooms/create" label="创建房间" />
     </div>
-    <section v-if="configurationError" class="empty-state" aria-live="polite">
-      <h2>暂时无法获取房间状态</h2>
-      <p>请检查网络连接，然后重试。</p>
+    <section v-if="error || !data?.available" class="empty-state" role="status">
+      <h2>暂时无法加载房间</h2>
+      <p class="muted">房间服务暂时不可用，请稍后重试。</p>
       <Button label="重新加载" severity="secondary" @click="refresh()" />
     </section>
-    <template v-else-if="configuration">
-      <p v-if="notice" class="session-notice" role="status">{{ notice }}</p>
-      <div v-if="error" class="session-feedback" role="alert">
-        <p class="form-error">{{ error }}</p>
-        <Button
-          v-if="restoreFailed"
-          label="重试恢复会话"
-          severity="secondary"
-          @click="restore"
+    <section v-else aria-labelledby="rooms-title" class="room-directory">
+      <div class="section-heading">
+        <h2 id="rooms-title">
+          转播房间 <span class="muted">{{ data.rooms.length }}</span>
+        </h2>
+        <InputText
+          v-if="data.rooms.length"
+          v-model="search"
+          type="search"
+          aria-label="搜索房间或区服"
+          placeholder="搜索房间或区服"
         />
       </div>
-      <div class="room-layout">
-        <section v-if="restoring" class="entry-panel" aria-busy="true">
-          <p>正在恢复本页连接…</p>
-        </section>
-        <section v-else-if="leavePending" class="entry-panel">
-          <p>本页连接已停止。</p>
-          <Button
-            label="重试退出"
-            severity="secondary"
-            :loading="submitting"
-            @click="leave"
-          />
-        </section>
-        <ListenerPanel
-          v-else-if="active && session"
-          :session="session"
-          :configuration="configuration"
-          :connection-state="connectionState"
-          :subtitles="subtitles"
-          :audio-state="audioState"
-          :audio-blocked="audioBlocked"
-          :muted="muted"
-          :busy="submitting"
-          :changing-language="changingLanguage"
-          @leave="leave"
-          @language="changeLanguage"
-          @play-audio="playAudio"
-          @toggle-mute="toggleMute"
-        />
-        <RoomEntry
-          v-else
-          :configuration="configuration"
-          :submitting="submitting"
-          @enter="enter"
-        />
-        <div class="room-detail">
-          <section class="room-detail" aria-labelledby="room-status-title">
-            <div class="section-heading">
-              <h2 id="room-status-title">频道状态</h2>
-              <Tag
-                :value="audioStatus[configuration.room.audioState].label"
-                severity="secondary"
-              />
-            </div>
+      <div v-if="!data.rooms.length" class="empty-state lobby-empty">
+        <h2>还没有转播房间</h2>
+        <p class="muted">创建房间，将 Discord 语音频道与协作地图连接起来。</p>
+      </div>
+      <p v-else-if="!rooms.length" class="muted lobby-empty" role="status">
+        没有匹配的房间，请试试其他名称或区服。
+      </p>
+      <ul v-else class="room-directory-list">
+        <li v-for="room in rooms" :key="room.id">
+          <div class="room-directory-identity">
+            <h2>
+              <NuxtLink :to="`/rooms/${room.id}`">{{ room.name }}</NuxtLink>
+            </h2>
             <p class="muted">
-              {{ audioStatus[configuration.room.audioState].description }}
+              Asia / {{ room.server }} ·
+              {{ room.restricted ? '指定角色可加入' : '本区服所有角色可加入' }}
             </p>
-          </section>
-          <div class="detail-divider" />
-          <PlayerList :players="players" :current="playersCurrent" />
-        </div>
-      </div>
-    </template>
+          </div>
+          <div class="room-directory-status">
+            <Tag
+              :value="room.stopped ? '转播已停止' : '房间已开放'"
+              severity="secondary"
+            />
+            <span class="muted">{{ room.memberCount }} 人在房间</span>
+            <Button
+              as="a"
+              :href="`/rooms/${room.id}`"
+              label="加入房间"
+              severity="secondary"
+            />
+          </div>
+        </li>
+      </ul>
+    </section>
   </main>
 </template>

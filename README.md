@@ -1,4 +1,4 @@
-# Babel · AION2 深渊站
+# Babel · AION2 深渊战
 
 Nuxt 4 + Better Auth + PostgreSQL project scaffold for AION2 Steam Global / Asia.
 Repository: [portwatcher/babel-aion2](https://github.com/portwatcher/babel-aion2),
@@ -63,6 +63,29 @@ cleanup, actual synthetic audio reception and the self-hosted LiveKit token-reus
 failure. Werift 0.25.1 is now used by the worker after these checks and actual
 application admission tests. Other candidate SDKs remain isolated from the app.
 
+## Multi-room entry and tactical map
+
+The current source adds a public room directory at `/`, room entry at
+`/rooms/:roomId`, and Discord installation at `/rooms/create`. These changes need
+migration `0013` and server-side Discord application configuration before release.
+The existing production acceptance evidence above predates this feature.
+
+Creators must select an Asia server and may restrict entry to up to 200 character
+IDs. The server checks AION2 Index's API for an exact character/server match;
+that game ID becomes the room display name. An empty allowlist admits all indexed
+characters on that server. Community rooms have independent sessions and duplicate
+ID replacement within each room.
+
+Members draw on the original Lower Reshanta tile layer with pan, wheel/pinch,
+keyboard zoom and reset. Lines stay in map coordinates, display their author's ID,
+and persist in PostgreSQL. An eraser removes the author's entire stroke by click
+or drag; undo and individual deletion are also available. Other members' lines
+remain protected. See [multi-room setup and limits](docs/multi-room-and-map.md).
+The public navigation no longer displays administration; `/admin` keeps Access
+protection and adds a room selector. Publish the original configured room by
+setting its server under “加入规则”; it reuses the existing Discord source and
+requires existing members to enter again through character validation.
+
 ## Start locally
 
 Use Node 24.18.0 and Docker Compose.
@@ -77,7 +100,8 @@ npm run dev
 ```
 
 Open `http://localhost:3000`. The page starts with no enabled subtitle languages.
-With a migrated database, a player can enter the waiting room as `JOINING`
+With a migrated database and configured Discord installation, a player can create
+a room and enter as `JOINING`
 (HTTP 202), view the current list and keep the session connected. With the optional
 private media worker configured, the current session can become ACTIVE after all
 older transports confirm closure. This authorizes a receive-only connection;

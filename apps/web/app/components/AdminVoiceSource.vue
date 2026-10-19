@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const roomQuery = useManagementRoomQuery()
 import { voiceSourceStatusSchema, type VoiceSourceStatus } from '@babel/contracts'
 import { audioStatus } from '~/utils/audio-status'
 
@@ -28,7 +29,7 @@ async function load() {
   checking = true
   try {
     const next = voiceSourceStatusSchema.parse(
-      await $fetch('/api/management/room/source'),
+      await $fetch('/api/management/room/source', { query: roomQuery.value }),
     )
     if (!disposed) {
       source.value = next

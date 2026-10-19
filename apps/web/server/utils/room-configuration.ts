@@ -1,27 +1,49 @@
-import type { PublicRoomConfiguration } from '@babel/contracts'
-import { outputLanguage, room } from '@babel/database/schema'
+import { DEFAULT_ROOM_ID, type PublicRoomConfiguration } from '@babel/contracts'
+import { communityRoom, outputLanguage, room } from '@babel/database/schema'
 import { and, asc, eq, isNotNull, sql } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import { useDatabase } from './database'
 import { voiceSourceConfigured } from '@babel/database/voice-sources'
 import { voiceSourceStatus } from './media-control'
+import { z } from 'zod'
 
-export const DEFAULT_ROOM_ID = '00000000-0000-4000-8000-000000000001'
+export { DEFAULT_ROOM_ID } from '@babel/contracts'
 
-export async function useListenerRoom(event?: H3Event) {
+export async function useListenerRoom(event?: H3Event, selectedRoomId?: string) {
   const database = useDatabase(event)
+  if (!selectedRoomId && event?.path.startsWith('/api/management/')) {
+    const query = getQuery(event).roomId
+    if (query !== undefined) {
+      const parsed = z.uuid().safeParse(query)
+      if (!parsed.success) {
+        throw createError({ statusCode: 400, statusMessage: 'Invalid room ID' })
+      }
+      const [saved] = await database
+        .select({ id: room.id })
+        .from(room)
+        .where(eq(room.id, parsed.data))
+      if (!saved) {
+        throw createError({ statusCode: 404, statusMessage: 'Room not found' })
+      }
+      selectedRoomId = saved.id
+    }
+  }
+  if (selectedRoomId) {
+    return { database, roomId: selectedRoomId }
+  }
   await database
     .insert(room)
-    .values({ id: DEFAULT_ROOM_ID, name: 'AION2 深渊站' })
+    .values({ id: DEFAULT_ROOM_ID, name: 'AION2 深渊战' })
     .onConflictDoNothing()
   return { database, roomId: DEFAULT_ROOM_ID }
 }
 
 export async function publicRoomConfiguration(
   event?: H3Event,
+  selectedRoomId = DEFAULT_ROOM_ID,
 ): Promise<PublicRoomConfiguration> {
   const configuration: PublicRoomConfiguration = {
-    room: { id: DEFAULT_ROOM_ID, name: 'AION2 深渊站', audioState: 'UNCONFIGURED' },
+    room: { id: selectedRoomId, name: 'AION2 深渊战', audioState: 'UNCONFIGURED' },
     outputLanguages: [],
     defaultOutputLanguage: null,
     entryAvailable: false,
@@ -30,11 +52,24 @@ export async function publicRoomConfiguration(
     return configuration
   }
   try {
-    const { database, roomId } = await useListenerRoom(event)
+    const { database, roomId } = await useListenerRoom(
+      event,
+      selectedRoomId === DEFAULT_ROOM_ID ? undefined : selectedRoomId,
+    )
     await database.execute(sql`select id from player_connection limit 1`)
     const [saved] = await database.select().from(room).where(eq(room.id, roomId))
     if (saved) {
       configuration.room.name = saved.name
+      const [admission] = await database
+        .select()
+        .from(communityRoom)
+        .where(eq(communityRoom.roomId, roomId))
+      if (admission) {
+        configuration.admission = {
+          server: admission.server,
+          restricted: admission.allowedIds.length > 0,
+        }
+      }
       configuration.outputLanguages = await database
         .select({ code: outputLanguage.code, name: outputLanguage.name })
         .from(outputLanguage)

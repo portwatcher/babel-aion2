@@ -18,7 +18,11 @@ import {
   type SavedListener,
 } from '~/utils/listener-client'
 
-export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | null>) {
+export function usePlayerSession(
+  configuration: Ref<PublicRoomConfiguration | null>,
+  roomId: string,
+) {
+  const credential = ref<string | null>(null)
   const session = shallowRef<ListenerSnapshot | null>(null)
   const restoring = ref(true)
   const restoreFailed = ref(false)
@@ -37,7 +41,7 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
   let epoch = 0
   let disposed = false
   const connection = usePlayerConnection(receive, invalidSession)
-  const playerList = usePlayerList(connection.state)
+  const playerList = usePlayerList(connection.state, roomId)
   const subtitles = usePlayerSubtitles(session, connection.state, changingLanguage)
   const audio = useListenerAudio((reference) => {
     if (
@@ -48,7 +52,7 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
       throw new Error('Listener has ended')
     }
     access = { ...access, mediaAttempt: Math.max(access.mediaAttempt, Date.now()) + 1 }
-    saveListener(access)
+    saveListener(access, roomId)
     return access.mediaAttempt
   })
 
@@ -56,10 +60,11 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
     subtitles.clear()
     audio.stop()
     access = null
+    credential.value = null
     restoreFailed.value = false
     try {
-      saveListener(null)
-      savePendingEntry(null)
+      saveListener(null, roomId)
+      savePendingEntry(null, roomId)
     } catch {
       /* Already unusable in this page. */
     }
@@ -75,6 +80,10 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
   }
 
   function accept(next: ListenerSnapshot) {
+    if (next.roomId !== roomId) {
+      invalidSession()
+      return
+    }
     session.value = next
     if (next.state === 'ACTIVE' && access) {
       audio.connect(access)
@@ -143,16 +152,16 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
     error.value = ''
     notice.value = ''
     try {
-      let pending = loadPendingEntry()
+      let pending = loadPendingEntry(roomId)
       if (
         pending?.request.nickname !== nickname ||
         pending.request.outputLanguage !== outputLanguage
       ) {
         pending = createPendingEntry(nickname, outputLanguage)
-        savePendingEntry(pending)
+        savePendingEntry(pending, roomId)
       }
       const next = await listenerRequest(
-        '/api/player/sessions',
+        roomId ? `/api/player/rooms/${roomId}/sessions` : '/api/player/sessions',
         pending.credential,
         'POST',
         pending.request,
@@ -167,15 +176,19 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
         leaving: false,
         mediaAttempt: 0,
       }
-      saveListener(access)
-      savePendingEntry(null)
+      credential.value = access.credential
+      saveListener(access, roomId)
+      savePendingEntry(null, roomId)
       accept(next)
       if (access && active.value) {
         connection.connect(access)
       }
-    } catch {
+    } catch (failure) {
       if (!disposed && currentEpoch === epoch) {
-        error.value = '入场结果尚未确认，请重试。重试会继续同一次入场。'
+        error.value =
+          failure instanceof PlayerApiError && [400, 403, 404].includes(failure.status)
+            ? failure.message
+            : '入场结果尚未确认，请重试。重试会继续同一次入场。'
       }
     } finally {
       submitting.value = false
@@ -186,11 +199,12 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
     restoring.value = true
     restoreFailed.value = false
     error.value = ''
-    access = loadListener()
+    access = loadListener(roomId)
+    credential.value = access?.credential ?? null
     const currentEpoch = ++epoch
     try {
       if (!access) {
-        if (loadPendingEntry()) {
+        if (loadPendingEntry(roomId)) {
           notice.value = '上次入场结果尚未确认，请手动重试。'
         }
         return
@@ -239,7 +253,7 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
     audio.stop()
     submitting.value = true
     try {
-      saveListener({ ...leaving, leaving: true })
+      saveListener({ ...leaving, leaving: true }, roomId)
       const next = await listenerRequest(
         `/api/player/sessions/${leaving.sessionId}`,
         leaving.credential,
@@ -302,9 +316,11 @@ export function usePlayerSession(configuration: Ref<PublicRoomConfiguration | nu
     disposed = true
     epoch += 1
     connection.stop()
+    audio.stop()
   })
   return {
     session,
+    credential,
     players: playerList.players,
     playersCurrent: playerList.current,
     restoring,
