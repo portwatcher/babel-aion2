@@ -19,6 +19,7 @@ export const roomInstallation = pgTable('room_installation', {
   allowedIds: jsonb('allowed_ids').$type<string[]>().notNull().default([]),
   guildId: text('guild_id'),
   creatorId: text('creator_id'),
+  hostId: text('host_id'),
   consumedRoomId: uuid('consumed_room_id').references(() => room.id),
   authorizedAt: timestamp('authorized_at', { withTimezone: true }),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),

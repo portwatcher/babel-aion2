@@ -114,7 +114,24 @@ map and listener history remain stored, with one `room.disband` audit event. The
 worker stops that room’s delivery and leaves occupied sibling rooms’ shared Discord
 receiver running. Unpublished legacy rooms are excluded.
 
-## Map behavior and limits
+## Host closing
+
+Apply migration `0019_room_host_close.sql`. Room creation requires a host
+character ID for both audio sources; Discord installation verifies it with AION2
+Index and stores it with the installation. A restricted allowlist always includes
+the host. Rooms installed before this migration have no host and cannot be closed
+early.
+
+When the room's `hostId` matches the listener nickname, the room page shows
+**Close room** with a second confirmation. The listener credential calls
+`DELETE /api/player/sessions/:id/room`. Under the room lock the server checks the
+session is the host's current generation, sets the disband tombstone, marks every
+JOINING or ACTIVE member `REMOVED` with `ROOM_CLOSED`, and records one
+`room.disband` audit event with reason `HOST_CLOSED`. Other members, a replaced host
+session and stale credentials receive 403, 410 or 401. Delivery shutdown then
+follows the normal revocation path; unconfirmed shutdown stays pending for the
+reconciler. Within about one second each member's WebSocket receives the terminal
+snapshot. The client then shows a toast and returns to the room list.
 
 The original map is
 [Lower Reshanta on InteractiveMap.app](https://interactivemap.app/aion2/maps/tw/abyss-reshanta-a).

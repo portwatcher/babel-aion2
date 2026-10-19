@@ -20,6 +20,7 @@ const {
   toggleMute,
   capture,
   leave,
+  closeRoom,
   changeLanguage,
 } = useRoomSession()
 </script>
@@ -39,6 +40,7 @@ const {
         :busy="submitting"
         :changing-language="changingLanguage"
         @leave="leave"
+        @close-room="closeRoom"
         @language="changeLanguage"
         @play-audio="playAudio"
         @toggle-mute="toggleMute"

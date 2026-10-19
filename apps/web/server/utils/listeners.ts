@@ -63,6 +63,7 @@ export async function listenerOperation<T>(operation: () => Promise<T>) {
       SESSION_ENDED: 410,
       ROOM_NOT_FOUND: 404,
       CHARACTER_CHECK_REQUIRED: 403,
+      NOT_ROOM_HOST: 403,
     }
     throw createError({ statusCode: status[error.code], statusMessage: error.code })
   }

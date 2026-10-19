@@ -14,7 +14,8 @@ export class ListenerError extends Error {
       | 'LANGUAGE_UNAVAILABLE'
       | 'SESSION_ENDED'
       | 'ROOM_NOT_FOUND'
-      | 'CHARACTER_CHECK_REQUIRED',
+      | 'CHARACTER_CHECK_REQUIRED'
+      | 'NOT_ROOM_HOST',
   ) {
     super(code)
   }

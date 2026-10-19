@@ -79,6 +79,9 @@ export async function publicRoomConfiguration(
         .where(eq(communityRoom.roomId, roomId))
       if (admission) {
         configuration.room.number = admission.number
+        if (saved.hostCharacterId) {
+          configuration.room.hostId = saved.hostCharacterId
+        }
         configuration.admission = {
           server: admission.server,
           restricted: admission.allowedIds.length > 0,

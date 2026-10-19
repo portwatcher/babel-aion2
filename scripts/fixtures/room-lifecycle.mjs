@@ -68,3 +68,49 @@ export async function verifyRoomDisband({
     'PASS autonomous room timeout: built web timer disbands an empty room; directory, configuration, players, entry and administrator settings reject it across replicas.',
   )
 }
+
+// Real HTTP across replicas: only the host's current session closes the room,
+// and every member's session then reports ROOM_CLOSED.
+export async function verifyHostClose({ create, join, call, a, b }) {
+  const { roomNumber } = await create('Host closes', 'siel', [], 'alpha', true)
+  const host = await join(roomNumber, 'Pilot')
+  const guest = await join(roomNumber, 'Scout')
+  const close = (server, listener) =>
+    call(server, `/api/player/sessions/${listener.sessionId}/room`, {
+      method: 'DELETE',
+      token: listener.token,
+    })
+  const config = await (await call(b, `/api/player/rooms/${roomNumber}/config`)).json()
+  assert.equal(config.room.hostId, 'Pilot', 'the room names its host')
+  assert.equal((await close(b, guest)).status, 403, 'a member cannot close the room')
+  assert.equal(
+    (
+      await call(a, `/api/player/sessions/${host.sessionId}/room`, {
+        method: 'DELETE',
+        token: host.token,
+        origin: 'https://attacker.example',
+      })
+    ).status,
+    403,
+    'closing requires the same origin',
+  )
+  const closed = await close(a, host)
+  assert.equal(closed.status, 200)
+  assert.equal((await closed.json()).terminalReason, 'ROOM_CLOSED')
+  const guestView = await (
+    await call(b, `/api/player/sessions/${guest.sessionId}`, { token: guest.token })
+  ).json()
+  assert.equal(guestView.state, 'REMOVED')
+  assert.equal(guestView.terminalReason, 'ROOM_CLOSED')
+  for (const server of [a, b]) {
+    const directory = await (await call(server, '/api/player/rooms')).json()
+    assert.ok(!directory.rooms.some((room) => room.number === roomNumber))
+    assert.equal(
+      (await call(server, `/api/player/rooms/${roomNumber}/config`)).status,
+      404,
+    )
+  }
+  console.log(
+    'PASS host close: only the host session closes its room; members end with ROOM_CLOSED and the room leaves both replicas immediately.',
+  )
+}

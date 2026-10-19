@@ -192,6 +192,14 @@ at any time: computer audio (so the host can talk without being broadcast) or
 any audio input device. Other listeners only receive. Discord capture keeps the
 existing installation flow.
 
+### Host room closing · 2026-10-19
+
+Every community room names a host character ID at creation, for both player and
+Discord capture. The host's current listener session can close the room from the
+room page at any time, without waiting for the empty-room timeout. Closing
+disbands the room immediately and ends every member session. Other members
+return to the room list with a notice that the host disbanded the room.
+
 ## 4. Interface and API boundaries
 
 Keep the player functions separate from the administrator functions.

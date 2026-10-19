@@ -49,6 +49,10 @@ minutes empty. An exclusive room lock serializes expiry with entry; live listene
 and unconfirmed transport closures block it. Persisted creation and shutdown
 timestamps define the deadline. A room tombstone fences public entry and settings,
 stops its destination, and preserves the guild source generation for other rooms.
+The host character's current session can apply the same tombstone immediately
+through `DELETE /api/player/sessions/:id/room`. That transaction also revokes every
+member session with `ROOM_CLOSED`; the player WebSocket sweep delivers the terminal
+snapshot and clients return to the room list.
 
 See [multi-room setup, upstream dependencies and limits](multi-room-and-map.md).
 

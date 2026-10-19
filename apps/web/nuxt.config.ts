@@ -66,9 +66,10 @@ export default defineNuxtConfig({
         'SelectButton',
         'Tag',
         'Textarea',
+        'Toast',
       ],
     },
     directives: { include: [] },
-    composables: { include: [] },
+    composables: { include: ['useToast'] },
   },
 })

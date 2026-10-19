@@ -203,5 +203,12 @@
   "botPermissionsMissing": "봇이 이 채널에 접근할 수 없습니다. 채널 권한을 확인하세요.",
   "credentialProtectionUnavailable": "지금은 사용할 수 없습니다. 나중에 다시 시도하세요.",
   "entryClosed": "지금은 이 방에 입장할 수 없습니다. 나중에 다시 시도하세요.",
-  "characterHelp": "대소문자를 구분합니다. {server} 서버의 캐릭터여야 합니다."
+  "characterHelp": "대소문자를 구분합니다. {server} 서버의 캐릭터여야 합니다.",
+  "closeRoom": "방 닫기",
+  "confirmCloseRoom": "방 해산",
+  "cancel": "취소",
+  "roomClosed": "방을 닫았습니다.",
+  "roomClosedByHost": "방장이 방을 해산했습니다.",
+  "closeRoomFailed": "방을 닫지 못했습니다. 다시 시도하세요.",
+  "hostCharacterDiscordHelp": "이 캐릭터는 방을 닫을 수 있습니다."
 }

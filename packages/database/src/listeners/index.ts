@@ -2,7 +2,7 @@ import type { CharacterProfile, ListenerReference } from '@babel/contracts'
 import { and, eq } from 'drizzle-orm'
 import type { Database } from '../client.ts'
 import { listenerSession } from '../schema/rooms.ts'
-import { disbandEmptyCommunityRooms } from '../room-lifecycle.ts'
+import { closeRoomAsHost, disbandEmptyCommunityRooms } from '../room-lifecycle.ts'
 import { activateCurrent, prepareEntry } from './entry.ts'
 import {
   confirmDeliveryStopped,
@@ -118,6 +118,12 @@ export function createListenerService(db: Database, delivery: ListenerDelivery) 
         await stop(removed)
       }
       return snapshot(removed ?? record)
+    },
+    async closeRoom(id: string, credential: string) {
+      const { host, removed } = await closeRoomAsHost(db, id, credential)
+      // A failed stop stays pending; reconcile retries it like any removal.
+      await Promise.allSettled(removed.map(stop))
+      return snapshot(host)
     },
     async remove(reference: ListenerReference, actorSubject: string) {
       const removed = await requestRemoval(

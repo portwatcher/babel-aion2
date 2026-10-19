@@ -8,6 +8,7 @@ import {
 } from '../../../utils/community-rooms'
 import { useDatabase } from '../../../utils/database'
 import { requirePlayerOrigin } from '../../../utils/listeners'
+import { verifyAdmissionCharacter } from '../../../utils/room-admission'
 
 export default defineEventHandler(async (event) => {
   requirePlayerOrigin(event)
@@ -20,8 +21,16 @@ export default defineEventHandler(async (event) => {
       statusMessage: '请填写房间名称、区服和有效的角色 ID 列表',
     })
   }
+  // The host must be a real character on the room's server, as for player rooms.
+  const host = await verifyAdmissionCharacter(
+    { server: body.data.server, allowedIds: [] },
+    body.data.hostId,
+  )
   return communityOperation(async () => {
-    const installation = await beginInstallation(useDatabase(event), body.data)
+    const installation = await beginInstallation(useDatabase(event), {
+      ...body.data,
+      hostId: host.nickname,
+    })
     setCookie(
       event,
       'babel-room-installation',

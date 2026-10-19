@@ -1,0 +1,1 @@
+ALTER TABLE "room_installation" ADD COLUMN "host_id" text;

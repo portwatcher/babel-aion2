@@ -203,5 +203,12 @@
   "botPermissionsMissing": "Bot がこのチャンネルにアクセスできません。チャンネル権限を確認してください。",
   "credentialProtectionUnavailable": "現在利用できません。後でお試しください。",
   "entryClosed": "このルームは現在参加を受け付けていません。後でお試しください。",
-  "characterHelp": "大文字と小文字を区別します。{server} のキャラクターである必要があります。"
+  "characterHelp": "大文字と小文字を区別します。{server} のキャラクターである必要があります。",
+  "closeRoom": "ルームを閉じる",
+  "confirmCloseRoom": "全員を退出させて閉じる",
+  "cancel": "キャンセル",
+  "roomClosed": "ルームを閉じました。",
+  "roomClosedByHost": "ホストがルームを解散しました。",
+  "closeRoomFailed": "閉じられませんでした。もう一度お試しください。",
+  "hostCharacterDiscordHelp": "このキャラクターはルームを閉じられます。"
 }

@@ -203,5 +203,12 @@
   "botPermissionsMissing": "机器人无法访问此频道，请检查频道权限。",
   "credentialProtectionUnavailable": "暂时不可用，请稍后再试。",
   "entryClosed": "此房间暂不开放收听，请稍后再试。",
-  "characterHelp": "区分大小写，须为 {server} 的角色。"
+  "characterHelp": "区分大小写，须为 {server} 的角色。",
+  "closeRoom": "关闭房间",
+  "confirmCloseRoom": "确认解散",
+  "cancel": "取消",
+  "roomClosed": "房间已关闭。",
+  "roomClosedByHost": "房间已被房主解散。",
+  "closeRoomFailed": "关闭失败，请重试。",
+  "hostCharacterDiscordHelp": "此角色可关闭房间。"
 }

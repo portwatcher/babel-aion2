@@ -12,6 +12,7 @@ export const publicRoomConfigurationSchema: z.ZodType<PublicRoomConfiguration> =
       number: roomNumberSchema.optional(),
       name: z.string(),
       audioState: publicAudioStateSchema,
+      hostId: z.string().optional(),
     }),
     outputLanguages: z.array(z.object({ code: z.string(), name: z.string() })),
     defaultOutputLanguage: z.string().nullable(),
@@ -25,6 +26,8 @@ export interface PublicRoomConfiguration {
     number?: number
     name: string
     audioState: z.infer<typeof publicAudioStateSchema>
+    // The community room's host character, who may close the room.
+    hostId?: string
   }
   outputLanguages: OutputLanguage[]
   defaultOutputLanguage: string | null
