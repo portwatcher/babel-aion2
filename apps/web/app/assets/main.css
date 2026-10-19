@@ -527,3 +527,13 @@ small {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.host-capture-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.host-capture-controls .p-select {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
