@@ -1,3 +1,13 @@
+-- Clear only defaults that depend on the retired provider paths.
+UPDATE room SET default_output_language = NULL
+WHERE default_output_language IN (
+  SELECT code FROM output_language
+  WHERE recognition_configuration_id IN
+          (SELECT id FROM provider_configuration WHERE provider_type <> 'openai')
+     OR translation_configuration_id IN
+          (SELECT id FROM provider_configuration WHERE provider_type <> 'openai')
+);
+--> statement-breakpoint
 -- Retire unsupported processing paths before removing their protected credentials.
 UPDATE output_language
 SET enabled = false,
@@ -12,9 +22,6 @@ WHERE recognition_configuration_id IN
         (SELECT id FROM provider_configuration WHERE provider_type <> 'openai')
    OR translation_configuration_id IN
         (SELECT id FROM provider_configuration WHERE provider_type <> 'openai');
---> statement-breakpoint
-UPDATE room SET default_output_language = NULL
-WHERE default_output_language IN (SELECT code FROM output_language WHERE NOT enabled);
 --> statement-breakpoint
 DELETE FROM provider_configuration WHERE provider_type <> 'openai';
 --> statement-breakpoint

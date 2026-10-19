@@ -13,6 +13,8 @@ test('retiring unsupported providers revokes their paths and encrypted history w
     current = randomUUID(),
     room = randomUUID()
   const language = 'qaa-x-' + randomUUID().slice(0, 8)
+  const preservedLanguage = 'qaa-x-' + randomUUID().slice(0, 8)
+  const preservedRoom = randomUUID()
   try {
     await client.query('begin')
     await client.query(
@@ -34,6 +36,14 @@ test('retiring unsupported providers revokes their paths and encrypted history w
     await client.query(
       'insert into room(id, name, default_output_language) values ($1, $2, $3)',
       [room, 'Migration fixture', language],
+    )
+    await client.query(
+      'insert into output_language(code, name, enabled, recognition_configuration_id, translation_configuration_id) values ($1, $2, false, $3, $3)',
+      [preservedLanguage, 'Current draft', current],
+    )
+    await client.query(
+      'insert into room(id, name, default_output_language) values ($1, $2, $3)',
+      [preservedRoom, 'Current default', preservedLanguage],
     )
     await client.query(
       await readFile(
@@ -65,6 +75,14 @@ test('retiring unsupported providers revokes their paths and encrypted history w
       )
     ).rows[0]
     assert.equal(preserved.encrypted_credential, 'protected-fixture')
+    assert.equal(
+      (
+        await client.query('select default_output_language from room where id=$1', [
+          preservedRoom,
+        ])
+      ).rows[0].default_output_language,
+      preservedLanguage,
+    )
     const path = (
       await client.query('select * from output_language where code=$1', [language])
     ).rows[0]
