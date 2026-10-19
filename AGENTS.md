@@ -116,7 +116,8 @@
   contracts and credible failure modes; do not mirror source or add test-only seams.
 - Update the README and relevant docs when behavior, commands, or limits change.
   Record PASS, FAIL, NOT RUN, or WAITING FOR CONFIGURATION with evidence.
-- Use conventional commits and a coding-agent coauthor trailer. Every update to
+- Use conventional commits and a coding-agent coauthor trailer. Publish releases
+  or deploy when ready. Every update to
   `main` automatically runs ser7 checks, builds and publishes immutable web and
   voice images to DigitalOcean, then updates the existing infra ArgoCD image
   tags. This continuous deployment is authorized; verify the workflow and rollout
