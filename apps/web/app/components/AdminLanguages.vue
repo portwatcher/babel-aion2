@@ -220,9 +220,8 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <p class="muted">
-      Configure subtitle languages, provider paths and display order. Sample validation
-      records provider and terminology versions; it does not establish live translation
-      quality.
+      Configure subtitle languages and display order. Sample validation records provider
+      and terminology versions; it does not establish live translation quality.
     </p>
     <p id="language-activation-help" class="muted">
       {{
@@ -245,7 +244,7 @@ onBeforeUnmount(() => {
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
     <p v-if="page && !languages.length" class="muted">
-      No output languages. Add provider configurations, then create a language path.
+      No output languages. Save an OpenAI API Key, then create a language path.
     </p>
     <ul v-else class="configuration-list">
       <li v-for="(language, index) in languages" :key="language.code">

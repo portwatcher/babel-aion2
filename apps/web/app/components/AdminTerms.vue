@@ -146,8 +146,9 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <p class="muted">
-      Enter only verified AION2 Global terms. Recognition and translation use enabled
-      entries as context hints. Saving a term does not validate its actual translation.
+      Enter only verified AION2 Global terms. Enabled entries guide original-caption
+      recognition. Live translation does not support custom glossaries. Check actual
+      translations with authorized samples.
     </p>
     <form class="entry-form" @submit.prevent="load()">
       <div class="field">
