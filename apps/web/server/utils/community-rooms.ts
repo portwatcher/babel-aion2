@@ -1,0 +1,88 @@
+import { z } from 'zod'
+import { eq } from 'drizzle-orm'
+import type { H3Event } from 'h3'
+import { communityRoom, room } from '@babel/database/schema'
+import { CommunityRoomError } from '@babel/database/community-rooms'
+import { useDatabase } from './database'
+import { readBoundedJson, BodyInputError } from './bounded-json'
+
+export function publicRoomId(event: H3Event) {
+  const result = z.uuid().safeParse(getRouterParam(event, 'roomId'))
+  if (!result.success) {
+    throw createError({ statusCode: 400, statusMessage: 'Invalid room ID' })
+  }
+  return result.data
+}
+export async function requireCommunityRoom(event: H3Event) {
+  const roomId = publicRoomId(event)
+  const database = useDatabase(event)
+  const [record] = await database
+    .select({ room, admission: communityRoom })
+    .from(room)
+    .innerJoin(communityRoom, eq(room.id, communityRoom.roomId))
+    .where(eq(room.id, roomId))
+  if (!record) {
+    throw createError({ statusCode: 404, statusMessage: '房间不存在' })
+  }
+  return { database, roomId, ...record }
+}
+export function installationConfiguration(event: H3Event) {
+  const config = useRuntimeConfig(event)
+  if (
+    !config.discordClientId ||
+    !config.discordClientSecret ||
+    !config.discordBotToken ||
+    !config.providerEncryptionKey
+  ) {
+    throw createError({ statusCode: 503, statusMessage: 'Discord 房间创建尚未配置' })
+  }
+  return {
+    clientId: config.discordClientId,
+    clientSecret: config.discordClientSecret,
+    botToken: config.discordBotToken,
+    redirectUri: new URL('/api/discord/callback', config.siteUrl).toString(),
+  }
+}
+export function installationCookie(event: H3Event) {
+  const value = getCookie(event, 'babel-room-installation') ?? ''
+  const parsed = z
+    .object({ id: z.uuid(), browser: z.string().regex(/^[A-Za-z0-9_-]{43}$/) })
+    .safeParse({ id: value.split('.')[0], browser: value.split('.')[1] })
+  if (!parsed.success) {
+    throw createError({ statusCode: 401, statusMessage: '请先安装 Discord Bot' })
+  }
+  return parsed.data
+}
+export async function readCommunityBody(event: H3Event) {
+  try {
+    return await readBoundedJson(event, 64 * 1024)
+  } catch (error) {
+    throw createError({
+      statusCode:
+        error instanceof BodyInputError && error.code === 'TOO_LARGE' ? 413 : 400,
+      statusMessage: 'Invalid request body',
+    })
+  }
+}
+export async function communityOperation<T>(operation: () => Promise<T>) {
+  try {
+    return await operation()
+  } catch (error) {
+    if (error instanceof CommunityRoomError) {
+      throw createError({
+        statusCode: error.code === 'GUILD_IN_USE' ? 409 : 401,
+        statusMessage:
+          error.code === 'GUILD_IN_USE'
+            ? '此 Discord 服务器已有房间，请加入现有房间'
+            : '安装已过期，请重新安装',
+      })
+    }
+    if (error && typeof error === 'object' && 'statusCode' in error) {
+      throw error
+    }
+    throw createError({
+      statusCode: 503,
+      statusMessage: '房间服务暂时不可用，请稍后重试',
+    })
+  }
+}

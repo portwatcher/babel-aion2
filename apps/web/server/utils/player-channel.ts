@@ -127,7 +127,7 @@ async function refresh(connection: Connection) {
     send(connection, { type: 'players', players })
     connection.lastPlayers = playersKey
   }
-  const configuration = await publicRoomConfiguration()
+  const configuration = await publicRoomConfiguration(undefined, session.roomId)
   const configurationKey = JSON.stringify(configuration)
   if (configurationKey !== connection.lastConfiguration) {
     send(connection, { type: 'configuration', configuration })

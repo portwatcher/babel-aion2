@@ -37,6 +37,9 @@ export class DiscordSource {
     this.client.on('error', () => this.fail())
     this.client.on('shardDisconnect', () => this.fail())
     this.client.on('voiceStateUpdate', (_, after) => {
+      if (after.guild.id !== configuration.discordGuildId) {
+        return
+      }
       if (
         after.id === this.client.user?.id &&
         after.channelId !== configuration.discordVoiceChannelId
@@ -103,6 +106,7 @@ export class DiscordSource {
       guildId,
       channelId,
       adapterCreator: guild.voiceAdapterCreator,
+      group: this.configuration.id,
       selfDeaf: false,
       selfMute: true,
       daveEncryption: true,

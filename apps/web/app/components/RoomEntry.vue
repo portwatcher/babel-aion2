@@ -25,7 +25,7 @@ function selectLanguage() {
   )
 }
 onMounted(() => {
-  nickname.value = loadPendingEntry()?.request.nickname ?? ''
+  nickname.value = loadPendingEntry(props.configuration.room.id)?.request.nickname ?? ''
   selectLanguage()
 })
 watch(
@@ -55,19 +55,29 @@ function changeLanguage(value: string | null) {
 <template>
   <section class="entry-panel" aria-labelledby="entry-title">
     <h2 id="entry-title">准备进入</h2>
+    <p v-if="configuration.admission" class="admission-notice muted">
+      Asia / {{ configuration.admission.server }} ·
+      {{
+        configuration.admission.restricted
+          ? '仅限房主指定的角色'
+          : '本区服所有角色可加入'
+      }}
+    </p>
     <form class="entry-form" @submit.prevent="enter">
       <div class="field">
-        <label for="nickname">游戏昵称</label>
+        <label for="nickname">游戏角色 ID</label>
         <InputText
           id="nickname"
           v-model="nickname"
           autocomplete="off"
-          placeholder="输入你的角色名"
+          placeholder="输入本区服的角色 ID"
           :invalid="Boolean(validationError)"
           :disabled="submitting"
           aria-describedby="nickname-limit nickname-notice nickname-error"
         />
-        <small id="nickname-limit" class="muted">最多 32 个字符，区分大小写。</small>
+        <small id="nickname-limit" class="muted"
+          >最多 32 个字符，区分大小写。将通过 AION2 Index 验证。</small
+        >
         <p id="nickname-error" class="form-error" role="alert">{{ validationError }}</p>
       </div>
       <OutputLanguageSelect
@@ -76,10 +86,16 @@ function changeLanguage(value: string | null) {
         :disabled="submitting"
         @update:model-value="changeLanguage"
       />
-      <p id="nickname-notice" class="entry-notice muted">{{ ENTRY_NOTICE }}</p>
+      <p id="nickname-notice" class="entry-notice muted">
+        {{
+          configuration.admission
+            ? '角色 ID 将显示在本房间在线名单中。同房间同 ID 新加入会使旧连接退出。'
+            : ENTRY_NOTICE
+        }}
+      </p>
       <Button
         type="submit"
-        :label="configuration.entryAvailable ? '进入房间' : '暂时无法进入'"
+        :label="configuration.entryAvailable ? '验证角色并加入' : '暂时无法进入'"
         :disabled="!configuration.entryAvailable"
         :loading="submitting"
         aria-describedby="availability-notice"

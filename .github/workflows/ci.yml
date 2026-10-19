@@ -1,0 +1,206 @@
+name: CI and release
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: babel-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    name: Checks and production release
+    # Repository-scoped runners execute only reviewed, same-repository branches.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, ser7-homelab]
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+        working-directory: source
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: babel
+          POSTGRES_USER: babel
+          POSTGRES_PASSWORD: babel
+        ports:
+          - 127.0.0.1::5432
+        options: >-
+          --cgroup-parent=ser7-ci.slice --cpus=1 --memory=512m --memory-swap=512m
+          --health-cmd "pg_isready -U babel -d babel"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    steps:
+      - name: Check out tested source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: source
+          fetch-depth: 0
+
+      - name: Set up the pinned Node version
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: source/.nvmrc
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run local-equivalent checks and builds
+        run: npm run ci:local
+
+      - name: Verify database, administrator and room contracts
+        env:
+          DATABASE_URL: postgresql://babel:babel@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/babel
+        run: |
+          set -euo pipefail
+          cp .env.example .env
+          npm run db:migrate
+          node packages/database/dist/migrate.mjs
+          npm run test:db
+          npm run test:management:db
+          npm run test:community:db
+
+      - name: Select only the current main commit for release
+        id: release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          IMAGE_REGISTRY: ${{ vars.IMAGE_REGISTRY }}
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          if [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then
+            echo 'A newer main commit will release; this run only validates its source.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [[ ! "$IMAGE_REGISTRY" =~ ^registry\.digitalocean\.com/[a-z0-9-]+$ ]]; then
+            echo 'Configure the IMAGE_REGISTRY repository variable.' >&2
+            exit 1
+          fi
+          tag="$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          {
+            echo 'current=true'
+            echo "image=$IMAGE_REGISTRY/babel-web:$tag"
+            echo "worker_image=$IMAGE_REGISTRY/babel-voice:$tag"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check out private GitOps release tooling
+        if: steps.release.outputs.current == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: ${{ vars.INFRA_REPOSITORY }}
+          ref: main
+          path: infra
+          fetch-depth: 0
+          ssh-key: ${{ secrets.INFRA_DEPLOY_KEY }}
+
+      - name: Validate the private image updater
+        if: steps.release.outputs.current == 'true'
+        run: python3 -B -m unittest discover -s ../infra/.github/scripts -p test_babel_gitops_image.py
+
+      - name: Prepare isolated registry credentials and the managed builder
+        if: steps.release.outputs.current == 'true'
+        env:
+          DOCKER_CONFIG_JSON: ${{ secrets.DOCR_DOCKER_CONFIG }}
+        run: |
+          set -euo pipefail
+          docker_config="$RUNNER_TEMP/babel-docker-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir -p "$docker_config"
+          chmod 700 "$docker_config"
+          test -n "$DOCKER_CONFIG_JSON"
+          printf '%s' "$DOCKER_CONFIG_JSON" > "$docker_config/config.json"
+          chmod 600 "$docker_config/config.json"
+          export DOCKER_CONFIG="$docker_config"
+          export BUILDX_CONFIG="$HOME/.docker/buildx"
+          export BUILDX_BUILDER=ci-builder
+          docker buildx inspect "$BUILDX_BUILDER" --bootstrap
+          {
+            echo "DOCKER_CONFIG=$DOCKER_CONFIG"
+            echo "BUILDX_CONFIG=$BUILDX_CONFIG"
+            echo "BUILDX_BUILDER=$BUILDX_BUILDER"
+          } >> "$GITHUB_ENV"
+
+      - name: Build and probe the web and migration image
+        if: steps.release.outputs.current == 'true'
+        env:
+          IMAGE: ${{ steps.release.outputs.image }}
+          DATABASE_URL: postgresql://babel:babel@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/babel
+        run: |
+          set -euo pipefail
+          docker buildx build --load --platform linux/amd64 --tag "$IMAGE" \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" .
+          test "$(docker run --rm --entrypoint id "$IMAGE" -u)" = 1000
+          docker run --rm --network host -e DATABASE_URL "$IMAGE" node database/migrate.mjs
+          container="babel-check-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+          docker run --detach --name "$container" -p 127.0.0.1::3000 "$IMAGE"
+          port=$(docker port "$container" 3000/tcp | awk -F: '{print $NF}')
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent "http://127.0.0.1:$port/api/health/live" >/dev/null; then break; fi
+            echo "Waiting for the web runtime ($attempt/30)"
+            sleep 1
+          done
+          curl --fail --silent "http://127.0.0.1:$port/" >/dev/null
+
+      - name: Build and probe the native voice image
+        if: steps.release.outputs.current == 'true'
+        env:
+          WORKER_IMAGE: ${{ steps.release.outputs.worker_image }}
+          DATABASE_URL: postgresql://babel:babel@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/babel
+        run: |
+          set -euo pipefail
+          docker buildx build --load --platform linux/amd64 --target voice-worker \
+            --tag "$WORKER_IMAGE" \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" .
+          node ../infra/.github/scripts/babel-worker-image-smoke.mjs
+
+      - name: Publish validated images and update ArgoCD manifests
+        if: steps.release.outputs.current == 'true'
+        env:
+          IMAGE: ${{ steps.release.outputs.image }}
+          WORKER_IMAGE: ${{ steps.release.outputs.worker_image }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          if [ "$(git rev-parse origin/main)" != "$SOURCE_SHA" ]; then
+            echo 'A newer main commit superseded this build before publication.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          docker push "$IMAGE"
+          docker push "$WORKER_IMAGE"
+          git fetch origin main
+          if [ "$(git rev-parse origin/main)" != "$SOURCE_SHA" ]; then
+            echo 'Images published; a newer main commit owns the next GitOps update.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          python3 ../infra/.github/scripts/babel-gitops-image.py ../infra
+          {
+            echo "Released Babel source: $SOURCE_SHA"
+            echo "Web, migration and recovery image: $IMAGE"
+            echo "Voice image: $WORKER_IMAGE"
+            echo 'GitOps image tags updated; ArgoCD reconciles the rollout.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove job-owned credentials and local images
+        if: always()
+        working-directory: .
+        env:
+          IMAGE: ${{ steps.release.outputs.image }}
+          WORKER_IMAGE: ${{ steps.release.outputs.worker_image }}
+        run: |
+          rm -f source/.env
+          for image in "$IMAGE" "$WORKER_IMAGE"; do
+            if [ -n "$image" ]; then docker image rm "$image" >/dev/null 2>&1 || true; fi
+          done
+          docker_config="$RUNNER_TEMP/babel-docker-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          if [ -d "$docker_config" ]; then rm -rf -- "$docker_config"; fi
