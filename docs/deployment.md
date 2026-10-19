@@ -130,6 +130,14 @@ The new Discord source reported 29 decoded frames at generation 11. See the
 [production lifecycle report](test-report.md#production-sessions-and-graceful-worker-recovery--2026-10-19)
 for the evidence and remaining multiple-member, game and abrupt-loss limits.
 
+A read-only production database snapshot subsequently passed isolated restoration
+with the same published web image and production database image. All 19
+application/migration tables, schema, sequence values and the saved encrypted
+Discord credential survived; the restored web runtime passed readiness while old
+unconfirmed transport records remained unconfirmed. Production settings and pods
+were unchanged. This is isolated restore evidence, not live production failover;
+see the [restoration report](test-report.md#production-snapshot-restoration--2026-10-19).
+
 ## Earlier web release verification — 2026-10-19
 
 Source `bbe9fc204d61b37a46284581416504bc172cb46e` was released through the
