@@ -70,6 +70,7 @@ jobs:
           npm run test:samples:db
           npm run test:languages:db
           npm run test:subtitles:db
+          npm run test:recovery:db
           npm run test:community:db
 
       - name: Select only the current main commit for release

@@ -10,6 +10,6 @@ await build({
   platform: 'node',
   target: 'node24',
   format: 'esm',
-  external: ['pg', 'werift', 'discord.js', '@discordjs/voice', '@discordjs/opus'],
+  external: ['pg', 'ws', 'werift', 'discord.js', '@discordjs/voice', '@discordjs/opus'],
 })
 console.log('Built voice-worker media control service')
