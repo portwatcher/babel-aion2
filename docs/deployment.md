@@ -107,13 +107,13 @@ The first human playback attempt produced no sound while the human Discord
 account was outside the voice channel. After joining the configured channel,
 the production source reported that member's correct identity and 282 decoded
 frames at 02:03 UTC, still on generation 9 with no failure reason. No recording
-was retained. The browser reports a connected audio channel, but the subsequent
-audible-playback check still awaits human confirmation; multiple members were
-not tested.
+was retained. Audible playback was unconfirmed at that stage; after the relay
+correction below, the human confirmed hearing their own Discord voice through
+the production Babel webpage. Multiple members were not tested.
 
 Provider/language lists remain empty. These checks prove administrator setup,
-single-member Discord receipt and media connectivity, not audible playback, provider
-quality, TURN TLS/restricted-network compatibility, mainland-China performance,
+single-member Discord receipt, media connectivity and human-confirmed browser
+playback. They do not establish provider quality, TURN TLS/restricted-network compatibility, mainland-China performance,
 native game-window behavior, host-loss fencing or production disaster recovery.
 
 Subsequent production checks passed real Chrome nickname replacement, persistent
@@ -128,7 +128,7 @@ without manual refresh or a new listener. Stored settings and encrypted
 credentials remained identical; old owners and transports have closure receipts.
 The new Discord source reported 29 decoded frames at generation 11. See the
 [production lifecycle report](test-report.md#production-sessions-and-graceful-worker-recovery--2026-10-19)
-for the evidence and remaining audible-playback, game and abrupt-loss limits.
+for the evidence and remaining multiple-member, game and abrupt-loss limits.
 
 ## Earlier web release verification — 2026-10-19
 
