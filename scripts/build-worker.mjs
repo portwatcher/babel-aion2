@@ -11,5 +11,9 @@ await build({
   target: 'node24',
   format: 'esm',
   external: ['pg', 'ws', 'werift', 'discord.js', '@discordjs/voice', '@discordjs/opus'],
+  // Bundled CommonJS dependencies (OpenTelemetry) require Node built-ins.
+  banner: {
+    js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',
+  },
 })
 console.log('Built voice-worker media control service')

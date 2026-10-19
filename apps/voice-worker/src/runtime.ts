@@ -1,4 +1,5 @@
 import { receiveRuntimeOwner } from '@babel/processes'
+import { startTelemetry, stopTelemetry } from '@babel/telemetry'
 import { createDatabase, databasePoolSize } from '@babel/database'
 import { createCredentialCipher } from '@babel/database/credentials'
 import { runtimeOwnerActive } from '@babel/database/runtime-owners'
@@ -24,6 +25,7 @@ async function start(ownerId: string) {
   const port = Number(process.env.MEDIA_CONTROL_PORT ?? '3100')
   const host = process.env.MEDIA_CONTROL_HOST ?? '127.0.0.1'
   const network = createMediaNetwork(process.env)
+  startTelemetry('babel-voice')
   // Source ownership holds a dedicated session while queries continue. Preserve
   // at least one additional slot and keep provider work out of the media pool.
   const storage = {
@@ -68,6 +70,7 @@ async function start(ownerId: string) {
         sourceDatabase.close(),
         subtitleDatabase.close(),
       ])
+      await stopTelemetry()
     } catch {
       process.exitCode = 1
     } finally {

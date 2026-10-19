@@ -7,6 +7,7 @@ import {
   type SubtitleStreamEvent,
 } from '@babel/providers'
 import { PCM_FRAME_BYTES, PcmTimeline } from './pcm-timeline.ts'
+import { SpeechTurns } from './speech-turns.ts'
 
 export interface RunningSubtitlePath extends LiveSubtitlePath {
   key: string
@@ -27,6 +28,7 @@ export interface SubtitleConsumer {
 export class SpeakerSubtitles {
   private readonly stream: ReturnType<typeof openSharedSubtitleStream>
   private readonly timeline = new PcmTimeline()
+  private readonly turns: SpeechTurns
   private readonly subscribers = new Map<
     string,
     { path: RunningSubtitlePath; remove: () => void }
@@ -49,6 +51,7 @@ export class SpeakerSubtitles {
     private readonly allowed: () => boolean,
     private readonly ended: (code: Exclude<ProviderTestCode, 'PASS'> | null) => void,
   ) {
+    this.turns = new SpeechTurns(roomId)
     this.stream = openSharedSubtitleStream({
       recognition: path.recognition,
       sampleRate: 48_000,
@@ -159,6 +162,12 @@ export class SpeakerSubtitles {
       return
     }
     const value = event.value
+    const latency = this.turns.fragment(
+      value.outputLanguage,
+      value.translatedText.trim()
+        ? `${value.utteranceId}:${value.translationRevision}`
+        : null,
+    )
     consumer.deliver(
       {
         type: 'subtitle',
@@ -185,6 +194,7 @@ export class SpeakerSubtitles {
           serverSentAt: new Date().toISOString(),
           discontinuity: value.discontinuity,
           failure: value.failure,
+          latency,
         },
       },
       path.stamp,
@@ -196,6 +206,7 @@ export class SpeakerSubtitles {
     if (this.closed || pcm.length % 4) {
       return
     }
+    this.turns.hear(pcm)
     const overflow = this.timeline.receive(pcm, performance.now())
     if (overflow && this.ready) {
       this.finish('UNAVAILABLE')
@@ -241,6 +252,7 @@ export class SpeakerSubtitles {
     clearInterval(this.timer)
     clearTimeout(this.rotation)
     this.timeline.clear()
+    this.turns.close()
     for (const subscriber of this.subscribers.values()) {
       subscriber.remove()
     }
