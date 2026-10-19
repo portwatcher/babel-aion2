@@ -1,6 +1,10 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { and, asc, count, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
-import { roomInstallSchema, type RoomDirectory } from '@babel/contracts'
+import {
+  playerRoomCreationSchema,
+  roomInstallSchema,
+  type RoomDirectory,
+} from '@babel/contracts'
 import type { Database } from './client.ts'
 import type { CredentialCipher } from './credentials.ts'
 import { auditEvent, listenerSession, room } from './schema/rooms.ts'
@@ -179,6 +183,47 @@ export async function createCommunityRoom(
       metadata: {
         server: installation.server,
         restricted: installation.allowedIds.length > 0,
+      },
+    })
+    return creationResult(tx, roomId)
+  })
+}
+
+/**
+ * Creates a room whose audio comes from the host character's own listener
+ * session. The caller verifies the host character before calling.
+ */
+export async function createPlayerRoom(db: Database, input: unknown) {
+  const request = playerRoomCreationSchema.parse(input)
+  const hostId = request.hostId.normalize('NFC')
+  const allowedIds = [...new Set(request.allowedIds.map((id) => id.normalize('NFC')))]
+  if (allowedIds.length && !allowedIds.includes(hostId)) {
+    allowedIds.push(hostId)
+  }
+  return db.transaction(async (tx) => {
+    const roomId = randomUUID()
+    await tx.insert(room).values({
+      id: roomId,
+      name: request.name,
+      audioSource: 'PLAYER',
+      hostCharacterId: hostId,
+      captureMode: 'ALL_CHANNEL',
+      stopped: false,
+      sourceGeneration: 1,
+    })
+    await tx.insert(communityRoom).values({
+      roomId,
+      server: request.server,
+      allowedIds,
+    })
+    await tx.insert(auditEvent).values({
+      actorSubject: 'player:room-host',
+      action: 'room.create',
+      resourceId: roomId,
+      metadata: {
+        server: request.server,
+        restricted: allowedIds.length > 0,
+        audioSource: 'PLAYER',
       },
     })
     return creationResult(tx, roomId)

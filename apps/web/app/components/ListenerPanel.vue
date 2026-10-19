@@ -10,6 +10,8 @@ const props = defineProps<{
   audioState: string
   audioBlocked: boolean
   muted: boolean
+  microphone: 'off' | 'live' | 'blocked'
+  microphoneMuted: boolean
   busy: boolean
   changingLanguage: boolean
   subtitles: SubtitlePresentation
@@ -19,6 +21,8 @@ const emit = defineEmits<{
   language: [language: string | null]
   playAudio: []
   toggleMute: []
+  toggleMicrophone: []
+  reconnectAudio: []
 }>()
 const pip = useSubtitlePictureInPicture(
   () => `${props.session.sessionId}:${props.session.nicknameGeneration}`,
@@ -38,7 +42,13 @@ const status = computed(() => {
   if (roomState !== 'LISTENING') {
     return t(audioStatus[roomState].description)
   }
+  if (props.microphone === 'blocked') {
+    return t('micBlocked')
+  }
   if (props.audioState === 'connected') {
+    if (props.microphone === 'live') {
+      return props.microphoneMuted ? t('micMuted') : t('micLive')
+    }
     return t('audioConnected')
   }
   return props.audioState === 'unavailable'
@@ -74,7 +84,19 @@ const languageName = computed(
           @click="emit('playAudio')"
         />
         <Button
-          v-if="audioState === 'connected'"
+          v-if="microphone === 'live'"
+          :label="microphoneMuted ? t('unmuteMic') : t('muteMic')"
+          severity="secondary"
+          :aria-pressed="microphoneMuted"
+          @click="emit('toggleMicrophone')"
+        />
+        <Button
+          v-else-if="microphone === 'blocked'"
+          :label="t('retryMic')"
+          @click="emit('reconnectAudio')"
+        />
+        <Button
+          v-else-if="audioState === 'connected'"
           :label="muted ? t('unmute') : t('mute')"
           severity="secondary"
           :aria-pressed="muted"

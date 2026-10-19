@@ -4,6 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import type { ListenerReference, MediaOffer } from '@babel/contracts'
 import type { Database } from '@babel/database'
 import { runtimeOwnerActive } from '@babel/database/runtime-owners'
+import { readUplinkHost } from '@babel/database/voice-sources'
 import {
   authorizeMediaSession,
   closeMediaConnection,
@@ -20,19 +21,24 @@ import {
   RtpHeader,
   RtpPacket,
 } from 'werift'
+import opus from '@discordjs/opus'
 import type { MediaNetwork } from './media-network.ts'
+import type { PlayerUplink } from './player-source.ts'
 
 interface Entry {
   id: string
   attempt: number
   reference: ListenerReference
   roomId: string
+  nickname: string
   roomEpoch: number
   sequence: number
   timestamp: number
   startedAt: number
   peer: RTCPeerConnection | null
   track: MediaStreamTrack | null
+  // Set only for a PLAYER room host: this peer receives instead of sending.
+  uplink: { id: string; decoder: InstanceType<typeof opus.OpusEncoder> } | null
   registered: boolean
   closing: boolean
   closed: boolean
@@ -54,6 +60,7 @@ export class MediaPeerError extends Error {
 export class MediaPeers {
   private readonly entries = new Map<string, Entry>()
   private readonly roomEpochs = new Map<string, number>()
+  private readonly uplinks = new Map<string, PlayerUplink>()
   private stopping = false
   private sweeping: Promise<void> | null = null
   private readonly timer: ReturnType<typeof setInterval>
@@ -121,12 +128,14 @@ export class MediaPeers {
       attempt,
       reference,
       roomId: listener.roomId,
+      nickname: listener.nickname.normalize('NFC'),
       roomEpoch: this.roomEpochs.get(listener.roomId) ?? 0,
       sequence: randomInt(65_536),
       timestamp: randomInt(0x1_0000_0000),
       startedAt: performance.now(),
       peer: null,
       track: null,
+      uplink: null,
       registered: false,
       closing: false,
       closed: false,
@@ -206,6 +215,7 @@ export class MediaPeers {
         await delay(50)
       }
       await this.authorized(entry)
+      const host = await readUplinkHost(this.db, entry.roomId)
       const network = this.network.create()
       entry.credentialExpiresAt = network.expiresAt
       const peer = new RTCPeerConnection({
@@ -222,8 +232,19 @@ export class MediaPeers {
         },
       })
       entry.peer = peer
-      entry.track = new MediaStreamTrack({ kind: 'audio' })
-      peer.addTransceiver(entry.track, { direction: 'sendonly' })
+      let uplink: ReturnType<RTCPeerConnection['addTransceiver']> | null = null
+      if (host !== null && host === entry.nickname) {
+        // The host publishes the room's audio and does not receive its own mix.
+        uplink = peer.addTransceiver('audio', { direction: 'recvonly' })
+        const decoder = new opus.OpusEncoder(48_000, 2)
+        entry.uplink = { id: `player:${entry.id}`, decoder }
+        uplink.onTrack.subscribe((track) => {
+          track.onReceiveRtp.subscribe((rtp) => this.receiveUplink(entry, rtp.payload))
+        })
+      } else {
+        entry.track = new MediaStreamTrack({ kind: 'audio' })
+        peer.addTransceiver(entry.track, { direction: 'sendonly' })
+      }
       peer.connectionStateChange.subscribe((state) => {
         if (state === 'connected') {
           entry.expiresAt = entry.credentialExpiresAt
@@ -248,8 +269,12 @@ export class MediaPeers {
       ) {
         throw new MediaPeerError('UNAVAILABLE')
       }
+      if (uplink && !uplink.mid) {
+        throw new MediaPeerError('UNAVAILABLE')
+      }
       result = {
         connectionId: entry.id,
+        uplinkMid: uplink?.mid ?? null,
         ice: {
           ...network.browser,
           renewAfterMs:
@@ -322,6 +347,9 @@ export class MediaPeers {
         await entry.peer?.close()
         entry.closed = true
       }
+      if (entry.uplink) {
+        this.uplinks.get(entry.roomId)?.remove(entry.uplink.id)
+      }
       if (entry.registered) {
         await closeMediaConnection(this.db, entry.id, this.ownerId)
       }
@@ -346,18 +374,45 @@ export class MediaPeers {
     return mediaConnectionsStopped(this.db, reference)
   }
 
+  private live(entry: Entry) {
+    return (
+      !entry.closing &&
+      !entry.closed &&
+      Date.now() < entry.credentialExpiresAt &&
+      entry.roomEpoch === (this.roomEpochs.get(entry.roomId) ?? 0) &&
+      entry.peer?.connectionState === 'connected'
+    )
+  }
+
+  attachUplink(roomId: string, uplink: PlayerUplink) {
+    this.uplinks.set(roomId, uplink)
+  }
+
+  detachUplink(roomId: string, uplink: PlayerUplink) {
+    if (this.uplinks.get(roomId) === uplink) {
+      this.uplinks.delete(roomId)
+    }
+  }
+
+  private receiveUplink(entry: Entry, payload: Buffer) {
+    const sink = this.uplinks.get(entry.roomId)
+    if (!entry.uplink || !sink || sink.hostId !== entry.nickname || !this.live(entry)) {
+      return
+    }
+    let pcm: Buffer
+    try {
+      pcm = entry.uplink.decoder.decode(payload)
+    } catch {
+      // A corrupt or empty packet is dropped without closing the host peer.
+      return
+    }
+    sink.receive(entry.uplink.id, entry.nickname, pcm)
+  }
+
   publish(roomId: string, payload: Buffer) {
     const now = performance.now()
     for (const entry of this.entries.values()) {
-      if (
-        entry.roomId !== roomId ||
-        entry.closing ||
-        entry.closed ||
-        Date.now() >= entry.credentialExpiresAt ||
-        entry.roomEpoch !== (this.roomEpochs.get(roomId) ?? 0) ||
-        entry.peer?.connectionState !== 'connected' ||
-        !entry.track
-      ) {
+      if (entry.roomId !== roomId || !entry.track || !this.live(entry)) {
         continue
       }
       const elapsed = now - entry.startedAt

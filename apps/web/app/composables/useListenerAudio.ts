@@ -10,6 +10,7 @@ interface AudioConnection {
   listener: SavedListener
   peer: RTCPeerConnection
   abort: AbortController
+  microphone: MediaStream | null
   renewal: ReturnType<typeof setTimeout> | undefined
 }
 
@@ -21,6 +22,9 @@ export function useListenerAudio(
   >('idle')
   const blocked = ref(false)
   const muted = ref(false)
+  // Only a player-source room host publishes; everyone else stays 'off'.
+  const microphone = ref<'off' | 'live' | 'blocked'>('off')
+  const microphoneMuted = ref(false)
   let connection: AudioConnection | null = null
   let desired: SavedListener | null = null
   let sound: HTMLAudioElement | null = null
@@ -34,6 +38,9 @@ export function useListenerAudio(
       clearTimeout(previous.renewal)
       previous.abort.abort()
       previous.peer.close()
+      for (const track of previous.microphone?.getTracks() ?? []) {
+        track.stop()
+      }
       void requestListenerMedia(previous.listener, {
         operation: 'close',
         connectionId: previous.id,
@@ -44,6 +51,7 @@ export function useListenerAudio(
       sound.srcObject = null
     }
     blocked.value = false
+    microphone.value = 'off'
   }
 
   function stop() {
@@ -130,6 +138,7 @@ export function useListenerAudio(
       listener,
       peer: new RTCPeerConnection({ iceServers: [] }),
       abort: new AbortController(),
+      microphone: null,
       renewal: undefined,
     }
     connection = active
@@ -187,6 +196,12 @@ export function useListenerAudio(
         }, offer.ice.renewAfterMs)
       }
       await active.peer.setRemoteDescription(offer.description)
+      if (offer.uplinkMid !== null) {
+        await publishMicrophone(active, offer.uplinkMid)
+        if (connection !== active) {
+          return
+        }
+      }
       await active.peer.setLocalDescription(await active.peer.createAnswer())
       await gather(active.peer, active.abort.signal)
       if (connection !== active) {
@@ -219,6 +234,55 @@ export function useListenerAudio(
     }
   }
 
+  async function publishMicrophone(active: AudioConnection, mid: string) {
+    const transceiver = active.peer
+      .getTransceivers()
+      .find((candidate) => candidate.mid === mid)
+    if (!transceiver) {
+      throw new Error('Microphone transceiver unavailable')
+    }
+    try {
+      active.microphone = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+        video: false,
+      })
+    } catch {
+      // Without permission the host still joins; the answer carries no track.
+      if (connection === active) {
+        microphone.value = 'blocked'
+      }
+      return
+    }
+    const track = active.microphone.getAudioTracks()[0]
+    if (connection !== active || !track) {
+      return
+    }
+    track.enabled = !microphoneMuted.value
+    transceiver.direction = 'sendonly'
+    await transceiver.sender.replaceTrack(track)
+    microphone.value = 'live'
+  }
+
+  function toggleMicrophone() {
+    microphoneMuted.value = !microphoneMuted.value
+    for (const track of connection?.microphone?.getAudioTracks() ?? []) {
+      track.enabled = !microphoneMuted.value
+    }
+  }
+
+  function reconnect() {
+    const listener = desired
+    if (listener && !disposed) {
+      clearTimeout(retry)
+      retry = undefined
+      void begin(listener)
+    }
+  }
+
   function connect(listener: SavedListener) {
     if (
       desired?.sessionId === listener.sessionId &&
@@ -245,5 +309,17 @@ export function useListenerAudio(
     stop()
     sound = null
   })
-  return { state, blocked, muted, play, toggleMute, connect, stop }
+  return {
+    state,
+    blocked,
+    muted,
+    microphone,
+    microphoneMuted,
+    play,
+    toggleMute,
+    toggleMicrophone,
+    reconnect,
+    connect,
+    stop,
+  }
 }

@@ -30,6 +30,7 @@ export const discordCaptureMode = pgEnum('discord_capture_mode', [
   'SELECTED_USERS',
   'ALL_CHANNEL',
 ])
+export const roomAudioSource = pgEnum('room_audio_source', ['DISCORD', 'PLAYER'])
 
 export const room = pgTable('room', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -45,6 +46,9 @@ export const room = pgTable('room', {
   captureMode: discordCaptureMode('capture_mode').notNull().default('SELECTED_USERS'),
   commanderIds: jsonb('commander_ids').$type<string[]>().notNull().default([]),
   encryptedDiscordCredential: text('encrypted_discord_credential'),
+  audioSource: roomAudioSource('audio_source').notNull().default('DISCORD'),
+  // Exact AION2 character ID whose listener session supplies PLAYER audio.
+  hostCharacterId: text('host_character_id'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   disbandedAt: timestamp('disbanded_at', { withTimezone: true }),

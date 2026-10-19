@@ -47,6 +47,14 @@ export const roomAdmissionSchema = z.object({
   allowedIds: z.array(nicknameSchema).max(200).default([]),
 })
 export const roomInstallSchema = roomAdmissionSchema.extend({ name: roomNameSchema })
+export const ROOM_AUDIO_SOURCES = ['PLAYER', 'DISCORD'] as const
+export const roomAudioSourceSchema = z.enum(ROOM_AUDIO_SOURCES)
+export type RoomAudioSource = z.infer<typeof roomAudioSourceSchema>
+// A player-source room receives audio only from the host character's own
+// listener session; it needs no Discord guild, channel or bot installation.
+export const playerRoomCreationSchema = roomInstallSchema.extend({
+  hostId: nicknameSchema,
+})
 export const roomCreationSchema = z.object({
   voiceChannelId: z.string().regex(/^[1-9][0-9]{16,19}$/),
 })
@@ -63,4 +71,5 @@ export interface RoomDirectory {
   rooms: LobbyRoom[]
   available: boolean
   creationAvailable: boolean
+  creationSources: RoomAudioSource[]
 }

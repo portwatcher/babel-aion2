@@ -1,5 +1,19 @@
 # Validation
 
+## Player audio source · 2026-10-19
+
+Scope: room creation chooses a host-microphone or Discord source; a host-microphone
+room publishes the host character's browser microphone without Discord.
+
+| Check                             | Status  | Evidence                                                                                                                                                                                                                                                   |
+| --------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source and built runtime          | PASS    | `npm run ci:local`: line limits, formatting, strict types, unit tests, all builds and the built HTTP smoke.                                                                                                                                                |
+| Player-room storage and ownership | PASS    | `npm run test:db` (17 tests, disposable PostgreSQL 16) including `player-rooms.test.ts`: no Discord fields, per-room source groups and concurrent ownership, host exposed only while running, restart without a credential.                                |
+| Host uplink over real WebRTC      | PASS    | `apps/voice-worker/test/player-uplink.test.mjs`: Werift browser peers and real Opus. Only the host is offered an uplink; its tone is decoded, mixed and heard by a guest; the host receives nothing back; detach, peer close and room stop end publishing. |
+| Existing media and subtitle paths | PASS    | `media-publication.test.mjs`, `subtitle-delivery.test.mjs`, `scripts/media-smoke.mjs` and `npm run test:community:db` against the same migrated database.                                                                                                  |
+| Creation page and endpoint        | PASS    | Local in-app browser on the built server: source selector, host field and Discord-unavailable state render; an unknown host ID returns AION2 Index 404 through `POST /api/player/rooms/hosted`.                                                            |
+| Real browser microphone and TURN  | NOT RUN | No Chrome `getUserMedia` capture, permission prompt or production relay was exercised; no real AION2 character was used to create a room.                                                                                                                  |
+
 ## Speech-to-subtitle latency tracing · 2026-10-19
 
 | Check                         | Status                    | Evidence                                                                                                                                                                       |
