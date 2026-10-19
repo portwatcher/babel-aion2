@@ -1,5 +1,21 @@
 # Validation
 
+## Subscriber-driven provider lifetime — 2026-10-19
+
+| Check                          | Result  | Evidence                                                                                                                                                                                                            |
+| ------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Full source and runtime checks | PASS    | `npm run ci:local`: source limits, formatting, strict types, 18 tests, all builds and built HTTP smoke                                                                                                              |
+| Shared target lifetime         | PASS    | Real loopback WebSockets retain a target for its remaining listener, close on the last unsubscribe, discard held-handshake audio, and reopen a fresh target while another language continues                        |
+| Listener transport lifetime    | PASS    | `npm run test:subtitles:db`: closing all actual player sockets closes recognition and translation while languages remain enabled; a returning listener opens only its requested target and receives fresh fragments |
+| Database regression suite      | PASS    | `npm run test:db`: all 13 tests on an isolated local database                                                                                                                                                       |
+| Regression controls            | PASS    | The target-lifetime case failed before removing the release grace. The real-player case failed with the old room owner restored, then passed after subscriber-driven cleanup                                        |
+| Production rollout             | NOT RUN | Source and local runtime validation only; merging `main` triggers the existing automatic deployment                                                                                                                 |
+
+The provider regression owns the connection and pending-audio lifecycle contract;
+the existing player integration owns cross-transport release and recovery. Both
+exercise actual sockets without adding production-only test hooks. Loopback
+evidence does not measure real-provider latency, quality or billing.
+
 ## Interface localization — 2026-10-19
 
 Scope: local source and built-server checks for player interface localization and

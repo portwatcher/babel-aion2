@@ -30,7 +30,6 @@ interface Output {
   path: TranslationPath
   stream: ReturnType<typeof openTranslation>
   subscribers: Set<Subscriber>
-  releaseAt: number | null
   value: SubtitleUpdate
   ready: boolean
   failed: boolean
@@ -76,6 +75,16 @@ export function openSharedSubtitleStream(input: {
   let recognitionReady = false
   let sourcePending: Array<ReturnType<typeof convert>> = []
   const created = Date.now()
+  function releaseUnused(output: Output) {
+    if (output.subscribers.size || outputs.get(output.path.outputLanguage) !== output) {
+      return
+    }
+    // Fence late deltas and handshake completion before closing the socket.
+    outputs.delete(output.path.outputLanguage)
+    output.pending = []
+    output.retryAt = null
+    output.stream.close()
+  }
   function deliver(output: Output, event: SubtitleStreamEvent) {
     if (closed || outputs.get(output.path.outputLanguage) !== output) {
       return
@@ -105,9 +114,7 @@ export function openSharedSubtitleStream(input: {
           }
         } catch {
           output.subscribers.delete(subscriber)
-          if (!output.subscribers.size) {
-            output.releaseAt = Date.now() + 2000
-          }
+          releaseUnused(output)
         }
       }
     }
@@ -188,7 +195,6 @@ export function openSharedSubtitleStream(input: {
     output = {
       path,
       subscribers,
-      releaseAt: null,
       ready: false,
       failed: false,
       stream,
@@ -322,14 +328,6 @@ export function openSharedSubtitleStream(input: {
         })
         continue
       }
-      if (
-        !output.subscribers.size &&
-        output.releaseAt !== null &&
-        output.releaseAt <= now
-      ) {
-        output.stream.close()
-        outputs.delete(code)
-      }
     }
     if (!outputs.size && !ending && now - created >= 2000) {
       fail(new ProviderFailure('UNAVAILABLE'))
@@ -360,7 +358,6 @@ export function openSharedSubtitleStream(input: {
       subscriber.after = events
     }
     const output = makeOutput(value, previous.subscribers)
-    output.releaseAt = previous.releaseAt
     outputs.set(value.outputLanguage, output)
     events += 1
     deliver(output, {
@@ -404,12 +401,11 @@ export function openSharedSubtitleStream(input: {
         receive,
       }
       output.subscribers.add(subscriber)
-      output.releaseAt = null
       return () => {
         const current = outputs.get(value.outputLanguage)
         current?.subscribers.delete(subscriber)
-        if (current && !current.subscribers.size && current.releaseAt === null) {
-          current.releaseAt = Date.now() + 2000
+        if (current) {
+          releaseUnused(current)
         }
       }
     },

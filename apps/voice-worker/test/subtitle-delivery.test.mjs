@@ -271,6 +271,25 @@ test(
       'replacement receives fresh fragments',
     )
     assert.equal(a.values().length, oldCount)
+    for (const client of [b, c, late, replacement]) {
+      client.socket.close()
+    }
+    await until(
+      () => active('recognition').length === 0 && active('translation').length === 0,
+      'last subtitle listener releases all provider sockets while languages remain enabled',
+      1500,
+    )
+    const returning = await f.enter('subtitle-returning', 'ko')
+    await until(
+      () => active('recognition').length === 1 && active('translation').length === 1,
+      'returning listener opens only its requested target',
+    )
+    target('ko', 'Returning listener only. ')
+    await until(
+      () => has(returning, 'Returning listener only.'),
+      'returning listener receives fresh streaming output',
+    )
+    assert.equal(has(returning, 'Current listener only.'), false)
     const languages = await f.json(await f.management('/languages'))
     for (const language of languages.items) {
       await f.json(
