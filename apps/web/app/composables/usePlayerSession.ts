@@ -26,7 +26,7 @@ export function usePlayerSession(
   const { t } = useInterfaceLocale()
   const credential = ref<string | null>(null)
   const session = shallowRef<ListenerSnapshot | null>(null)
-  const restoring = ref(false)
+  const restoring = ref(true)
   const restoreFailed = ref(false)
   const submitting = ref(false)
   const changingLanguage = ref(false)

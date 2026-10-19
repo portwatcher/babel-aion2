@@ -36,6 +36,20 @@ source readiness remains worker status, independently from the saved request.
 
 ## Room and character entry
 
+Share `/rooms/:roomId` directly. A valid listener session opens the room; absent,
+invalid or ended sessions go to `/rooms/:roomId/verify`. That page checks the
+character on the room's game server and returns to the same room after admission.
+No player account or Cloudflare login is required. Entry controls live only on
+verification; the room's listener panel, online members and map render only after
+session restoration or verified entry succeeds.
+
+The parent room route owns one listener controller across the verification and
+room pages. The transition preserves the session, nickname generation, socket
+and original-audio connection. A refresh validates the per-tab saved credential
+before revealing room content. Storage/network failures keep a recovery action;
+they do not trigger another entry or replacement generation. Leaving, removal,
+replacement and expiry stop delivery and return to explicit verification.
+
 Creation requires one of the current 20 Asia server slugs. The optional allowlist
 accepts one exact character ID per line, up to 200. Empty means all indexed
 characters on that server. IDs retain case and use NFC comparison.

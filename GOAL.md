@@ -118,6 +118,12 @@ nickname requirements below for community rooms. Previously stored rooms and leg
 new rooms are created only through Discord installation.
 
 - `/` lists community rooms; `/rooms/:roomId` is one independent broadcast room.
+  A shared room URL is a direct entry point. Restore an existing valid room
+  listener session; otherwise redirect to `/rooms/:roomId/verify` to verify a
+  game character. Successful verification returns to the original room without
+  creating another session. Do not require a player account or administrator
+  login. Ended sessions return to verification; temporary restoration failures
+  offer retry without treating the player as signed out.
 - A creator must choose an Asia game server. An optional list of up to 200 exact
   character IDs restricts admission. An empty list admits any indexed character
   on the selected server.
