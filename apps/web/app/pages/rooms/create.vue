@@ -14,7 +14,7 @@ const installation = shallowRef<{
   name: string
   server: string
   allowedIds: string[]
-  roomId: string | null
+  roomNumber: number | null
   channels: { id: string; name: string }[]
 } | null>(null)
 const busy = ref(false)
@@ -55,8 +55,8 @@ async function readInstallation() {
   errorKey.value = ''
   try {
     const result = await $fetch('/api/player/rooms/installation')
-    if (result.roomId) {
-      await navigateTo(`/rooms/${result.roomId}`)
+    if (result.roomNumber) {
+      await navigateTo(`/rooms/${result.roomNumber}`)
       return
     }
     installation.value = result
@@ -78,7 +78,7 @@ async function create() {
       method: 'POST',
       body: { voiceChannelId: voiceChannelId.value },
     })
-    await navigateTo(`/rooms/${result.roomId}`)
+    await navigateTo(`/rooms/${result.roomNumber}`)
   } catch (failure) {
     errorKey.value = playerErrorKey(failure)
   } finally {

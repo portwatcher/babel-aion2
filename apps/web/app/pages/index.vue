@@ -71,7 +71,7 @@ onBeforeUnmount(() => clearInterval(timer))
           }}</span>
           <Button
             as="a"
-            :href="`/rooms/${room.id}`"
+            :href="`/rooms/${room.number}`"
             :label="t('joinRoomLink')"
             :aria-label="`${t('joinRoomLink')} ${room.name}`"
             severity="secondary"
