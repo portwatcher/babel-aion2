@@ -273,7 +273,7 @@ onMounted(() => {
       <aside class="room-detail creation-notes" aria-labelledby="creation-notes-title">
         <h2 id="creation-notes-title">{{ t('creationInstructions') }}</h2>
         <ul>
-          <li v-if="audioSource === 'PLAYER'">{{ t('hostMicrophoneNote') }}</li>
+          <li v-if="audioSource === 'PLAYER'">{{ t('playerCaptureNote') }}</li>
           <li v-else>{{ t('installationPermissions') }}</li>
           <li>{{ t('broadcastConsent') }}</li>
         </ul>

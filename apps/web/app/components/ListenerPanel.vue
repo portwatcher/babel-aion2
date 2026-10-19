@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ListenerSnapshot, PublicRoomConfiguration } from '@babel/contracts'
 import { audioStatus } from '~/utils/audio-status'
+import type { useHostCapture } from '~/composables/useHostCapture'
 import type { SubtitlePresentation } from '~/utils/subtitle-view'
 const { t } = useInterfaceLocale()
 const props = defineProps<{
@@ -10,8 +11,7 @@ const props = defineProps<{
   audioState: string
   audioBlocked: boolean
   muted: boolean
-  microphone: 'off' | 'live' | 'blocked'
-  microphoneMuted: boolean
+  capture: ReturnType<typeof useHostCapture>
   busy: boolean
   changingLanguage: boolean
   subtitles: SubtitlePresentation
@@ -21,8 +21,6 @@ const emit = defineEmits<{
   language: [language: string | null]
   playAudio: []
   toggleMute: []
-  toggleMicrophone: []
-  reconnectAudio: []
 }>()
 const pip = useSubtitlePictureInPicture(
   () => `${props.session.sessionId}:${props.session.nicknameGeneration}`,
@@ -34,6 +32,13 @@ const textSizes = computed(() => [
   { label: t('textLarge'), value: 1.5 },
   { label: t('textExtraLarge'), value: 2 },
 ])
+const captureState = props.capture.state
+const captureStatus = {
+  idle: 'captureIdle',
+  live: 'captureLive',
+  blocked: 'captureBlocked',
+  silent: 'captureNoAudio',
+} as const
 const status = computed(() => {
   if (props.session.state === 'JOINING') {
     return t('waitingChannel')
@@ -42,13 +47,12 @@ const status = computed(() => {
   if (roomState !== 'LISTENING') {
     return t(audioStatus[roomState].description)
   }
-  if (props.microphone === 'blocked') {
-    return t('micBlocked')
+  if (captureState.value !== 'off') {
+    return captureState.value === 'live' && props.capture.muted.value
+      ? t('captureMuted')
+      : t(captureStatus[captureState.value])
   }
   if (props.audioState === 'connected') {
-    if (props.microphone === 'live') {
-      return props.microphoneMuted ? t('micMuted') : t('micLive')
-    }
     return t('audioConnected')
   }
   return props.audioState === 'unavailable'
@@ -84,19 +88,7 @@ const languageName = computed(
           @click="emit('playAudio')"
         />
         <Button
-          v-if="microphone === 'live'"
-          :label="microphoneMuted ? t('unmuteMic') : t('muteMic')"
-          severity="secondary"
-          :aria-pressed="microphoneMuted"
-          @click="emit('toggleMicrophone')"
-        />
-        <Button
-          v-else-if="microphone === 'blocked'"
-          :label="t('retryMic')"
-          @click="emit('reconnectAudio')"
-        />
-        <Button
-          v-else-if="audioState === 'connected'"
+          v-if="captureState === 'off' && audioState === 'connected'"
           :label="muted ? t('unmute') : t('mute')"
           severity="secondary"
           :aria-pressed="muted"
@@ -104,6 +96,7 @@ const languageName = computed(
         />
       </div>
     </div>
+    <HostCapture v-if="captureState !== 'off'" :capture="capture" />
     <ListenerSubtitleStatus
       :session="session"
       :connection-state="connectionState"
