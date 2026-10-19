@@ -148,7 +148,9 @@ onMounted(() => {
       <section class="entry-panel">
         <form v-if="!installation" class="entry-form" @submit.prevent="submit">
           <div class="field">
-            <span id="audio-source-label">{{ t('audioSource') }}</span>
+            <span id="audio-source-label" class="field-label">{{
+              t('audioSource')
+            }}</span>
             <SelectButton
               v-model="audioSource"
               :options="audioSources"

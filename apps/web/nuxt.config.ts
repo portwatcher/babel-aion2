@@ -1,9 +1,14 @@
-import Aura from '@primeuix/themes/aura'
+import { AbyssPreset } from './theme/abyss-preset'
 
 export default defineNuxtConfig({
   compatibilityDate: '2026-10-18',
   modules: ['@primevue/nuxt-module'],
-  css: ['~/assets/main.css', '~/assets/rooms.css'],
+  css: [
+    '@fontsource/cinzel/latin-600.css',
+    '@fontsource/cinzel/latin-700.css',
+    '~/assets/main.css',
+    '~/assets/rooms.css',
+  ],
   devtools: { enabled: false },
   typescript: { strict: true },
   build: { transpile: ['@babel/contracts'] },
@@ -30,6 +35,7 @@ export default defineNuxtConfig({
           content: 'Original commander audio and multilingual subtitles for AION2.',
         },
         { name: 'color-scheme', content: 'dark' },
+        { name: 'theme-color', content: '#0b0e1b' },
       ],
     },
   },
@@ -48,7 +54,9 @@ export default defineNuxtConfig({
     discordBotToken: '',
   },
   primevue: {
-    options: { theme: { preset: Aura, options: { darkModeSelector: '.babel-dark' } } },
+    options: {
+      theme: { preset: AbyssPreset, options: { darkModeSelector: '.babel-dark' } },
+    },
     components: {
       include: [
         'Button',

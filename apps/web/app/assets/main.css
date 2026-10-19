@@ -1,10 +1,33 @@
 :root {
   color-scheme: dark;
-  --babel-background: #111827;
-  --babel-surface: #182131;
-  --babel-border: #3b4658;
-  --babel-text: #f3f4f6;
-  --babel-muted: #c1cad8;
+  /* AION2 Abyss tokens; keep aligned with theme/abyss-preset.ts. */
+  --babel-void: #070912;
+  --babel-background: #0b0e1b;
+  --babel-surface: #131729;
+  --babel-surface-raised: #1a1f36;
+  --babel-border: #30364f;
+  --babel-gold: #d6ad55;
+  --babel-gold-bright: #ecd9a3;
+  --babel-gold-line: rgb(214 173 85 / 0.32);
+  --babel-aether: #8fe3ff;
+  --babel-rift: rgb(110 76 196 / 0.22);
+  --babel-text: #eef0f7;
+  --babel-heading: #f5ecd0;
+  --babel-muted: #b4bad0;
+  --babel-danger: #fca5a5;
+  --babel-display-font:
+    'Cinzel', 'Hiragino Mincho ProN', 'Songti SC', 'Noto Serif CJK SC', 'Yu Mincho',
+    'Nanum Myeongjo', serif;
+  /* Bright corner trim drawn over a panel's softer gold border. */
+  --babel-frame-trim:
+    linear-gradient(var(--babel-gold), var(--babel-gold)) top left / 16px 1px,
+    linear-gradient(var(--babel-gold), var(--babel-gold)) top left / 1px 16px,
+    linear-gradient(var(--babel-gold), var(--babel-gold)) top right / 16px 1px,
+    linear-gradient(var(--babel-gold), var(--babel-gold)) top right / 1px 16px,
+    linear-gradient(var(--babel-gold), var(--babel-gold)) bottom left / 16px 1px,
+    linear-gradient(var(--babel-gold), var(--babel-gold)) bottom left / 1px 16px,
+    linear-gradient(var(--babel-gold), var(--babel-gold)) bottom right / 16px 1px,
+    linear-gradient(var(--babel-gold), var(--babel-gold)) bottom right / 1px 16px;
   font-family: 'PingFang SC', 'Hiragino Sans', 'Microsoft YaHei', sans-serif;
   color: var(--babel-text);
   background: var(--babel-background);
@@ -17,6 +40,20 @@
 body {
   margin: 0;
   min-width: 320px;
+  min-height: 100svh;
+  background:
+    radial-gradient(ellipse 90% 50% at 50% -10%, var(--babel-rift), transparent 70%),
+    radial-gradient(
+      ellipse 60% 40% at 100% 110%,
+      rgb(214 173 85 / 0.07),
+      transparent 70%
+    ),
+    var(--babel-background);
+  background-attachment: fixed;
+}
+::selection {
+  background: rgb(214 173 85 / 0.35);
+  color: var(--babel-text);
 }
 a {
   color: var(--babel-text);
@@ -28,7 +65,7 @@ select {
   font: inherit;
 }
 :focus-visible {
-  outline: 2px solid #a7f3d0;
+  outline: 2px solid var(--babel-aether);
   outline-offset: 4px;
 }
 h1,
@@ -36,10 +73,17 @@ h2,
 p {
   margin: 0;
 }
+h1,
+h2,
+h3 {
+  font-family: var(--babel-display-font);
+  color: var(--babel-heading);
+}
 h1 {
   font-size: clamp(1.5rem, 1.25rem + 1vw, 2rem);
   line-height: 1.2;
-  font-weight: 650;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   text-wrap: balance;
   overflow-wrap: anywhere;
 }
@@ -63,21 +107,42 @@ small {
   padding-inline: clamp(16px, 4vw, 32px);
 }
 .site-header {
+  position: relative;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px 16px;
   padding-block: 16px;
-  border-bottom: 1px solid var(--babel-border);
+}
+.site-header::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--babel-gold) 20%,
+    var(--babel-gold) 80%,
+    transparent
+  );
+  opacity: 0.6;
 }
 .site-title {
-  font-size: 1.25rem;
-  font-weight: 650;
+  font-family: var(--babel-display-font);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--babel-gold);
   text-decoration: none;
+  text-shadow: 0 0 18px rgb(214 173 85 / 0.35);
 }
 .site-context {
   color: var(--babel-muted);
-  font-size: 0.875rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 .site-header nav {
   margin-inline-start: auto;
@@ -111,8 +176,10 @@ small {
   }
 }
 .eyebrow {
-  color: var(--babel-muted);
-  font-size: 0.875rem;
+  color: var(--babel-gold);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 .muted {
   color: var(--babel-muted);
@@ -123,11 +190,20 @@ small {
   gap: clamp(24px, 4vw, 48px);
   align-items: start;
 }
+.entry-panel,
+.management-confirmation {
+  background:
+    var(--babel-frame-trim),
+    linear-gradient(180deg, var(--babel-surface-raised), var(--babel-surface));
+  background-repeat: no-repeat;
+  border: 1px solid var(--babel-gold-line);
+  border-radius: 2px;
+  box-shadow:
+    inset 0 1px 0 rgb(236 217 163 / 0.06),
+    0 18px 40px -24px rgb(0 0 0 / 0.9);
+}
 .entry-panel {
   padding: clamp(16px, 3vw, 24px);
-  background: var(--babel-surface);
-  border: 1px solid var(--babel-border);
-  border-radius: 12px;
   min-width: 0;
 }
 .entry-panel:has(> .entry-form:only-child) {
@@ -141,9 +217,11 @@ small {
 .entry-form {
   gap: 20px;
 }
-.field label {
+.field label,
+.field-label {
   font-size: 0.875rem;
   font-weight: 600;
+  color: var(--babel-gold-bright);
 }
 .field .p-inputtext,
 .field .p-select,
@@ -152,7 +230,7 @@ small {
   min-height: 44px;
 }
 .form-error {
-  color: #fecaca;
+  color: var(--babel-danger);
   font-size: 0.875rem;
 }
 .form-error:empty {
@@ -202,8 +280,10 @@ small {
   align-content: start;
   min-height: 7rem;
   padding: 16px;
-  border-radius: 8px;
-  background: var(--babel-background);
+  border: 1px solid var(--babel-border);
+  border-inline-start: 2px solid var(--babel-gold);
+  border-radius: 2px;
+  background: var(--babel-void);
 }
 .subtitle-message {
   font-size: var(--subtitle-text-size, 1.25rem);
@@ -235,6 +315,7 @@ small {
 .listener-subtitles-compact {
   min-height: 0;
   padding: 0;
+  border: 0;
   background: none;
 }
 .listener-subtitles-compact .subtitle-message {
@@ -329,9 +410,6 @@ small {
   display: grid;
   gap: 16px;
   padding: 20px;
-  border: 1px solid var(--babel-border);
-  border-radius: 12px;
-  background: var(--babel-surface);
 }
 .room-detail {
   display: grid;
@@ -384,6 +462,7 @@ small {
   transform: translateY(-200%);
   padding: 12px 20px;
   background: var(--babel-surface);
+  border: 1px solid var(--babel-gold-line);
   z-index: 10;
 }
 .skip-link:focus {
