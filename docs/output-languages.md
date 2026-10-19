@@ -7,10 +7,9 @@ list. No credentials or languages are seeded.
 
 ## Administrator workflow
 
-1. Save a Soniox recognition candidate and a DeepL translation candidate in
-   **字幕服务配置**. The same candidate can be shared by several languages.
-2. Add an **输出语言** with a canonical BCP 47 code, a display name, both service
-   references, and a choice of whether to include enabled game terms.
+1. Save one **OpenAI API Key** in **OpenAI 字幕服务**. The same encrypted
+   configuration is used for recognition and every output language.
+2. Add an **输出语言** with a canonical BCP 47 code, a display name, the automatically selected OpenAI configuration, and a choice of whether to include enabled game terms.
 3. Use **验证样本路径** to select an authorized PCM WAV and inspect its source and
    translated text. The existing sample form and provider adapters handle it.
 4. Enable a language with a current sample proof and a ready worker. Reorder the
@@ -29,16 +28,15 @@ provider support. Only the actual selected provider path can test that support.
 
 The validation endpoint reads the language's stored service references, output
 code and terminology policy. Clients cannot substitute a provider or output code
-in the sample request. The normal bounded sample operation owns both provider
-test leases. Audio and text go to the selected official providers; requests may
+in the sample request. The normal bounded sample operation owns the referenced provider
+test leases (one lease when both references use the same key). Audio and text go to the selected official providers; requests may
 incur charges. See [sample limits](providers-and-languages.md#audio-sample-comparison).
 
 The stored result contains the check time, path version, provider IDs/versions,
 terminology catalog version when included, audio duration, stable-utterance
 count and a safe result code. It contains no audio, transcript, translated text,
 credential or provider error message. A successful proof requires at least one
-nonempty stable source utterance and completed translations for all nonempty
-utterances. It establishes that the sample path processed text, not translation
+nonempty completed source and translated display windows. It establishes that the sample path processed text, not translation
 accuracy, live latency, player authorization or game suitability.
 
 The latest attempt is separate from the last successful validation. A transient
@@ -77,7 +75,7 @@ Administration uses HTTP and private, noncacheable responses.
 
 Ordinary mutation bodies are limited to 32 KiB; sample JSON to 1,400,000 bytes.
 Unknown fields are rejected. Referenced configurations must exist and have the
-correct Soniox/DeepL roles. A provider cannot be deleted while any language,
+implemented OpenAI speech recognition/translation support. A provider cannot be deleted while any language,
 including a disabled language, references it. Deleting a language clears matching
 room defaults. The default uses the existing room field; no second default store
 is introduced and room/source configuration generations do not change.

@@ -11,6 +11,11 @@
   },
   "dependencies": {
     "@babel/contracts": "*",
+    "opencc-js": "1.4.2",
+    "ws": "^8.22.0",
     "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1"
   }
 }

@@ -73,7 +73,13 @@ const visible = computed(() =>
         }}
       </p>
       <details v-if="!compact">
-        <summary>原文{{ subtitle.sourceIsFinal ? '' : '（识别中）' }}</summary>
+        <summary>
+          {{
+            subtitle.sourceAlignment === 'independent'
+              ? '当前原文流（独立识别）'
+              : '原文'
+          }}{{ subtitle.sourceIsFinal ? '' : '（识别中）' }}
+        </summary>
         <p :lang="subtitle.sourceLanguage">{{ subtitle.originalText }}</p>
       </details>
       <small v-if="!compact && subtitle.discontinuity" class="muted"

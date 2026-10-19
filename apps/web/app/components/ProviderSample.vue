@@ -20,8 +20,8 @@ const emit = defineEmits<{
   validated: [value: ManagedLanguage]
 }>()
 const formId = useId()
-const recognitionId = ref<string | null>(null)
-const translationId = ref<string | null>(null)
+const recognitionId = computed(() => props.providers[0]?.id ?? null)
+const translationId = recognitionId
 const outputLanguage = ref('')
 const includeTerms = ref(true)
 const effectiveRecognition = computed(
@@ -35,12 +35,6 @@ const previewUrl = ref('')
 const running = ref(false)
 const error = ref('')
 const result = shallowRef<ProviderSampleResult | null>(null)
-const recognitionOptions = computed(() =>
-  props.providers.filter((value) => value.settings.type === 'soniox'),
-)
-const translationOptions = computed(() =>
-  props.providers.filter((value) => value.settings.type === 'deepl'),
-)
 let disposed = false
 
 function selectAudio(event: Event) {
@@ -83,7 +77,7 @@ async function preview() {
     (value) => value.id === effectiveTranslation.value,
   )
   if (!recognition || !translation || !audio.value || audio.value.size > 1_000_000) {
-    error.value = '请选择识别、翻译配置和不超过 1 MB 的音频样本。'
+    error.value = '请先保存 API Key，并选择不超过 1 MB 的音频样本。'
     return
   }
   let code: string
@@ -156,7 +150,8 @@ onBeforeUnmount(() => {
   <form class="entry-form provider-editor" @submit.prevent="preview">
     <h3>{{ path ? `验证样本路径：${path.name}` : '音频样本测试' }}</h3>
     <p class="muted">
-      使用已保存的识别与翻译配置处理一段授权样本，核对原文与译文。测试文字仅在此页展示，不会启用语言或发送给玩家。
+      使用已保存的 OpenAI API
+      Key处理一段授权样本，核对原文与译文。测试文字仅在此页展示，不会启用语言或发送给玩家。
     </p>
     <p v-if="path" class="muted">
       输出 {{ path.code }} ·
@@ -165,34 +160,10 @@ onBeforeUnmount(() => {
       }}。验证状态会保存到此语言配置。
     </p>
     <p class="muted">
-      音频会发送至 Soniox，识别文字会发送至
-      DeepL，识别修订可能触发多次翻译并产生服务费用。请选择获授权的样本；服务器不保存音频或测试文字。
+      音频会同时发送至 OpenAI
+      识别和目标语言翻译会话，并产生服务费用。请选择获授权的样本；服务器不保存音频或测试文字。
       处理期间会持续识别和翻译，结果在结束后显示。
     </p>
-    <div v-if="!path" class="field">
-      <label :for="`${formId}-recognition`">语音识别配置</label>
-      <Select
-        :input-id="`${formId}-recognition`"
-        v-model="recognitionId"
-        :options="recognitionOptions"
-        option-label="name"
-        option-value="id"
-        :disabled="disabled || running"
-        placeholder="选择 Soniox 候选"
-      />
-    </div>
-    <div v-if="!path" class="field">
-      <label :for="`${formId}-translation`">文本翻译配置</label>
-      <Select
-        :input-id="`${formId}-translation`"
-        v-model="translationId"
-        :options="translationOptions"
-        option-label="name"
-        option-value="id"
-        :disabled="disabled || running"
-        placeholder="选择 DeepL 候选"
-      />
-    </div>
     <div v-if="!path" class="field">
       <label :for="`${formId}-language`">样本输出语言代码</label>
       <InputText
@@ -237,7 +208,7 @@ onBeforeUnmount(() => {
       <label :for="`${formId}-terms`">使用已启用的游戏术语提示</label>
     </div>
     <small v-if="!path" class="muted"
-      >启用后，词表内容也会发送给识别和翻译服务。可关闭此项对比效果。<a
+      >启用后，词表仅用于识别提示，实时翻译不支持自定义词表。可关闭此项对比效果。<a
         href="#terms-title"
         >管理术语表</a
       ></small
@@ -274,7 +245,8 @@ onBeforeUnmount(() => {
       <ol class="sample-segments">
         <li v-for="segment in result.segments" :key="segment.utteranceId">
           <p class="muted">
-            {{ segment.isFinal ? '稳定原文' : '未稳定原文' }} ·
+            {{ segment.sourceAlignment === 'independent' ? '独立原文流' : '原文' }} ·
+            {{ segment.isFinal ? '已完成识别' : '识别中' }} ·
             {{ segment.language === 'und' ? '语言未识别' : segment.language }}
           </p>
           <p>{{ segment.text || '原文已撤回' }}</p>

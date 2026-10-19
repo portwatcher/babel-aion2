@@ -56,8 +56,8 @@ export class SpeakerSubtitles {
     })
     this.timer = setInterval(() => this.tick(), 20)
     this.timer.unref()
-    // Replace before the provider adapter's 295-minute safety cutoff.
-    this.rotation = setTimeout(() => this.finish(null), 290 * 60_000)
+    // Rotate before the provider session limit; the adapter also honors expires_at.
+    this.rotation = setTimeout(() => this.finish(null), 50 * 60_000)
     this.rotation.unref()
     void this.stream.ready
       .then(() => {
@@ -179,6 +179,7 @@ export class SpeakerSubtitles {
           sourceIsFinal: value.isFinal,
           translationIsFinal: value.translationIsFinal,
           configurationVersion: value.configurationVersion,
+          sourceAlignment: value.sourceAlignment,
           audioStartMs: value.audioStartMs,
           audioEndMs: value.audioEndMs,
           serverSentAt: new Date().toISOString(),

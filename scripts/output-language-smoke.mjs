@@ -17,7 +17,7 @@ const recognitionId = randomUUID()
 const translationId = randomUUID()
 const termId = randomUUID()
 const recognitionKey = network.credential('speech')
-const translationKey = network.credential()
+const translationKey = network.credential('speech')
 const audioBase64 = syntheticWave().toString('base64')
 const entry = {
   expectedVersion: 0,
@@ -109,16 +109,14 @@ try {
   const recognition = {
     name: 'Language fixture recognition',
     expectedVersion: 0,
-    settings: { type: 'soniox', model: 'stt-rt-v5', timeoutMs: 5_000 },
+    settings: { type: 'openai', timeoutMs: 5_000 },
     credential: recognitionKey,
   }
   const translation = {
     name: 'Language fixture translation',
     expectedVersion: 0,
     settings: {
-      type: 'deepl',
-      endpoint: 'https://api-free.deepl.com',
-      model: 'prefer_quality_optimized',
+      type: 'openai',
       timeoutMs: 5_000,
     },
     credential: translationKey,
@@ -136,14 +134,6 @@ try {
     ['und', entry],
     ['ja', { ...entry, name: 'bad\u200bname' }],
     ['ja', { ...entry, name: 'x'.repeat(81) }],
-    [
-      'ja',
-      {
-        ...entry,
-        recognitionConfigurationId: translationId,
-        translationConfigurationId: recognitionId,
-      },
-    ],
     ['ja', { ...entry, recognitionConfigurationId: randomUUID() }],
     ['ja', { ...entry, enabled: true }],
   ]) {
@@ -188,7 +178,7 @@ try {
     language.validation.terminologyVersion,
     validated.sample.terminology.version,
   )
-  assert.equal(language.validation.stableUtterances, 2)
+  assert.equal(language.validation.stableUtterances, 1)
   const proof = language.validation
   const unavailable = await value(
     await call('/zh-Hant/state', 'POST', {
@@ -217,7 +207,7 @@ try {
   )
   assert.equal(language.validationState, 'CURRENT')
   assert.equal(language.enabled, false)
-  network.setMode(translationKey, 'pass')
+  network.setMode(translationKey, 'speech')
   const renamed = await value(
     await call('/zh-Hant', 'PUT', {
       ...entry,

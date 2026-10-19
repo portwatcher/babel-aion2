@@ -39,13 +39,13 @@ The provider editor saves disabled candidates, performs explicit connection test
 and restores encrypted history as a new version. Candidate connection changes
 must pass a probe before replacing saved settings. Database leases prevent
 duplicate tests across replicas and version checks reject late results.
-The audio-sample form holds two candidate test leases while Soniox recognizes
-a bounded authorized PCM WAV and DeepL translates current utterance revisions.
-The result is restricted to the administrator and does not enable player delivery.
-The term editor persists a versioned catalog with source alternatives and separate
-output expressions. Sample processing reads one catalog snapshot, passes enabled
-entries as provider context, and checks the catalog revision before accepting a
-result. The original and translated text remain provider output.
+The audio-sample form holds the selected OpenAI configuration lease while a
+bounded authorized PCM WAV feeds original-caption recognition and direct-audio
+translation concurrently. Finite samples return their comparison after draining;
+player captions publish each fragment. The catalog's enabled source terms become
+recognition hints. Target expressions remain evaluation data because the realtime
+translator does not support custom prompts/glossaries. Independent source and
+translation streams are labeled accordingly; timestamps are not fabricated.
 The output-language editor stores provider references, terminology policy, order
 and a room default. Sample validation binds to the path and provider/catalog
 revisions; stale results cannot validate a replacement path. Last successful
@@ -114,17 +114,14 @@ stable administrator ID from the signed issuer and subject, saves the identity,
 and creates an HTTP-only session cookie. Player listener sessions use their own
 tables and are not Better Auth user accounts.
 
-`@babel/providers` implements bounded DeepL text requests and Soniox WebSocket
-recognition with provisional/final tokens, revisions, utterance endpoints and known
-sample-relative timestamps. Connection probes reuse these adapters. The sample
-comparison preserves PCM pauses and uses the shared streaming engine to translate
-while recognition continues. The engine shares recognition per source and
-translation work per output language, bounds pending revisions, cancels obsolete
-requests and releases unused lanes. Both adapters use fixed official destinations,
-safe error classifications and deadlines. The worker groups recognition by
-member/configuration/terminology and translates once per requested language.
-Current listener/source/configuration checks fence delivery and cancel obsolete
-work. See [streaming processing](streaming-subtitles.md).
+`@babel/providers` implements `gpt-live-transcribe` with minimal delay and one
+`gpt-realtime-translate` continuous audio session per active target language.
+Audio fans out in parallel, without serial transcript-to-translation requests.
+Every target delta publishes immediately. Recognition and targets share one
+server-only encrypted key, fixed official destinations, bounded socket/audio
+queues and safe errors. Current listener/source/configuration checks run in one
+database round trip before delivery and fence obsolete work. Main page and PiP
+consume the same incremental state. See [streaming processing](streaming-subtitles.md).
 See [provider configuration](providers-and-languages.md) for probe and sample limits.
 
 ## Next implementation gates

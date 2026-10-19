@@ -19,9 +19,7 @@ const credential = network.credential()
 const replacement = network.credential()
 const invalid = network.credential('invalid')
 const settings = {
-  type: 'deepl',
-  endpoint: 'https://api-free.deepl.com',
-  model: 'prefer_quality_optimized',
+  type: 'openai',
   timeoutMs: 5_000,
 }
 
@@ -224,18 +222,18 @@ try {
         path,
         'PUT',
         input(current, {
-          settings: { type: 'soniox', model: 'stt-rt-v5', timeoutMs: 5_000 },
+          settings: { type: 'unsupported', timeoutMs: 5_000 },
         }),
       )
     ).status,
-    409,
+    400,
   )
 
   // A second server shares the database lease. A late first response must not
   // overwrite a newer configuration after its persisted lease has expired.
   await pastCooldown()
   const second = await start()
-  const hold = network.hold(replacement)
+  const hold = network.hold(replacement, 'translation', true)
   const pending = request(server, auth, `${path}/test`, 'POST', {
     expectedVersion: current.version,
   })

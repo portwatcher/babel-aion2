@@ -15,16 +15,10 @@ const props = defineProps<{
 const emit = defineEmits<{ save: [code: string, input: LanguageSave]; cancel: [] }>()
 const code = ref(props.current?.code ?? '')
 const name = ref(props.current?.name ?? '')
-const recognitionId = ref(props.current?.recognitionConfigurationId ?? '')
-const translationId = ref(props.current?.translationConfigurationId ?? '')
+const recognitionId = computed(() => props.providers[0]?.id ?? '')
+const translationId = recognitionId
 const includeTerms = ref(props.current?.includeTerms ?? true)
 const error = ref('')
-const recognitionOptions = computed(() =>
-  props.providers.filter((row) => row.settings.type === 'soniox'),
-)
-const translationOptions = computed(() =>
-  props.providers.filter((row) => row.settings.type === 'deepl'),
-)
 onMounted(() =>
   document.getElementById(props.current ? 'output-name' : 'output-code')?.focus(),
 )
@@ -49,7 +43,7 @@ function save() {
     includeTerms: includeTerms.value,
   })
   if (!languageCodeSchema.safeParse(canonical).success || !input.success) {
-    error.value = '请检查语言代码、显示名称，并选择识别与翻译配置。'
+    error.value = '请检查语言代码、显示名称，并先保存 OpenAI API Key。'
     return
   }
   emit('save', canonical, input.data)
@@ -85,30 +79,6 @@ function save() {
           required
         />
       </div>
-      <div class="field">
-        <label for="output-recognition">语音识别服务</label>
-        <Select
-          input-id="output-recognition"
-          v-model="recognitionId"
-          :options="recognitionOptions"
-          option-label="name"
-          option-value="id"
-          :disabled="busy || current?.enabled"
-          placeholder="选择 Soniox 配置"
-        />
-      </div>
-      <div class="field">
-        <label for="output-translation">文本翻译服务</label>
-        <Select
-          input-id="output-translation"
-          v-model="translationId"
-          :options="translationOptions"
-          option-label="name"
-          option-value="id"
-          :disabled="busy || current?.enabled"
-          placeholder="选择 DeepL 配置"
-        />
-      </div>
     </div>
     <div class="check-field">
       <Checkbox
@@ -120,7 +90,7 @@ function save() {
       <label for="output-terms">使用已启用的游戏术语提示</label>
     </div>
     <small class="muted"
-      >保存后需用授权音频验证路径。启用术语提示时，词表内容也会发送给识别和翻译服务。</small
+      >保存后需用授权音频验证路径。启用术语提示时，词表仅用于识别提示；实时翻译模型暂不支持自定义词表。</small
     >
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <div class="management-actions">

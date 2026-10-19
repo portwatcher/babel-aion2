@@ -2,8 +2,7 @@ import {
   sampleSegmentSchema,
   type ProviderSampleResult,
   type SampleSegment,
-  type SonioxSettings,
-  type DeepLSettings,
+  type OpenAISettings,
   type TerminologySnapshot,
 } from '@babel/contracts'
 import { ProviderFailure } from './errors.ts'
@@ -11,8 +10,8 @@ import { sendPcmAudio, type PcmAudio } from './pcm.ts'
 import { openSharedSubtitleStream } from './subtitle-stream.ts'
 
 export async function previewSubtitleSample(input: {
-  recognition: { settings: SonioxSettings; credential: string; version: number }
-  translation: { settings: DeepLSettings; credential: string; version: number }
+  recognition: { settings: OpenAISettings; credential: string; version: number }
+  translation: { settings: OpenAISettings; credential: string; version: number }
   outputLanguage: string
   audio: PcmAudio
   terminology: TerminologySnapshot | null
@@ -37,6 +36,9 @@ export async function previewSubtitleSample(input: {
           version: input.translation.version,
         },
         (event) => {
+          if (event.type === 'failure') {
+            code = event.code
+          }
           if (event.type !== 'subtitle') {
             return
           }
@@ -47,6 +49,7 @@ export async function previewSubtitleSample(input: {
           segments.set(segment.utteranceId, segment)
         },
       )
+      await stream.prepare()
       await sendPcmAudio(stream, input.audio, deadline)
     } finally {
       stream.close()
@@ -54,7 +57,7 @@ export async function previewSubtitleSample(input: {
     const finalized = [...segments.values()].filter(
       (segment) => segment.isFinal && segment.text.trim(),
     )
-    if (!finalized.length) {
+    if (code === 'PASS' && !finalized.length) {
       code = 'NO_SPEECH'
     }
     for (const segment of segments.values()) {

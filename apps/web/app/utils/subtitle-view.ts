@@ -115,7 +115,10 @@ export class SubtitleView {
       items: [...this.speakers.values()]
         .sort((a, b) => b.order - a.order)
         .flatMap((speaker) =>
-          speaker.value && speaker.value.originalText.trim() ? [speaker.value] : [],
+          speaker.value &&
+          (speaker.value.originalText.trim() || speaker.value.translatedText.trim())
+            ? [speaker.value]
+            : [],
         )
         .slice(0, 2),
     }

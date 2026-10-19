@@ -144,7 +144,7 @@ export async function createLiveSubtitleFixture(mediaEnvironment = {}) {
         expectedVersion: 0,
         name: 'Synthetic recognition fixture',
         credential: recognitionKey,
-        settings: { type: 'soniox', model: 'stt-rt-v5', timeoutMs: 3_000 },
+        settings: { type: 'openai', timeoutMs: 3_000 },
       }),
     )
     await json(
@@ -153,9 +153,7 @@ export async function createLiveSubtitleFixture(mediaEnvironment = {}) {
         name: 'Synthetic translation fixture',
         credential: translationKey,
         settings: {
-          type: 'deepl',
-          endpoint: 'https://api-free.deepl.com',
-          model: 'prefer_quality_optimized',
+          type: 'openai',
           timeoutMs: 15_000,
         },
       }),

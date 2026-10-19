@@ -20,6 +20,7 @@ export const subtitleSchema = z.object({
   sourceIsFinal: z.boolean(),
   translationIsFinal: z.boolean(),
   configurationVersion: z.number().int().positive(),
+  sourceAlignment: z.enum(['aligned', 'independent']).optional(),
   audioStartMs: z.number().nonnegative().nullable(),
   audioEndMs: z.number().nonnegative().nullable(),
   serverSentAt: z.iso.datetime({ offset: true }),

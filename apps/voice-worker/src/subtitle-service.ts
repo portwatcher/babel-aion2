@@ -9,7 +9,7 @@ import type { CredentialCipher } from '@babel/database/credentials'
 import {
   readSubtitleListener,
   readSubtitlePaths,
-  subtitlePathCurrent,
+  subtitleDeliveryCurrent,
   type SubtitlePathStamp,
 } from '@babel/database/subtitles'
 import { RoomSubtitles } from './room-subtitles.ts'
@@ -149,6 +149,23 @@ export class SubtitleService {
     if (consumer.closed) {
       return
     }
+    // Replace an unsent revision of the same display window immediately. This
+    // bounds slow-client work without a debounce or an authorization cache.
+    if (event.message.type === 'subtitle') {
+      const incoming = event.message.value
+      consumer.queue = consumer.queue.filter((pending) => {
+        if (pending.message.type !== 'subtitle') {
+          return true
+        }
+        const previous = pending.message.value
+        return (
+          previous.speakerId !== incoming.speakerId ||
+          previous.streamGeneration !== incoming.streamGeneration ||
+          previous.configurationVersion !== incoming.configurationVersion ||
+          previous.sequence > incoming.sequence
+        )
+      })
+    }
     if (consumer.queue.length >= 16) {
       this.close(consumer)
       return
@@ -170,23 +187,28 @@ export class SubtitleService {
       if (!event || event.current?.() === false) {
         continue
       }
-      if (!(await readSubtitleListener(this.db, consumer.input))) {
-        this.close(consumer)
-        return
-      }
       if (event.message.type === 'subtitle') {
-        const value = event.message.value
-        if (
-          !event.stamp ||
-          !(await subtitlePathCurrent(
-            this.db,
-            value.roomId,
-            value.sourceGeneration,
-            event.stamp,
-          ))
-        ) {
+        if (!event.stamp) {
           continue
         }
+        const value = event.message.value
+        const permitted = await subtitleDeliveryCurrent(
+          this.db,
+          consumer.input,
+          value.roomId,
+          value.sourceGeneration,
+          event.stamp,
+        )
+        if (!permitted.listener) {
+          this.close(consumer)
+          return
+        }
+        if (!permitted.path) {
+          continue
+        }
+      } else if (!(await readSubtitleListener(this.db, consumer.input))) {
+        this.close(consumer)
+        return
       }
       if (consumer.closed || event.current?.() === false) {
         continue

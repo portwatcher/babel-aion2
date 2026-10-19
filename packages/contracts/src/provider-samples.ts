@@ -18,7 +18,6 @@ export const providerSampleRequestSchema = z
       .regex(/^[A-Za-z0-9+/]+={0,2}$/),
   })
   .strict()
-  .refine((value) => value.recognition.id !== value.translation.id)
 
 export const transcriptSchema = z.object({
   utteranceId: z.uuid(),
@@ -26,6 +25,7 @@ export const transcriptSchema = z.object({
   text: z.string().max(4096),
   language: z.string().min(2).max(35),
   isFinal: z.boolean(),
+  sourceAlignment: z.enum(['aligned', 'independent']).optional(),
   audioStartMs: z.number().nonnegative().nullable(),
   audioEndMs: z.number().nonnegative().nullable(),
 })

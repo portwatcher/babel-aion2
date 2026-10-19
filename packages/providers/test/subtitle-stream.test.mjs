@@ -1,421 +1,214 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { setTimeout } from 'node:timers/promises'
-import { openSharedSubtitleStream, readPcmWave } from '../src/index.ts'
+import {
+  openSharedSubtitleStream,
+  previewSubtitleSample,
+  readPcmWave,
+} from '../src/index.ts'
 import { sendPcmAudio } from '../src/pcm.ts'
 import { createProviderFixture } from '../../../scripts/fixtures/provider-server.mjs'
 import { routeProviderNetwork } from '../../../scripts/fixtures/provider-network.mjs'
 import { syntheticWave } from '../../../scripts/fixtures/audio-sample.mjs'
 
-async function until(predicate, message, timeout = 4_000) {
+const settings = { type: 'openai', timeoutMs: 3000 }
+const values = (events) =>
+  events.filter((event) => event.type === 'subtitle').map((event) => event.value)
+async function until(predicate, message, timeout = 4000) {
   const deadline = Date.now() + timeout
   while (!predicate() && Date.now() < deadline) {
-    await setTimeout(10)
+    await setTimeout(5)
   }
   assert.ok(predicate(), message)
 }
-const token = (text, is_final = false) => ({ text, is_final, language: 'en' })
-const values = (events) =>
-  events.filter((event) => event.type === 'subtitle').map((event) => event.value)
-const translated = (events) => values(events).filter((value) => value.translatedText)
-function path(network, code, key = network.credential('echo'), version = 1) {
-  return {
-    outputLanguage: code,
-    version,
-    credential: key,
-    settings: {
-      type: 'deepl',
-      endpoint: 'https://api-free.deepl.com',
-      model: 'prefer_quality_optimized',
-      timeoutMs: 15_000,
-    },
-  }
+async function fixture(t) {
+  const network = await createProviderFixture()
+  const restore = routeProviderNetwork(network.origin)
+  t.after(async () => {
+    restore()
+    await network.close()
+  })
+  return network
 }
-function source(network, key, signal) {
+function stream(network, key, terminology = null) {
   return openSharedSubtitleStream({
-    recognition: {
-      settings: { type: 'soniox', model: 'stt-rt-v5', timeoutMs: 3_000 },
-      credential: key,
-    },
-    sampleRate: 48_000,
-    terminology: null,
-    signal,
+    recognition: { settings, credential: key },
+    sampleRate: 48000,
+    terminology,
   })
 }
-async function manual(network, stream, key) {
-  await stream.ready
-  stream.write(new Uint8Array(1920), 0)
-  await until(
-    () =>
-      network.observations.some((value) => value.key === key && value.configuration),
-    'Recognition has accepted its configuration',
-  )
+function path(key, outputLanguage, version = 1) {
+  return { settings, credential: key, outputLanguage, version }
 }
-
-test('one recognition stream shares translations, preserves speech corrections, and keeps slow languages off audio input', async () => {
-  const network = await createProviderFixture()
-  const restore = routeProviderNetwork(network.origin)
-  const stream = source(network, network.credential('speech'))
-  const japanese = path(network, 'ja')
-  const korean = path(network, 'ko')
-  const hold = network.hold(japanese.credential)
+test('direct audio fans out by language and translated fragments appear before source finalization or audio end', async (t) => {
+  const network = await fixture(t)
+  const key = network.credential('speech')
+  const s = stream(network, key)
+  t.after(() => s.close())
   const a = [],
     b = [],
-    k = []
-  try {
-    stream.subscribe(japanese, (event) => a.push(event))
-    stream.subscribe(
-      {
-        credential: japanese.credential,
-        version: japanese.version,
-        settings: {
-          timeoutMs: 15_000,
-          model: 'prefer_quality_optimized',
-          endpoint: 'https://api-free.deepl.com',
-          type: 'deepl',
-        },
-        outputLanguage: 'ja',
-      },
-      (event) => b.push(event),
-    )
-    stream.subscribe(korean, (event) => k.push(event))
-    let complete = false
-    const sent = sendPcmAudio(
-      stream,
-      readPcmWave(syntheticWave()),
-      AbortSignal.timeout(12_000),
-    ).then(() => {
-      complete = true
-    })
-    await hold.started
-    await until(
-      () => translated(k).length === 2,
-      'Korean finishes independently of the held Japanese request',
-    )
-    await until(
-      () => network.observations.find((value) => value.protocol === 'soniox')?.end,
-      'All audio reaches recognition while Japanese is still held',
-    )
-    assert.equal(complete, false)
-    const recognition = network.observations.filter(
-      (value) => value.protocol === 'soniox',
-    )
-    assert.equal(recognition.length, 1)
-    assert.equal(recognition[0].frames.length, 50)
-    assert.equal(translated(a).length, 0)
-    hold.release()
-    await sent
-    assert.deepEqual(a, b, 'Same-language subscribers receive the same revisions')
-    for (const [events, target] of [
-      [a, 'JA'],
-      [k, 'KO'],
-    ]) {
-      assert.deepEqual(
-        translated(events).map((value) => [
-          value.text,
-          value.translatedText,
-          value.sequence,
-          value.translationIsFinal,
-        ]),
-        [
-          ['Do not attack', `fixture:${target}:Do not attack`, 1, true],
-          ['Wait 3 seconds.', `fixture:${target}:Wait 3 seconds.`, 2, true],
-        ],
-      )
-      assert.equal(
-        network.observations.filter((value) => value.body?.target_lang === target)
-          .length,
-        2,
-        'Jobs scale with language, not subscriber count',
-      )
-    }
-  } finally {
-    stream.close()
-    restore()
-    await network.close()
-  }
-})
-
-test('revisions, retractions and path replacement discard obsolete HTTP results without restarting recognition', async () => {
-  const network = await createProviderFixture()
-  const restore = routeProviderNetwork(network.origin)
-  const recognitionKey = network.credential()
-  const stream = source(network, recognitionKey)
-  const original = path(network, 'ja')
-  const events = []
-  try {
-    stream.subscribe(original, (event) => events.push(event))
-    await manual(network, stream, recognitionKey)
-    const old = network.hold(original.credential)
-    network.transcript(recognitionKey, [token('Attack')])
-    await old.started
-    network.transcript(recognitionKey, [token('Do not attack')])
-    await until(
-      () =>
-        network.observations.filter((value) => value.protocol === 'deepl').length === 2,
-      'A correction replaces in-flight provisional work',
-    )
-    assert.equal(
-      network.observations.find((value) => value.body?.text[0] === 'Attack').closed,
-      true,
-    )
-    old.release()
-    await until(
-      () => translated(events).length === 1,
-      'Only the current correction becomes translated text',
-    )
-    assert.equal(translated(events)[0].translatedText, 'fixture:JA:Do not attack')
-    assert.equal(translated(events)[0].translationIsFinal, false)
-    network.transcript(recognitionKey, [
-      token('Do not attack', true),
-      token('<end>', true),
-    ])
-    await until(
-      () => translated(events).at(-1)?.translationIsFinal,
-      'Finality updates without translating identical text again',
-    )
-    assert.equal(
-      network.observations.filter((value) => value.protocol === 'deepl').length,
-      2,
-    )
-
-    const withdrawn = network.hold(original.credential)
-    network.transcript(recognitionKey, [token('Retreat')])
-    await withdrawn.started
-    network.transcript(recognitionKey, [])
-    await until(
-      () => values(events).at(-1)?.text === '',
-      'A retraction immediately clears the current source and translation',
-    )
-    assert.equal(values(events).at(-1).translatedText, '')
-    await until(
-      () =>
-        network.observations.find((value) => value.body?.text[0] === 'Retreat')?.closed,
-      'Retracted work is cancelled',
-    )
-    withdrawn.release()
-
-    const obsolete = network.hold(original.credential)
-    network.transcript(recognitionKey, [token('Old order')])
-    await obsolete.started
-    const next = path(network, 'ja', network.credential('echo'), 2)
-    stream.replaceOutput(next)
-    const reset = events.findIndex((event) => event.type === 'reset')
-    assert.ok(reset >= 0)
-    network.transcript(recognitionKey, [token('Wait', true), token('<end>', true)])
-    await until(
-      () => translated(events).at(-1)?.text === 'Wait',
-      'New configuration accepts only current speech',
-    )
-    obsolete.release()
-    await stream.end()
+    korean = []
+  s.subscribe(path(key, 'ja'), (event) => a.push(event))
+  s.subscribe(path(key, 'ja'), (event) => b.push(event))
+  s.subscribe(path(key, 'ko'), (event) => korean.push(event))
+  await s.prepare()
+  const sent = sendPcmAudio(s, readPcmWave(syntheticWave()), AbortSignal.timeout(8000))
+  await until(
+    () => values(a).some((value) => value.translatedText.includes('Wait 3 seconds.')),
+    'incremental translation before audio finishes',
+  )
+  const connections = network.observations
+  assert.equal(
+    connections.filter((value) => value.protocol === 'recognition').length,
+    1,
+  )
+  assert.equal(
+    connections.filter((value) => value.protocol === 'translation').length,
+    2,
+  )
+  assert.ok(connections.every((value) => value.frames.length < 50))
+  assert.ok(values(a).some((value) => value.translatedText && !value.isFinal))
+  assert.ok(
+    values(a).some((value) => value.translatedText && !value.translationIsFinal),
+  )
+  await sent
+  assert.deepEqual(a, b)
+  assert.ok(
+    values(korean).some(
+      (value) => value.translatedText === 'fixture:ko:Wait 3 seconds.',
+    ),
+  )
+  assert.ok(
+    values(a).at(-1).translationIsFinal,
+    'session.closed flushes the last caption',
+  )
+  assert.ok(
+    values(a).every(
+      (value) =>
+        value.sourceAlignment === 'independent' &&
+        value.audioStartMs === null &&
+        value.audioEndMs === null,
+    ),
+  )
+  for (const connection of connections) {
+    assert.equal(connection.frames.length, 50)
     assert.ok(
-      values(events.slice(reset)).every((value) => value.configurationVersion === 2),
+      connection.frames.every((frame) => frame.bytes === 960),
+      'all endpoints receive 24 kHz 20 ms PCM',
     )
-    assert.deepEqual(
-      translated(events.slice(reset)).map((value) => value.translatedText),
-      ['fixture:JA:Wait'],
-    )
-    assert.equal(
-      network.observations.filter((value) => value.protocol === 'soniox').length,
-      1,
-    )
-    assert.equal(
-      translated(events).some((value) =>
-        ['Attack', 'Retreat', 'Old order'].includes(value.text),
-      ),
-      false,
-    )
-  } finally {
-    stream.close()
-    restore()
-    await network.close()
-  }
-})
-
-test('new subscribers receive no queued history and unused streams are released after the grace period', async () => {
-  const network = await createProviderFixture()
-  const restore = routeProviderNetwork(network.origin)
-  const recognitionKey = network.credential()
-  const stream = source(network, recognitionKey)
-  const output = path(network, 'ja')
-  const first = [],
-    late = []
-  try {
-    const leaveFirst = stream.subscribe(output, (event) => first.push(event))
-    await manual(network, stream, recognitionKey)
-    const hold = network.hold(output.credential)
-    network.transcript(recognitionKey, [
-      token('Before entry', true),
-      token('<end>', true),
-    ])
-    await hold.started
-    const leaveLate = stream.subscribe(output, (event) => late.push(event))
-    hold.release()
-    await until(
-      () => translated(first).length === 1,
-      'The existing subscriber receives its command',
-    )
-    assert.deepEqual(
-      late,
-      [],
-      'Neither cached nor in-flight earlier commands are replayed to a new subscriber',
-    )
-    leaveFirst()
-    network.transcript(recognitionKey, [
-      token('After entry', true),
-      token('<end>', true),
-    ])
-    await until(
-      () => translated(late).length === 1,
-      'The remaining subscriber receives new speech',
-    )
-    assert.equal(translated(first).length, 1)
-    leaveLate()
-    await assert.rejects(stream.finished, (error) => error.code === 'UNAVAILABLE')
-    await until(
-      () => network.observations.find((value) => value.protocol === 'soniox')?.closed,
-      'The unused recognition connection actually closes',
-    )
-  } finally {
-    stream.close()
-    restore()
-    await network.close()
-  }
-})
-
-test('recognition failure cancels old translation and a new source cannot publish its late results', async () => {
-  const network = await createProviderFixture()
-  const restore = routeProviderNetwork(network.origin)
-  const oldKey = network.credential()
-  const old = source(network, oldKey)
-  let next
-  const output = path(network, 'ja')
-  const oldEvents = [],
-    nextEvents = []
-  try {
-    old.subscribe(output, (event) => oldEvents.push(event))
-    await manual(network, old, oldKey)
-    const hold = network.hold(output.credential)
-    network.transcript(oldKey, [token('Old generation', true), token('<end>', true)])
-    await hold.started
-    network.disconnect(oldKey)
-    await assert.rejects(old.finished, (error) => error.code === 'INVALID_RESPONSE')
-    await until(
-      () =>
-        network.observations.find((value) => value.body?.text[0] === 'Old generation')
-          ?.closed,
-      'Source failure cancels its actual HTTP request',
-    )
-    const nextKey = network.credential()
-    next = source(network, nextKey)
-    next.subscribe(path(network, 'ja'), (event) => nextEvents.push(event))
-    await manual(network, next, nextKey)
-    network.transcript(nextKey, [
-      token('Current generation', true),
-      token('<end>', true),
-    ])
-    hold.release()
-    await next.end()
-    assert.equal(translated(oldEvents).length, 0)
-    assert.deepEqual(
-      oldEvents.filter((event) => event.type === 'failure'),
-      [{ type: 'failure', code: 'INVALID_RESPONSE' }],
-    )
-    assert.deepEqual(
-      translated(nextEvents).map((value) => value.translatedText),
-      ['fixture:JA:Current generation'],
-    )
-  } finally {
-    old.close()
-    next?.close()
-    restore()
-    await network.close()
-  }
-})
-
-test('cancellation still bounds translation after recognition has already finished', async () => {
-  const network = await createProviderFixture()
-  const restore = routeProviderNetwork(network.origin)
-  const cancellation = new AbortController()
-  const recognitionKey = network.credential()
-  const stream = source(network, recognitionKey, cancellation.signal)
-  const output = path(network, 'ja')
-  const events = []
-  try {
-    stream.subscribe(output, (event) => events.push(event))
-    await manual(network, stream, recognitionKey)
-    const hold = network.hold(output.credential)
-    network.transcript(recognitionKey, [token('Wait', true), token('<end>', true)])
-    await hold.started
-    const finished = stream.end()
-    void finished.catch(() => {})
-    await until(
-      () => network.observations.find((value) => value.protocol === 'soniox')?.closed,
-      'Recognition is already complete before the deadline expires',
-    )
-    cancellation.abort()
-    await assert.rejects(
-      Promise.race([
-        finished,
-        setTimeout(500).then(() => {
-          throw new Error('Cancellation left translation running')
-        }),
-      ]),
-      (error) => error.code === 'TIMEOUT',
-    )
-    await until(
-      () => network.observations.find((value) => value.protocol === 'deepl')?.closed,
-      'The total deadline cancels the actual translation request',
-    )
-    hold.release()
-    assert.equal(translated(events).length, 0)
-  } finally {
-    stream.close()
-    restore()
-    await network.close()
-  }
-})
-
-test('a full translation queue discards old work, marks discontinuity and retains bounded current commands', async () => {
-  const network = await createProviderFixture()
-  const restore = routeProviderNetwork(network.origin)
-  const recognitionKey = network.credential()
-  const stream = source(network, recognitionKey)
-  const output = path(network, 'ja')
-  const events = []
-  try {
-    stream.subscribe(output, (event) => events.push(event))
-    await manual(network, stream, recognitionKey)
-    const hold = network.hold(output.credential)
-    network.transcript(recognitionKey, [token('Obsolete', true), token('<end>', true)])
-    await hold.started
-    network.transcript(
-      recognitionKey,
-      Array.from({ length: 40 }, (_, index) => [
-        token(`Command ${index}`, true),
-        token('<end>', true),
-      ]).flat(),
-    )
-    await until(
-      () => values(events).some((value) => value.discontinuity),
-      'Dropping queued commands is explicitly signalled',
-    )
-    hold.release()
-    await stream.end()
-    const results = translated(events)
-    assert.equal(results.length, 32)
-    assert.deepEqual(
-      results.map((value) => value.text),
-      Array.from({ length: 32 }, (_, index) => `Command ${index + 8}`),
-    )
-    assert.equal(results.at(-1).sequence, 41)
     assert.ok(
-      network.observations.filter((value) => value.protocol === 'deepl').length <= 33,
+      connection.frames.some((frame) => frame.silence),
+      'actual silence survives resampling',
     )
-  } finally {
-    stream.close()
-    restore()
-    await network.close()
   }
+})
+test('slow or failed translations never delay recognition or another output language', async (t) => {
+  const network = await fixture(t)
+  const sourceKey = network.credential('speech'),
+    japaneseKey = network.credential('speech'),
+    koreanKey = network.credential('speech')
+  const hold = network.hold(japaneseKey)
+  const s = stream(network, sourceKey)
+  t.after(() => s.close())
+  const japanese = [],
+    korean = []
+  s.subscribe(path(japaneseKey, 'ja'), (event) => japanese.push(event))
+  s.subscribe(path(koreanKey, 'ko'), (event) => korean.push(event))
+  await s.prepare()
+  const sent = sendPcmAudio(s, readPcmWave(syntheticWave()), AbortSignal.timeout(8000))
+  await hold.started
+  await until(
+    () => values(korean).some((value) => value.translatedText),
+    'other language streams while Japanese is held',
+  )
+  await until(
+    () =>
+      network.observations
+        .filter((value) => value.protocol === 'recognition')
+        .some((value) => value.frames.length === 50),
+    'audio finishes while Japanese is still held',
+  )
+  assert.ok(values(japanese).every((value) => !value.translatedText))
+  hold.release()
+  await sent
+})
+test('target changes fence obsolete sockets and equal timestamps do not discard distinct deltas', async (t) => {
+  const network = await fixture(t)
+  const key = network.credential()
+  const s = stream(network, key)
+  t.after(() => s.close())
+  const events = []
+  s.subscribe(path(key, 'ja'), (event) => events.push(event))
+  await s.prepare()
+  const output = network.observations.find((value) => value.protocol === 'translation')
+  const delta = (event_id, text) => ({
+    type: 'session.output_transcript.delta',
+    event_id,
+    delta: text,
+    elapsed_ms: 200,
+  })
+  network.emit(key, delta('one', 'Do '), output)
+  network.emit(key, delta('two', 'not attack.'), output)
+  network.emit(key, delta('two', 'not attack.'), output)
+  await until(
+    () => values(events).at(-1)?.translatedText === 'Do not attack.',
+    'append exact fragments and deduplicate event IDs only',
+  )
+  s.replaceOutput(path(key, 'ja', 2))
+  await until(
+    () =>
+      network.observations.filter((value) => value.protocol === 'translation')
+        .length === 2,
+    'replacement connected',
+  )
+  const replacement = network.observations
+    .filter((value) => value.protocol === 'translation')
+    .at(-1)
+  await until(() => replacement.configuration, 'new target configured')
+  network.emit(key, delta('new', 'Retreat.'), replacement)
+  await until(
+    () => values(events).at(-1)?.translatedText === 'Retreat.',
+    'only new configuration is delivered',
+  )
+  assert.equal(values(events).at(-1).configurationVersion, 2)
+  await assert.rejects(async () => s.subscribe(path(key, 'unsupported'), () => {}), {
+    code: 'INVALID_CONFIGURATION',
+  })
+})
+test('sample processing uses the same direct streaming path and hints apply only to recognition', async (t) => {
+  const network = await fixture(t)
+  const key = network.credential('speech')
+  const term = {
+    sourceTerm: 'TestSkill',
+    sourceLanguage: 'en',
+    alternatives: ['TS'],
+    category: 'skill',
+    context: 'Synthetic test term',
+    expressions: [{ language: 'ja', text: 'テスト' }],
+  }
+  const result = await previewSubtitleSample({
+    recognition: { settings, credential: key, version: 1 },
+    translation: { settings, credential: key, version: 1 },
+    outputLanguage: 'ja',
+    audio: readPcmWave(syntheticWave()),
+    terminology: { version: 1, terms: [term] },
+  })
+  assert.equal(result.code, 'PASS')
+  const recognition = network.observations.find(
+    (value) => value.protocol === 'recognition',
+  )
+  const translation = network.observations.find(
+    (value) => value.protocol === 'translation',
+  )
+  assert.deepEqual(recognition.configuration.audio.input.transcription.keywords, [
+    'TestSkill',
+    'TS',
+  ])
+  assert.deepEqual(
+    translation.configuration,
+    { audio: { output: { language: 'ja' } } },
+    'no unsupported translation prompt or glossary is sent',
+  )
+  assert.equal(result.segments.at(-1).translationTermCount, 0)
+  assert.ok(result.segments.at(-1).translationIsFinal)
 })

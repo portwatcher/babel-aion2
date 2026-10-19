@@ -1,8 +1,5 @@
 import { setTimeout } from 'node:timers/promises'
-import type { SonioxSettings, Transcript } from '@babel/contracts'
-import { openSonioxStream } from './soniox-stream.ts'
 import { ProviderFailure } from './errors.ts'
-import type { RecognitionContext } from './terminology.ts'
 
 export interface PcmAudio {
   data: Uint8Array
@@ -70,27 +67,6 @@ export function readPcmWave(bytes: Uint8Array): PcmAudio {
     throw invalid()
   }
   return { data, sampleRate, durationMs }
-}
-
-export async function transcribePcm(
-  settings: SonioxSettings,
-  credential: string,
-  audio: PcmAudio,
-  onTranscript: (value: Transcript) => void,
-  signal: AbortSignal,
-  context?: RecognitionContext,
-) {
-  const stream = openSonioxStream(settings, credential, {
-    sampleRate: audio.sampleRate,
-    onTranscript,
-    signal,
-    context,
-  })
-  try {
-    return await sendPcmAudio(stream, audio, signal)
-  } finally {
-    stream.close()
-  }
 }
 
 export async function sendPcmAudio<T>(

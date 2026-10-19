@@ -1,40 +1,43 @@
-// Test-process routing only: production keeps fixed official destinations and
-// has no alternate endpoint setting. Exercise actual local HTTP/WS transport.
+import http from 'node:http'
+import https from 'node:https'
+import { syncBuiltinESMExports } from 'node:module'
+
+// Test-process routing only. Exercise the real ws handshake, framing, headers
+// and loopback sockets without introducing a production endpoint override.
 export function routeProviderNetwork(origin) {
   const local = new URL(origin)
   if (local.hostname !== '127.0.0.1' || local.protocol !== 'http:') {
     throw new Error('Provider fixture must listen on loopback')
   }
-  const networkFetch = globalThis.fetch
-  const NetworkWebSocket = globalThis.WebSocket
-  globalThis.fetch = (input, options) => {
-    const url = input instanceof Request ? input.url : String(input)
+  const request = https.request
+  https.request = function (options, callback) {
     if (
-      [
-        'https://api.deepl.com/v2/translate',
-        'https://api-free.deepl.com/v2/translate',
-      ].includes(url)
+      options &&
+      typeof options === 'object' &&
+      (options.hostname ?? options.host) === 'api.openai.com'
     ) {
-      return networkFetch(`${origin}/v2/translate`, options)
-    }
-    return networkFetch(input, options)
-  }
-  globalThis.WebSocket = class extends NetworkWebSocket {
-    constructor(url, protocols) {
-      super(
-        String(url) === 'wss://stt-rt.soniox.com/transcribe-websocket'
-          ? `${origin.replace('http:', 'ws:')}/transcribe-websocket`
-          : url,
-        protocols,
+      return http.request(
+        {
+          ...options,
+          protocol: 'http:',
+          hostname: local.hostname,
+          host: local.hostname,
+          port: local.port,
+          agent: undefined,
+          createConnection: undefined,
+          defaultPort: Number(local.port),
+        },
+        callback,
       )
     }
+    return request.call(this, options, callback)
   }
+  syncBuiltinESMExports()
   return () => {
-    globalThis.fetch = networkFetch
-    globalThis.WebSocket = NetworkWebSocket
+    https.request = request
+    syncBuiltinESMExports()
   }
 }
-
 if (process.env.BABEL_TEST_PROVIDER_ORIGIN) {
   routeProviderNetwork(process.env.BABEL_TEST_PROVIDER_ORIGIN)
 }

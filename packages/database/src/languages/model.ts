@@ -78,7 +78,7 @@ export async function pathReferences(
   const ids = [path.recognitionConfigurationId, path.translationConfigurationId].filter(
     (id): id is string => Boolean(id),
   )
-  if (new Set(ids).size !== 2) {
+  if (!ids.length) {
     throw new LanguageConfigurationError('INVALID_PATH')
   }
   const rows = await tx
@@ -92,10 +92,10 @@ export async function pathReferences(
     .orderBy(asc(providerConfiguration.id))
     .for('share')
   const recognition = rows.find(
-    (row) => row.id === path.recognitionConfigurationId && row.type === 'soniox',
+    (row) => row.id === path.recognitionConfigurationId && row.type === 'openai',
   )
   const translation = rows.find(
-    (row) => row.id === path.translationConfigurationId && row.type === 'deepl',
+    (row) => row.id === path.translationConfigurationId && row.type === 'openai',
   )
   if (!recognition || !translation) {
     throw new LanguageConfigurationError('INVALID_PATH')

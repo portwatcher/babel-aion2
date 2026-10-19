@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { setTimeout } from 'node:timers/promises'
 import { Pool } from 'pg'
 import { createManagementFixture } from './management-fixture.mjs'
@@ -18,7 +18,7 @@ const termId = randomUUID()
 const disabledTermId = randomUUID()
 const largeTermId = randomUUID()
 const recognitionKey = network.credential('speech')
-const translationKey = network.credential()
+const translationKey = network.credential('speech')
 const wave = syntheticWave()
 const path = '/api/management/providers/sample'
 const input = {
@@ -99,16 +99,14 @@ try {
   const recognition = {
     name: '样本识别',
     expectedVersion: 0,
-    settings: { type: 'soniox', model: 'stt-rt-v5', timeoutMs: 5_000 },
+    settings: { type: 'openai', timeoutMs: 5_000 },
     credential: recognitionKey,
   }
   const translation = {
     name: '样本翻译',
     expectedVersion: 0,
     settings: {
-      type: 'deepl',
-      endpoint: 'https://api-free.deepl.com',
-      model: 'prefer_quality_optimized',
+      type: 'openai',
       timeoutMs: 5_000,
     },
     credential: translationKey,
@@ -224,74 +222,39 @@ try {
     version: disabledTerm.version,
     recognitionTermCount: 1,
   })
-  assert.deepEqual(
-    preview.segments.map((segment) => segment.text),
-    ['Do not attack', 'Wait 3 seconds.'],
-  )
-  assert.equal(
+  assert.equal(preview.segments.at(-1).text, 'Wait 3 seconds.')
+  assert.ok(preview.segments.at(-1).isFinal)
+  assert.ok(preview.segments.at(-1).translationIsFinal)
+  assert.equal(preview.segments.at(-1).translatedText, 'fixture:zh:Wait 3 seconds.')
+  assert.ok(
     preview.segments.every(
-      (segment) => segment.isFinal && segment.translationRevision === 1,
+      (segment) =>
+        segment.sourceAlignment === 'independent' &&
+        segment.audioStartMs === null &&
+        segment.audioEndMs === null,
     ),
-    true,
   )
-  assert.ok(
-    preview.segments[0].revision >= 3,
-    'Corrected source replaces earlier hypotheses',
+  const audioRequest = network.observations.find(
+    (value) => value.protocol === 'recognition',
   )
-  assert.notEqual(preview.segments[0].utteranceId, preview.segments[1].utteranceId)
-  assert.equal(preview.segments[0].audioStartMs, 0)
-  assert.equal(preview.segments[0].audioEndMs, 320)
-  assert.equal(preview.segments[1].audioStartMs, null)
-  assert.equal(preview.segments[1].audioEndMs, null)
-  assert.deepEqual(
-    preview.segments.map((segment) => segment.translatedText),
-    ['fixture:ZH-HANT', 'fixture:ZH-HANT'],
-  )
-  const audioRequest = network.observations.find((value) => value.protocol === 'soniox')
-  assert.deepEqual(audioRequest.configuration.context.terms, ['attack', 'engage'])
-  assert.equal(
-    'translation_terms' in audioRequest.configuration.context,
-    false,
-    'Recognition uses source terms independently of the output language',
-  )
-  assert.equal(
-    audioRequest.audioDigest,
-    createHash('sha256').update(wave.subarray(44)).digest('hex'),
-  )
-  assert.ok(
-    audioRequest.elapsedMs >= 900,
-    'Pace audio instead of compressing the sample timeline',
-  )
+  assert.deepEqual(audioRequest.configuration.audio.input.transcription.keywords, [
+    'attack',
+    'engage',
+  ])
+  assert.equal(audioRequest.frames.length, 50)
+  assert.ok(audioRequest.frames.every((frame) => frame.bytes === 960))
   assert.ok(
     audioRequest.frames.some((frame) => frame.silence) &&
       audioRequest.frames.some((frame) => !frame.silence),
   )
   const translations = network.observations.filter(
-    (value) => value.protocol === 'deepl',
+    (value) => value.protocol === 'translation',
   )
-  assert.deepEqual(
-    translations.map((value) => value.body.text),
-    [['Do not attack'], ['Wait 3 seconds.']],
-  )
-  assert.ok(
-    translations.every(
-      (value) =>
-        value.body.source_lang === 'EN' && value.body.target_lang === 'ZH-HANT',
-    ),
-  )
-  for (const translated of translations) {
-    const context = JSON.parse(translated.body.context)
-    assert.deepEqual(context.terminology, [
-      {
-        source: 'attack',
-        alternatives: ['engage'],
-        output: '測試攻擊',
-        category: 'Fixture-only action',
-        context: 'Local fixture, not confirmed game vocabulary.',
-      },
-    ])
-  }
-  assert.ok(preview.segments.every((segment) => segment.translationTermCount === 1))
+  assert.equal(translations.length, 1, 'One continuous audio connection per target')
+  assert.deepEqual(translations[0].configuration, {
+    audio: { output: { language: 'zh' } },
+  })
+  assert.ok(preview.segments.every((segment) => segment.translationTermCount === 0))
   const saved = (
     await pool.query(
       'select enabled, last_test from provider_configuration where id = any($1::uuid[])',
@@ -314,24 +277,27 @@ try {
   assert.ok(
     network.observations
       .slice(beforeOptOut)
-      .every((observation) =>
-        observation.protocol === 'soniox'
-          ? observation.configuration.context === undefined
-          : observation.body.context === undefined,
+      .every(
+        (observation) =>
+          observation.protocol !== 'recognition' ||
+          observation.configuration.audio.input.transcription.keywords === undefined,
       ),
   )
 
   await pastCooldown()
   network.setMode(recognitionKey, 'pass')
+  network.setMode(translationKey, 'pass')
   const beforeSilence = network.observations.filter(
-    (value) => value.protocol === 'deepl',
+    (value) => value.protocol === 'translation',
   ).length
   const silence = await result(await request(server, auth, path))
   assert.equal(silence.code, 'NO_SPEECH')
-  assert.equal(silence.segments.length, 0)
+  assert.ok(
+    silence.segments.every((segment) => !segment.text && !segment.translatedText),
+  )
   assert.equal(
-    network.observations.filter((value) => value.protocol === 'deepl').length,
-    beforeSilence,
+    network.observations.filter((value) => value.protocol === 'translation').length,
+    beforeSilence + 1,
   )
   await pastCooldown()
   network.setMode(recognitionKey, 'speech')
@@ -345,7 +311,7 @@ try {
   )
 
   await pastCooldown()
-  network.setMode(translationKey, 'pass')
+  network.setMode(translationKey, 'speech')
   const termHold = network.hold(translationKey)
   const pendingTerms = request(server, auth, path)
   await Promise.race([
@@ -403,7 +369,7 @@ try {
   // The sample owns two configuration test slots. Validate the whole snapshot
   // after network work, including a configuration replaced after lease expiry.
   await pastCooldown()
-  network.setMode(translationKey, 'pass')
+  network.setMode(translationKey, 'speech')
   const hold = network.hold(translationKey)
   const pending = request(server, auth, path)
   await Promise.race([
