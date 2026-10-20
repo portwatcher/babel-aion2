@@ -38,3 +38,18 @@ export async function readBoundedJson(
     throw new BodyInputError('INVALID_JSON')
   }
 }
+
+export async function readJsonBody(
+  event: H3Event,
+  maximumBytes = 64 * 1024,
+): Promise<unknown> {
+  try {
+    return await readBoundedJson(event, maximumBytes)
+  } catch (error) {
+    throw createError({
+      statusCode:
+        error instanceof BodyInputError && error.code === 'TOO_LARGE' ? 413 : 400,
+      statusMessage: 'Invalid request body',
+    })
+  }
+}

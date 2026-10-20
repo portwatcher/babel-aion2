@@ -4,10 +4,11 @@ import {
 } from '@babel/database/credentials'
 import { RoomConfigurationError } from '@babel/database/room-settings'
 import { isError, type H3Event } from 'h3'
+import { readBoundedJson } from './bounded-json'
 
 export async function readRoomConfigurationBody(event: H3Event): Promise<unknown> {
   try {
-    return await readBody(event)
+    return await readBoundedJson(event, 64 * 1024)
   } catch {
     throw createError({ statusCode: 400, statusMessage: 'Invalid room configuration' })
   }

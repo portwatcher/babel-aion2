@@ -1,5 +1,6 @@
 import { administratorUserId } from '@babel/auth'
 import { listenerReferenceSchema } from '@babel/contracts'
+import { readJsonBody } from '../../../utils/bounded-json'
 import { requireAdministratorSession } from '../../../utils/auth'
 import {
   listenerOperation,
@@ -9,7 +10,7 @@ import {
 
 export default defineEventHandler(async (event) => {
   const { identity } = await requireAdministratorSession(event)
-  const body: unknown = await readBody(event)
+  const body: unknown = await readJsonBody(event)
   const reference = listenerReferenceSchema.safeParse({
     ...(typeof body === 'object' && body !== null ? body : {}),
     sessionId: listenerSessionId(event),

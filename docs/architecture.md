@@ -67,7 +67,9 @@ and subtitle path as Discord. See [player audio source](player-audio-source.md).
 configuration and the complete player list, then uses HTTP for explicit entry,
 restoration, language changes and leave. `/api/player/ws` carries authenticated
 session, list, configuration and heartbeat events. Session credentials stay in
-per-tab storage and travel in the first WebSocket frame, never in a URL. Refresh
+per-tab storage and travel in the first WebSocket frame, never in a URL. The
+transport rejects frames above 2 KiB before buffering them, and JSON request
+bodies are capped (64 KiB unless a route sets its own limit). Refresh
 and reconnect restore the original generation; replaced sessions never re-enter
 automatically. No sample players, language choices or subtitles are generated.
 A player action can open a feature-detected Document PiP window. Vue Teleport

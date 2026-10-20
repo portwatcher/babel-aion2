@@ -13,3 +13,4 @@ node_modules
 .agents
 .local
 coverage
+.claude
