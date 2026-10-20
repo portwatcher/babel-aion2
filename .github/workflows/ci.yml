@@ -15,11 +15,75 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Pull requests, including forks, run on GitHub-hosted runners without secrets.
   checks:
+    name: Checks
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+        working-directory: source
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: babel
+          POSTGRES_USER: babel
+          POSTGRES_PASSWORD: babel
+        ports:
+          - 127.0.0.1::5432
+        options: >-
+          --health-cmd "pg_isready -U babel -d babel"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    steps:
+      - &checkout
+        name: Check out tested source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: source
+          fetch-depth: 0
+
+      - &node
+        name: Set up the pinned Node version
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: source/.nvmrc
+
+      - &install
+        name: Install locked dependencies
+        run: npm ci
+
+      - &local-checks
+        name: Run local-equivalent checks and builds
+        run: npm run ci:local
+
+      - &database-checks
+        name: Verify database, administrator and room contracts
+        env:
+          DATABASE_URL: postgresql://babel:babel@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/babel
+        run: |
+          set -euo pipefail
+          cp .env.example .env
+          npm run db:migrate
+          node packages/database/dist/migrate.mjs
+          npm run test:db
+          npm run test:management:db
+          npm run test:providers:db
+          npm run test:samples:db
+          npm run test:languages:db
+          npm run test:subtitles:db
+          npm run test:recovery:db
+          npm run test:community:db
+
+  # Only main reaches the self-hosted runner; production secrets live in the
+  # environment, which deploys from main alone.
+  release:
     name: Checks and production release
-    # Repository-scoped runners execute only reviewed, same-repository branches.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: [self-hosted, Linux, X64, ser7-homelab]
+    environment: production
     timeout-minutes: 90
     defaults:
       run:
@@ -39,43 +103,14 @@ jobs:
           --health-cmd "pg_isready -U babel -d babel"
           --health-interval 3s --health-timeout 3s --health-retries 20
     steps:
-      - name: Check out tested source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          path: source
-          fetch-depth: 0
-
-      - name: Set up the pinned Node version
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version-file: source/.nvmrc
-
-      - name: Install locked dependencies
-        run: npm ci
-
-      - name: Run local-equivalent checks and builds
-        run: npm run ci:local
-
-      - name: Verify database, administrator and room contracts
-        env:
-          DATABASE_URL: postgresql://babel:babel@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/babel
-        run: |
-          set -euo pipefail
-          cp .env.example .env
-          npm run db:migrate
-          node packages/database/dist/migrate.mjs
-          npm run test:db
-          npm run test:management:db
-          npm run test:providers:db
-          npm run test:samples:db
-          npm run test:languages:db
-          npm run test:subtitles:db
-          npm run test:recovery:db
-          npm run test:community:db
+      - *checkout
+      - *node
+      - *install
+      - *local-checks
+      - *database-checks
 
       - name: Select only the current main commit for release
         id: release
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           IMAGE_REGISTRY: ${{ vars.IMAGE_REGISTRY }}
         run: |

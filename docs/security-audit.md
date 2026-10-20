@@ -15,15 +15,15 @@ was not executed during hunting. The coverage critic and independent
 verifiers did not run, so this is a partial pass. Fixes were checked with the
 repository's own tests.
 
-| Result                                                                           | Status                                                                                 |
-| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Map stroke quota/eraser reset on character re-entry (low)                        | Fixed, regression test                                                                 |
-| Pre-auth WebSocket frames buffered up to 100 MiB                                 | Fixed: transport `maxPayload` 2 KiB                                                    |
-| Unbounded `readBody` on player and admin routes                                  | Fixed: 64 KiB bounded reader                                                           |
-| Admin path guard was case-sensitive                                              | Fixed (hardening)                                                                      |
-| `.claude` not in `.dockerignore`                                                 | Fixed (hardening)                                                                      |
-| Anonymous room creation has no quota; rows never purged                          | Open: needs a product limit                                                            |
-| Release secrets are repository-scoped, PR and release share a self-hosted runner | Open: move secrets to a protected `production` environment before adding collaborators |
+| Result                                                                           | Status                                                                                                                                                                     |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Map stroke quota/eraser reset on character re-entry (low)                        | Fixed, regression test                                                                                                                                                     |
+| Pre-auth WebSocket frames buffered up to 100 MiB                                 | Fixed: transport `maxPayload` 2 KiB                                                                                                                                        |
+| Unbounded `readBody` on player and admin routes                                  | Fixed: 64 KiB bounded reader                                                                                                                                               |
+| Admin path guard was case-sensitive                                              | Fixed (hardening)                                                                                                                                                          |
+| `.claude` not in `.dockerignore`                                                 | Fixed (hardening)                                                                                                                                                          |
+| Anonymous room creation has no quota; rows never purged                          | Open: needs a product limit                                                                                                                                                |
+| Release secrets are repository-scoped, PR and release share a self-hosted runner | Fixed: PRs run GitHub-hosted; release uses the `main`-only `production` environment; fork runs need approval. Secret values must be moved to that environment by the owner |
 
 Rejected: host impersonation through an unproven character ID is the accepted
 design (no ownership checks), and entry validation details exposed no secrets.

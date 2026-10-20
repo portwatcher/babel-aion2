@@ -55,11 +55,14 @@ No production image is published from a local checkout.
 ## Automatic main releases
 
 `.github/workflows/ci.yml` runs on pull requests targeting `main`, pushes to
-`main`, and manual dispatch. Its runner labels are
-`[self-hosted, Linux, X64, ser7-homelab]`. Fork pull requests do not execute on
-this private self-hosted machine; reviewed contributions must first move to a
-trusted repository branch. The runner uses the established shared admission,
-resource limits and managed `ci-builder` from private infra.
+`main`, and manual dispatch. Pull requests, including forks, run the `checks`
+job on GitHub-hosted `ubuntu-latest` with no secrets. Pushes to `main` run the
+`release` job on `[self-hosted, Linux, X64, ser7-homelab]` in the `production`
+environment, whose deployment branch policy allows only `main`. That runner uses
+the established shared admission, resource limits and managed `ci-builder` from
+private infra. Fork workflow runs require approval for every external
+contributor; read `.github/` changes before approving one, because a fork runs
+its own copy of the workflow.
 
 Pull requests run `npm run ci:local`, repeatable migrations, `test:db`,
 `test:management:db` and `test:community:db` against disposable PostgreSQL.
@@ -69,7 +72,8 @@ startup and native voice runtime, then pushes both validated images. Tags contai
 the full source SHA, workflow run ID and attempt; OCI labels record source and
 revision. Source secrets are never Docker build arguments.
 
-Configure these repository values through GitHub settings:
+Configure these values through GitHub settings. Store the secrets on the
+`production` environment, not the repository:
 
 | Kind     | Name                 | Purpose                                                 |
 | -------- | -------------------- | ------------------------------------------------------- |
