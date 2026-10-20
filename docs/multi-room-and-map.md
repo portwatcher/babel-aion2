@@ -161,12 +161,13 @@ character: re-entering as the same game ID takes over its earlier strokes, so
 the eraser and quota follow it, while the old session's access is revoked.
 
 Limits are 500 strokes per room, 100 per character, 1,000 points per stroke and a
-64 KiB mutation body. UUIDs make retries idempotent. Map polling repairs a complete
-snapshot every two seconds; a failed save retains a dashed pending line with
+64 KiB mutation body. UUIDs make retries idempotent. The player socket pushes a
+room map revision; members refetch the snapshot when it changes, every 30
+seconds as a repair, and every two seconds while the socket is unavailable; a failed save retains a dashed pending line with
 explicit retry/discard actions. Poll failures are shown instead of reporting
 stale data as current. Lines persist through refresh, runtime restart and web
 replica changes. Authorization is rechecked against the room and current nickname
-generation on every read and mutation, including JOINING sessions waiting for
+generation on every read and mutation (reads take no lock), including JOINING sessions waiting for
 command delivery. Map access does not grant audio or subtitle delivery.
 
 ## Validation

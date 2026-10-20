@@ -1,5 +1,5 @@
-import type { ListenerReference } from '@babel/contracts'
-import { and, eq, isNull } from 'drizzle-orm'
+import type { ListenerReference, ListenerSnapshot } from '@babel/contracts'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 import type { Database } from '../client.ts'
 import { playerConnection } from '../schema/player-connections.ts'
 import { listenerSession, nickname } from '../schema/rooms.ts'
@@ -66,6 +66,30 @@ export async function readPlayerConnection(db: Database, reference: ListenerRefe
       ),
     )
   return record ? snapshot(record) : null
+}
+
+/** One round trip for every socket a sweep verifies; keyed by session ID. */
+export async function readPlayerConnections(
+  db: Database,
+  references: ListenerReference[],
+) {
+  const sessions = new Map<string, ListenerSnapshot>()
+  if (!references.length) {
+    return sessions
+  }
+  const records = await db
+    .select()
+    .from(listenerSession)
+    .where(
+      inArray(
+        listenerSession.id,
+        references.map((reference) => reference.sessionId),
+      ),
+    )
+  for (const record of records) {
+    sessions.set(record.id, snapshot(record))
+  }
+  return sessions
 }
 
 export async function renewPlayerConnection(

@@ -100,3 +100,89 @@ test('player-source rooms need no Discord, own their source per room and expose 
   assert.equal(restarted.stopped, false, 'starting needs no Discord credential')
   assert.equal(await readUplinkHost(database.db, second), `host-${suffix}-1`)
 })
+
+test('a worker with a two-connection pool controls five rooms at once and loses them together', async (t) => {
+  assert.ok(process.env.DATABASE_URL, 'Use disposable PostgreSQL')
+  const url = new URL(process.env.DATABASE_URL)
+  assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))
+  // The production worker budget: two connections per pool.
+  const database = createDatabase(url.toString(), {
+    queryTimeoutMs: 2_000,
+    maxConnections: 2,
+  })
+  const suffix = randomUUID().slice(0, 12)
+  const ids: string[] = []
+  const ownerId = randomUUID()
+  const leases: Awaited<ReturnType<typeof claimVoiceSource>>[] = []
+  t.after(async () => {
+    try {
+      await Promise.all(leases.map((lease) => lease.abandon()))
+      if (ids.length) {
+        await database.db
+          .delete(voiceSourceRun)
+          .where(inArray(voiceSourceRun.roomId, ids))
+        await database.db.delete(auditEvent).where(inArray(auditEvent.resourceId, ids))
+        await database.db.delete(room).where(inArray(room.id, ids))
+      }
+      await database.db.delete(runtimeOwner).where(inArray(runtimeOwner.id, [ownerId]))
+    } finally {
+      await database.close()
+    }
+  })
+  await registerRuntimeOwner(database.db, ownerId)
+  for (const index of [0, 1, 2, 3, 4]) {
+    const created = await createPlayerRoom(database.db, {
+      name: `pool-${suffix}-${index}`,
+      server: 'siel',
+      allowedIds: [],
+      hostId: `pool-host-${suffix}-${index}`,
+    })
+    ids.push(created.roomId)
+  }
+  const groups = (await readVoiceSourceGroups(database.db)).filter((group) =>
+    ids.includes(group.configuration.id),
+  )
+  assert.equal(groups.length, 5)
+  const lost = new Set<string>()
+  const claims = await Promise.all(
+    groups.map((group) =>
+      claimVoiceSource(
+        database.db,
+        database.pool,
+        group.configuration,
+        null,
+        ownerId,
+        () => lost.add(group.configuration.id),
+      ),
+    ),
+  )
+  leases.push(...claims)
+  assert.ok(claims.every((lease) => lease.valid()))
+  // Ordinary queries still have a connection while every source is held.
+  assert.equal(await readUplinkHost(database.db, ids[0]!), `pool-host-${suffix}-0`)
+  await assert.rejects(
+    claimVoiceSource(
+      database.db,
+      database.pool,
+      groups[0]!.configuration,
+      null,
+      ownerId,
+      () => {},
+    ),
+    'a held room cannot be claimed twice in the same process',
+  )
+  const holders = await database.pool.query<{ pid: number }>(
+    `select l.pid from pg_locks l
+     join pg_stat_activity a on a.pid = l.pid and a.datname = current_database()
+     where l.locktype = 'advisory' and l.granted
+     group by l.pid having count(*) >= 5`,
+  )
+  assert.equal(holders.rows.length, 1, 'one session holds every source lock')
+  await database.pool.query('select pg_terminate_backend($1)', [holders.rows[0]!.pid])
+  const deadline = Date.now() + 3_000
+  while (lost.size < 5 && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+  assert.equal(lost.size, 5, 'losing the session invalidates every source')
+  assert.ok(claims.every((lease) => !lease.valid()))
+})

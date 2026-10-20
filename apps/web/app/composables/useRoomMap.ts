@@ -16,6 +16,8 @@ export function useRoomMap(
   roomNumber: string,
   session: Ref<ListenerSnapshot | null>,
   credential: Ref<string | null>,
+  // The server-pushed map digest; null while the player socket is unavailable.
+  revision: Ref<string | null>,
 ) {
   const { t } = useInterfaceLocale()
   const strokes = shallowRef<MapStroke[]>([])
@@ -148,9 +150,23 @@ export function useRoomMap(
       void refresh()
     },
   )
+  // Pushed revisions trigger reads. Polling is a repair path: fast only while
+  // revisions are unavailable, otherwise an occasional full snapshot.
+  watch(revision, (value) => {
+    if (value !== null) {
+      void refresh()
+    }
+  })
+  let repairedAt = 0
   onMounted(() => {
     void refresh()
-    timer = setInterval(() => void refresh(), 2_000)
+    timer = setInterval(() => {
+      const now = Date.now()
+      if (revision.value === null || now - repairedAt >= 30_000) {
+        repairedAt = now
+        void refresh()
+      }
+    }, 2_000)
   })
   onBeforeUnmount(() => {
     disposed = true

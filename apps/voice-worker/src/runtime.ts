@@ -8,6 +8,16 @@ import { createControlServer } from './control-server.ts'
 import { VoiceSources } from './voice-sources.ts'
 import { SubtitleService } from './subtitle-service.ts'
 import { createMediaNetwork } from './media-network.ts'
+import { PACKET_DURATIONS, type PacketDuration } from './room-audio.ts'
+
+/** Original-audio packet duration; longer packets cut per-listener packet work. */
+function packetDuration(value: string | undefined): PacketDuration {
+  const duration = PACKET_DURATIONS.find((item) => String(item) === (value || '60'))
+  if (!duration) {
+    throw new Error('Invalid Opus packet duration')
+  }
+  return duration
+}
 
 try {
   await start(await receiveRuntimeOwner())
@@ -38,7 +48,18 @@ async function start(ownerId: string) {
   if (!(await runtimeOwnerActive(database.db, ownerId)) || !process.connected) {
     process.exit(1)
   }
-  const peers = new MediaPeers(database.db, network, ownerId)
+  const threads = Number(process.env.MEDIA_WORKER_THREADS || '2')
+  if (!Number.isSafeInteger(threads) || threads < 0 || threads > 16) {
+    throw new Error('Invalid media worker thread count')
+  }
+  // A lost media thread took its peers with it; restart through the supervisor.
+  const peers = new MediaPeers(database.db, network, ownerId, {
+    threads,
+    failed: () => {
+      process.exitCode = 1
+      void stop()
+    },
+  })
   let cipher = null
   try {
     cipher = createCredentialCipher(process.env.PROVIDER_ENCRYPTION_KEY ?? '')
@@ -46,7 +67,14 @@ async function start(ownerId: string) {
     /* Media admission remains available without a source credential key. */
   }
   const subtitles = new SubtitleService(subtitleDatabase.db, cipher)
-  const sources = new VoiceSources(sourceDatabase, peers, cipher, subtitles, ownerId)
+  const sources = new VoiceSources(
+    sourceDatabase,
+    peers,
+    cipher,
+    subtitles,
+    ownerId,
+    packetDuration(process.env.MEDIA_OPUS_FRAME_MS),
+  )
   const server = createControlServer(peers, secret, sources, subtitles)
   let stopping = false
   async function stop() {

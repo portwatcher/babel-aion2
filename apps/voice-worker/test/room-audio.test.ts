@@ -201,3 +201,70 @@ test('one guild broadcast delivers real Opus to independent rooms and retires on
   advance(60)
   assert.equal(frames.get('two')!.length, ended)
 })
+
+test('60 ms packets carry three mixed frames each, in order and without gaps', (t) => {
+  const advance = playbackClock(t)
+  const decoder = new opus.OpusEncoder(48_000, 2)
+  const packets: { pcm: Buffer; durationMs: number }[] = []
+  const audio = new RoomAudio(
+    () => true,
+    (packet, durationMs) => {
+      packets.push({ pcm: Buffer.from(decoder.decode(packet)), durationMs })
+    },
+    () => assert.fail('audio encoding failed'),
+    60,
+  )
+  t.after(() => audio.close())
+  // 60 ms of one tone followed by 60 ms of another, arriving in real time.
+  for (const frequency of [1_000, 1_000, 1_000, 3_000, 3_000, 3_000]) {
+    audio.receive('one', tone(frequency, 20, 0))
+    advance(20)
+  }
+  advance(60)
+  assert.equal(packets.length, 3, 'one packet per 60 ms')
+  assert.ok(packets.every((packet) => packet.durationMs === 60))
+  assert.ok(packets.every((packet) => packet.pcm.length === 2880 * 2 * 2))
+  // Decoded 20 ms windows show the first tone, then directly the second: no
+  // silent window between them. Opus codec delay may blur one boundary window.
+  const pcm = Buffer.concat(packets.map((packet) => packet.pcm))
+  const windows = Array.from({ length: pcm.length / 3840 }, (_, index) => {
+    const frame = pcm.subarray(index * 3840, (index + 1) * 3840)
+    const first = energy(frame, 1_000, 0)
+    const second = energy(frame, 3_000, 0)
+    return Math.max(first, second) < 500 ? '-' : first > second ? 'a' : 'b'
+  }).join('')
+  assert.match(windows, /^-*a{3,4}b{3,4}-*$/)
+  assert.ok(
+    windows.replaceAll('-', '').length <= 7,
+    'no tone outlasts a window of codec delay',
+  )
+})
+
+test('late interval callbacks still produce real-time output instead of discarding sound', (t) => {
+  let now = 0
+  t.mock.method(performance, 'now', () => now)
+  t.mock.timers.enable({ apis: ['setInterval'] })
+  const decoder = new opus.OpusEncoder(48_000, 2)
+  const frames: Buffer[] = []
+  const audio = new RoomAudio(
+    () => true,
+    (packet) => {
+      frames.push(Buffer.from(decoder.decode(packet)))
+    },
+    () => assert.fail('audio encoding failed'),
+  )
+  t.after(() => audio.close())
+  // One second of speech arriving every 20 ms while the interval callback only
+  // runs every 21 ms, as a busy event loop delays it.
+  for (now = 1; now <= 1_000; now += 1) {
+    if (now % 20 === 0) {
+      audio.receive('one', tone(1_000, 20, 0))
+    }
+    if (now % 21 === 0) {
+      t.mock.timers.tick(20)
+    }
+  }
+  assert.ok(frames.length >= 49, `real-time frames, received ${frames.length}`)
+  const audible = frames.filter((frame) => energy(frame, 1_000, 0) > 1_000)
+  assert.ok(audible.length >= 47, 'the backlog bound did not discard speech')
+})

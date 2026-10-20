@@ -1,5 +1,5 @@
 import type { VoiceSourceConfiguration } from '@babel/database/voice-sources'
-import { RoomAudio } from './room-audio.ts'
+import { RoomAudio, type PacketDuration } from './room-audio.ts'
 import type { MediaPeers } from './media-peers.ts'
 import type { SubtitleService } from './subtitle-service.ts'
 
@@ -20,15 +20,17 @@ export class GuildBroadcast {
     private readonly peers: Pick<MediaPeers, 'publish' | 'closeRoom'>,
     private readonly subtitles: Pick<SubtitleService, 'source'>,
     failed: () => void,
+    packetMs: PacketDuration = 20,
   ) {
     this.audio = new RoomAudio(
       allowed,
-      (packet) => {
+      (packet, durationMs) => {
         for (const roomId of this.destinations.keys()) {
-          this.peers.publish(roomId, packet)
+          this.peers.publish(roomId, packet, durationMs)
         }
       },
       failed,
+      packetMs,
     )
   }
 

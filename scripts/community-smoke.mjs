@@ -3,7 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { seedLegacyRoom } from './fixtures/legacy-room.mjs'
 import { isolatedDatabase } from './fixtures/isolated-database.mjs'
 import { communityService } from './fixtures/community-service.mjs'
-import { call, map } from './fixtures/community-client.mjs'
+import { call, map, mapRevisions } from './fixtures/community-client.mjs'
 import { startTestServer } from './test-server.mjs'
 import { createManagementFixture } from './management-fixture.mjs'
 import { verifyHostClose, verifyRoomDisband } from './fixtures/room-lifecycle.mjs'
@@ -427,7 +427,21 @@ try {
     ],
     nickname: 'forged',
   }
-  assert.equal((await map(a, first.roomNumber, scout, 'POST', stroke)).status, 200)
+  // Members refetch the map when the room snapshot pushes a new revision,
+  // including writes made through another replica.
+  const pushed = await mapRevisions(a, pilot)
+  const deadline = Date.now() + 5_000
+  while (!pushed.revisions.length && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  assert.equal(
+    pushed.revisions.length,
+    1,
+    'the socket receives the current map revision',
+  )
+  const drawn = pushed.changed('a stroke changes the pushed revision')
+  assert.equal((await map(b, first.roomNumber, scout, 'POST', stroke)).status, 200)
+  await drawn
   assert.equal((await map(b, first.roomNumber, scout, 'POST', stroke)).status, 200)
   const drawing = (await (await map(b, first.roomNumber, pilot)).json()).strokes
   assert.equal(drawing.length, 1, 'retry never duplicates a stroke')
@@ -466,7 +480,14 @@ try {
     1,
     'members cannot erase each other',
   )
+  const erased = pushed.changed('erasure changes the pushed revision')
   await map(a, first.roomNumber, scout, 'DELETE', undefined, `/${stroke.id}`)
+  await erased
+  assert.ok(
+    pushed.revisions.every((value, i) => i === 0 || value !== pushed.revisions[i - 1]),
+    'a revision is pushed only when the map changes',
+  )
+  pushed.close()
   assert.deepEqual(
     (await (await map(b, first.roomNumber, pilot)).json()).strokes,
     [],

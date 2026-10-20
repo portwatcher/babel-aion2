@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
 import {
   providerSettingsSchema,
   type OpenAISettings,
@@ -12,6 +12,7 @@ import {
   nickname,
   outputLanguage,
   providerConfiguration,
+  room,
 } from './schema/rooms.ts'
 import { playerConnection } from './schema/player-connections.ts'
 import { createTermService } from './terms.ts'
@@ -129,6 +130,77 @@ function listenerQuery(db: Database, input: SubtitleSubscription) {
 export async function readSubtitleListener(db: Database, input: SubtitleSubscription) {
   const [row] = await listenerQuery(db, input)
   return row ? snapshot(row.listener) : null
+}
+
+/**
+ * The same listener fence as readSubtitleListener for every subscriber in one
+ * snapshot. Returns the connection IDs whose exact subscription is still current.
+ */
+export async function authorizedSubtitleListeners(
+  db: Database,
+  inputs: SubtitleSubscription[],
+) {
+  const authorized = new Set<string>()
+  if (!inputs.length) {
+    return authorized
+  }
+  const rows = await db
+    .select({
+      connectionId: playerConnection.id,
+      connectionGeneration: playerConnection.nicknameGeneration,
+      sessionId: listenerSession.id,
+      nicknameGeneration: listenerSession.nicknameGeneration,
+      subscriptionVersion: listenerSession.subscriptionVersion,
+    })
+    .from(playerConnection)
+    .innerJoin(listenerSession, eq(listenerSession.id, playerConnection.sessionId))
+    .innerJoin(nickname, eq(nickname.key, listenerSession.nicknameKey))
+    .innerJoin(outputLanguage, eq(outputLanguage.code, listenerSession.outputLanguage))
+    .where(
+      and(
+        inArray(
+          playerConnection.id,
+          inputs.map((input) => input.connectionId),
+        ),
+        isNull(playerConnection.closedAt),
+        eq(listenerSession.state, 'ACTIVE'),
+        isNull(listenerSession.revokedAt),
+        eq(nickname.currentSessionId, listenerSession.id),
+        eq(nickname.generation, listenerSession.nicknameGeneration),
+        eq(outputLanguage.enabled, true),
+        isNotNull(outputLanguage.pathValidatedAt),
+      ),
+    )
+  const current = new Map(rows.map((row) => [row.connectionId, row]))
+  for (const input of inputs) {
+    const row = current.get(input.connectionId)
+    if (
+      row &&
+      row.connectionGeneration === input.reference.nicknameGeneration &&
+      row.sessionId === input.reference.sessionId &&
+      row.nicknameGeneration === input.reference.nicknameGeneration &&
+      row.subscriptionVersion === input.subscriptionVersion
+    ) {
+      authorized.add(input.connectionId)
+    }
+  }
+  return authorized
+}
+
+/** Current source generation of each room that may still deliver subtitles. */
+export async function readRoomSources(db: Database, roomIds: string[]) {
+  const sources = new Map<string, number>()
+  if (!roomIds.length) {
+    return sources
+  }
+  const rows = await db
+    .select({ id: room.id, generation: room.sourceGeneration })
+    .from(room)
+    .where(and(inArray(room.id, roomIds), eq(room.stopped, false)))
+  for (const row of rows) {
+    sources.set(row.id, row.generation)
+  }
+  return sources
 }
 
 function pathQuery(roomId: string, generation: number, stamp: SubtitlePathStamp) {

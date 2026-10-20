@@ -9,18 +9,30 @@ const FRAME_BYTES = FRAME_SAMPLES * CHANNELS * 2
 const FRAME_MS = 20
 const MAX_QUEUE_MS = 100
 
-/** Receives independent speaker PCM. Only the playback branch is mixed. */
+/** Opus packet durations the playback branch may use. */
+export const PACKET_DURATIONS = [20, 40, 60] as const
+export type PacketDuration = (typeof PACKET_DURATIONS)[number]
+
+/**
+ * Receives independent speaker PCM. Only the playback branch is mixed. Mixing
+ * runs every 20 ms; longer packets carry several mixed frames, so every listener
+ * receives proportionally fewer packets to encrypt, relay and decode.
+ */
 export class RoomAudio {
   private readonly encoder = new opus.OpusEncoder(SAMPLE_RATE, CHANNELS)
   private readonly queues = new Map<string, PcmTimeline>()
   private readonly timer: ReturnType<typeof setInterval>
   private closed = false
-  private lastTick = performance.now()
+  // Frames follow the monotonic clock. Interval callbacks drift late, so each
+  // tick mixes every frame that is due rather than exactly one.
+  private nextFrameAt = performance.now() + FRAME_MS
+  private pending: Buffer[] = []
 
   constructor(
     private readonly allowed: () => boolean,
-    private readonly publish: (packet: Buffer) => void,
+    private readonly publish: (packet: Buffer, durationMs: PacketDuration) => void,
     private readonly failed: () => void,
+    private readonly packetMs: PacketDuration = 20,
   ) {
     this.encoder.setBitrate(96_000)
     this.timer = setInterval(() => {
@@ -49,16 +61,24 @@ export class RoomAudio {
   }
   clear() {
     this.queues.clear()
+    this.pending = []
   }
 
   private tick() {
     const now = performance.now()
-    if (this.closed || !this.allowed() || now - this.lastTick > MAX_QUEUE_MS) {
+    if (this.closed || !this.allowed() || now - this.nextFrameAt > MAX_QUEUE_MS) {
+      // A stalled or unauthorized interval restarts from now without stale sound.
       this.clear()
-      this.lastTick = now
+      this.nextFrameAt = now + FRAME_MS
       return
     }
-    this.lastTick = now
+    while (now >= this.nextFrameAt && !this.closed) {
+      this.nextFrameAt += FRAME_MS
+      this.mix(now)
+    }
+  }
+
+  private mix(now: number) {
     const frames: Buffer[] = []
     for (const [id, timeline] of this.queues) {
       const frame = timeline.take(now)
@@ -80,9 +100,14 @@ export class RoomAudio {
       }
     }
     // Explicit silence preserves pauses on the same 48 kHz media timeline.
-    const packet = this.encoder.encode(mixed)
+    this.pending.push(mixed)
+    if (this.pending.length < this.packetMs / FRAME_MS) {
+      return
+    }
+    const packet = this.encoder.encode(Buffer.concat(this.pending))
+    this.pending = []
     if (this.allowed()) {
-      this.publish(Buffer.from(packet))
+      this.publish(Buffer.from(packet), this.packetMs)
     }
   }
 
