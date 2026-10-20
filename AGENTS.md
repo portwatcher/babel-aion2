@@ -131,7 +131,10 @@
   tags. This continuous deployment is authorized; verify the workflow and rollout
   and report actual failures. Keep production manifests and deployment-specific
   tooling in private infra. Never publish production images from a local build.
-- If GitHub Actions are added, follow Perohub's runner policy:
-  `[self-hosted, Linux, X64, ser7-homelab]`. Keep local/CI checks equivalent.
+- The repository is public. Pull-request jobs run on GitHub-hosted runners with
+  no secrets. Only `main` releases use `[self-hosted, Linux, X64, ser7-homelab]`
+  through the `production` environment, which holds release secrets and deploys
+  from `main` alone. Never run pull-request code on the self-hosted runner.
+  Keep local/CI checks equivalent.
 - Production manifests belong in `../infra`; reuse public-edge, Access policy,
   secrets, databases, and GitOps conventions. No new LoadBalancer without cause.
