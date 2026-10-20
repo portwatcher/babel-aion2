@@ -82,6 +82,9 @@ test('admin page, management API and auth paths share a boundary with public pla
     '/api/management/status',
     '/api/auth/get-session',
     '/api/%6danagement/status',
+    '/ADMIN',
+    '/Admin/settings',
+    '/API/Management/status',
   ]) {
     assert.equal(isAdministratorPath(path), true, path)
   }

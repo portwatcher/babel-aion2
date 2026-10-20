@@ -1,6 +1,7 @@
 import { entryRequestSchema } from '@babel/contracts'
 import { communityRoom } from '@babel/database/schema'
 import { eq } from 'drizzle-orm'
+import { readJsonBody } from '../../utils/bounded-json'
 import { verifyAdmissionCharacter } from '../../utils/room-admission'
 import {
   listenerOperation,
@@ -13,13 +14,9 @@ import { useListenerRoom } from '../../utils/room-configuration'
 export default defineEventHandler(async (event) => {
   requirePlayerOrigin(event)
   const credential = requireListenerCredential(event)
-  const request = entryRequestSchema.safeParse(await readBody(event))
+  const request = entryRequestSchema.safeParse(await readJsonBody(event))
   if (!request.success) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Invalid listener entry',
-      data: request.error.flatten(),
-    })
+    throw createError({ statusCode: 400, statusMessage: 'Invalid listener entry' })
   }
   return listenerOperation(async () => {
     const { database, roomId } = await useListenerRoom(event)

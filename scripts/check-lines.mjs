@@ -21,6 +21,8 @@ const ignored = new Set([
   'coverage',
   'migrations',
 ])
+// Vendored agent skills keep their upstream layout.
+const vendored = new Set(['.agents/skills'])
 let failures = 0
 let count = 0
 let largest = { path: '', lines: 0 }
@@ -31,6 +33,9 @@ async function walk(directory) {
       continue
     }
     const path = resolve(directory, entry.name)
+    if (vendored.has(relative(root, path))) {
+      continue
+    }
     if (entry.isDirectory()) {
       await walk(path)
     } else if (extensions.has(extname(path)) && !/\.config\.[^.]+$/.test(path)) {

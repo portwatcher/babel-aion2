@@ -109,6 +109,9 @@
 - The requested `better-interface` skill is installed at
   `.agents/skills/better-interface/SKILL.md`. Use it for combined interface
   reviews; use installed `better-*` domain skills for focused work.
+- Cloudflare's `security-audit` skill is installed at
+  `.agents/skills/security-audit/SKILL.md` for security reviews and audits.
+  Keep audit run output outside the repository.
 - Read `.impeccable.md` for the provisional design context. Keep player interface copy
   in the English, Simplified Chinese, Japanese and Korean catalogs, independent
   of selectable subtitle languages. Administration uses hard-coded English only.

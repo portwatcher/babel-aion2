@@ -156,10 +156,11 @@ Members can draw with five colors. Every committed stroke has a numbered label
 and the authenticated author's game ID, plus a corresponding line sample in the
 sidebar. Clicking a sidebar entry locates its stroke. The eraser removes an entire
 own stroke on click or drag; undo and per-stroke delete provide precise removal.
-A member cannot erase another session's strokes. After replacement, the old
-session's historical lines remain visible and its access is revoked.
+A member cannot erase another character's strokes. Strokes belong to the
+character: re-entering as the same game ID takes over its earlier strokes, so
+the eraser and quota follow it, while the old session's access is revoked.
 
-Limits are 500 strokes per room, 100 per session, 1,000 points per stroke and a
+Limits are 500 strokes per room, 100 per character, 1,000 points per stroke and a
 64 KiB mutation body. UUIDs make retries idempotent. Map polling repairs a complete
 snapshot every two seconds; a failed save retains a dashed pending line with
 explicit retry/discard actions. Poll failures are shown instead of reporting

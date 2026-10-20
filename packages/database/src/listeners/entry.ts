@@ -8,7 +8,11 @@ import {
 import { and, eq, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm'
 import type { Database } from '../client.ts'
 import { listenerSession, nickname, outputLanguage, room } from '../schema/rooms.ts'
-import { communityRoom, listenerCharacter } from '../schema/room-community.ts'
+import {
+  communityRoom,
+  listenerCharacter,
+  mapStroke,
+} from '../schema/room-community.ts'
 import { digest, ListenerError, type Transaction, verifyCredential } from './model.ts'
 
 export async function requireOutputLanguage(tx: Transaction, code: string | null) {
@@ -139,6 +143,24 @@ export async function prepareEntry(
       .update(nickname)
       .set({ generation, currentSessionId: id })
       .where(eq(nickname.key, key))
+    // Map strokes belong to the character, so its quota and eraser follow re-entry.
+    await tx
+      .update(mapStroke)
+      .set({ sessionId: id })
+      .where(
+        and(
+          eq(mapStroke.roomId, roomId),
+          inArray(
+            mapStroke.sessionId,
+            tx
+              .select({ id: listenerSession.id })
+              .from(listenerSession)
+              .where(
+                and(eq(listenerSession.nicknameKey, key), ne(listenerSession.id, id)),
+              ),
+          ),
+        ),
+      )
     if (!created) {
       throw new Error('Listener entry was not persisted')
     }

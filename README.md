@@ -130,3 +130,4 @@ image tags in the private infra repository. See
 - [Operations](docs/operations.md)
 - [Test report](docs/test-report.md)
 - [Interface skills](docs/interface-skills.md)
+- [Security audit](docs/security-audit.md)

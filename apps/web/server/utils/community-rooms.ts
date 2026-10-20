@@ -5,7 +5,7 @@ import type { H3Event } from 'h3'
 import { communityRoom, room } from '@babel/database/schema'
 import { CommunityRoomError } from '@babel/database/community-rooms'
 import { useDatabase } from './database'
-import { readBoundedJson, BodyInputError } from './bounded-json'
+import { readJsonBody } from './bounded-json'
 
 function publicRoomNumber(event: H3Event) {
   const result = roomNumberParameterSchema.safeParse(getRouterParam(event, 'roomId'))
@@ -54,16 +54,8 @@ export function installationCookie(event: H3Event) {
   }
   return parsed.data
 }
-export async function readCommunityBody(event: H3Event) {
-  try {
-    return await readBoundedJson(event, 64 * 1024)
-  } catch (error) {
-    throw createError({
-      statusCode:
-        error instanceof BodyInputError && error.code === 'TOO_LARGE' ? 413 : 400,
-      statusMessage: 'Invalid request body',
-    })
-  }
+export function readCommunityBody(event: H3Event) {
+  return readJsonBody(event)
 }
 export async function communityOperation<T>(operation: () => Promise<T>) {
   try {

@@ -55,7 +55,10 @@ export function assertSameOrigin(origin: string | null, siteUrl: string): void {
 
 export function isAdministratorPath(pathname: string): boolean {
   // Decode once before testing route boundaries; malformed encodings fail closed.
-  const path = decodeURIComponent(pathname).replace(/\/{2,}/g, '/')
+  // Page routes match case-insensitively, so the guard does too.
+  const path = decodeURIComponent(pathname)
+    .replace(/\/{2,}/g, '/')
+    .toLowerCase()
   return ['/admin', '/api/management', '/api/auth'].some(
     (prefix) => path === prefix || path.startsWith(`${prefix}/`),
   )

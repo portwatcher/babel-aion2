@@ -7,6 +7,7 @@ import {
 import { testProviderConnection } from '@babel/providers'
 import { z } from 'zod'
 import type { H3Event } from 'h3'
+import { readBoundedJson } from './bounded-json'
 import { requireAdministratorSession } from './auth'
 import { useDatabase } from './database'
 import { roomCredentialCipher } from './management-configuration'
@@ -85,7 +86,7 @@ export async function providerBody<T>(
 ): Promise<T> {
   let body: unknown
   try {
-    body = await readBody(event)
+    body = await readBoundedJson(event, 64 * 1024)
   } catch {
     throw new ProviderConfigurationError('INVALID_CONFIGURATION')
   }

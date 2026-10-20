@@ -1,4 +1,5 @@
 import { languageChangeSchema } from '@babel/contracts'
+import { readJsonBody } from '../../../../utils/bounded-json'
 import {
   listenerOperation,
   listenerSessionId,
@@ -11,7 +12,7 @@ export default defineEventHandler(async (event) => {
   requirePlayerOrigin(event)
   const credential = requireListenerCredential(event)
   const id = listenerSessionId(event)
-  const request = languageChangeSchema.safeParse(await readBody(event))
+  const request = languageChangeSchema.safeParse(await readJsonBody(event))
   if (!request.success) {
     throw createError({ statusCode: 400, statusMessage: 'Invalid output language' })
   }
