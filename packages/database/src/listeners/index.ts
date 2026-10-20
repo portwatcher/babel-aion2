@@ -19,6 +19,7 @@ export {
   authorizeMediaSession,
   openMediaConnection,
   mediaConnectionAuthorized,
+  authorizedMediaConnections,
   earlierMediaConnectionsStopped,
   closeMediaConnection,
   mediaConnectionsStopped,
@@ -26,6 +27,7 @@ export {
 export {
   openPlayerConnection,
   readPlayerConnection,
+  readPlayerConnections,
   renewPlayerConnection,
   closePlayerConnection,
   subtitleConnectionsStopped,

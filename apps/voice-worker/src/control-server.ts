@@ -58,9 +58,15 @@ export function createControlServer(
           json(response, 400, { code: 'INVALID_REQUEST' })
           return
         }
+        // Events delivered during subscription wait until the 200 header is sent.
+        let early: string[] | null = []
         const stop = await subtitles.subscribe(parsed.data, {
           send(event) {
             const line = JSON.stringify(event) + '\n'
+            if (early) {
+              early.push(line)
+              return early.length <= 32
+            }
             if (
               response.destroyed ||
               response.writableEnded ||
@@ -84,6 +90,10 @@ export function createControlServer(
           'cache-control': 'no-store',
         })
         response.flushHeaders()
+        for (const line of early) {
+          response.write(line)
+        }
+        early = null
         const keepalive = setInterval(() => {
           if (response.writableLength >= 256 * 1024) {
             response.destroy()

@@ -67,6 +67,8 @@ Optional configuration in `.env`:
 `DATABASE_URL` (tools) and `NUXT_DATABASE_URL` (runtime) must point at the same
 database. Size the pools with `DATABASE_POOL_MAX` and `NUXT_DATABASE_POOL_MAX`;
 see [connection budgeting](docs/operations.md#database-connection-budget).
+`MEDIA_WORKER_THREADS` and `MEDIA_OPUS_FRAME_MS` size original-audio delivery; see
+[listener capacity](docs/capacity.md).
 
 ## Workspace
 

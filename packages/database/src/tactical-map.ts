@@ -60,23 +60,67 @@ export async function withMapMember<T>(
   })
 }
 
+/**
+ * Reads take no lock: one statement authenticates the credential, room and current
+ * nickname generation, so a replaced or removed session receives nothing.
+ */
 export async function readMap(
   db: Database,
   roomId: string,
   sessionId: string,
   credential: string,
 ): Promise<MapStroke[]> {
-  return withMapMember(db, roomId, sessionId, credential, async (tx) => {
-    const records = await tx
-      .select()
-      .from(mapStroke)
-      .where(eq(mapStroke.roomId, roomId))
-      .orderBy(asc(mapStroke.createdAt), asc(mapStroke.id))
-    return records.map((record) => ({
-      ...record,
-      createdAt: record.createdAt.toISOString(),
-    }))
-  })
+  const [record] = await db
+    .select({
+      credentialHash: listenerSession.credentialHash,
+      roomId: listenerSession.roomId,
+      state: listenerSession.state,
+      revokedAt: listenerSession.revokedAt,
+      generation: listenerSession.nicknameGeneration,
+      currentSessionId: nickname.currentSessionId,
+      currentGeneration: nickname.generation,
+    })
+    .from(listenerSession)
+    .leftJoin(nickname, eq(nickname.key, listenerSession.nicknameKey))
+    .where(eq(listenerSession.id, sessionId))
+  const actual = createHash('sha256').update(credential).digest()
+  const expected = Buffer.from(record?.credentialHash ?? '0'.repeat(64), 'hex')
+  if (!record || !timingSafeEqual(actual, expected)) {
+    throw new MapAccessError('UNAUTHORIZED')
+  }
+  if (
+    record.roomId !== roomId ||
+    !['JOINING', 'ACTIVE'].includes(record.state) ||
+    record.revokedAt ||
+    record.currentSessionId !== sessionId ||
+    record.currentGeneration !== record.generation
+  ) {
+    throw new MapAccessError('FORBIDDEN')
+  }
+  const records = await db
+    .select()
+    .from(mapStroke)
+    .where(eq(mapStroke.roomId, roomId))
+    .orderBy(asc(mapStroke.createdAt), asc(mapStroke.id))
+  return records.map((record) => ({
+    ...record,
+    createdAt: record.createdAt.toISOString(),
+  }))
+}
+
+/**
+ * A digest that changes whenever a stroke is added or removed. Strokes are
+ * immutable, so their count and identities are sufficient. Reveals no content.
+ */
+export async function mapRevision(db: Database, roomId: string) {
+  const [row] = await db
+    .select({
+      count: count(),
+      digest: sql<string>`coalesce(sum(hashtext(${mapStroke.id}::text)::bigint), 0)::text`,
+    })
+    .from(mapStroke)
+    .where(eq(mapStroke.roomId, roomId))
+  return `${row?.count ?? 0}:${row?.digest ?? '0'}`
 }
 
 export async function drawMap(

@@ -10,11 +10,13 @@ const props = defineProps<{
   roomNumber: string
   session: ListenerSnapshot | null
   credential: string | null
+  revision: string | null
 }>()
 const { strokes, current, busy, error, enabled, refresh, save, remove } = useRoomMap(
   props.roomNumber,
   toRef(props, 'session'),
   toRef(props, 'credential'),
+  toRef(props, 'revision'),
 )
 const drawing = ref(false)
 const erasing = ref(false)

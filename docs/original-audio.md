@@ -43,7 +43,8 @@ Connected source state is not proof that anyone has spoken or heard playback.
 
 ## Source ownership and retirement
 
-A dedicated PostgreSQL session holds an advisory lock for bot ID plus guild ID.
+A dedicated PostgreSQL session holds an advisory lock for bot ID plus guild ID;
+one such session holds the locks of every source the worker controls.
 An open `voice_source_run` receipt also uniquely owns both that control key and
 the room. A second controller cannot connect, including after the first session
 disappears without a confirmed close. Every successful claim advances the source
@@ -79,8 +80,10 @@ Decoding produces 48 kHz stereo signed-16 PCM. The playback branch copies frames
 into per-member queues bounded to 100 ms. Short inputs are assembled into 20 ms
 frames; a trailing partial frame is padded after a pause. Stale frames and work
 accumulated across a process stall are discarded. Active member frames are
-averaged for playback, and explicit silence retains pauses. Each packet contains
-960 samples per channel and is encoded as Opus for receive-only WebRTC.
+averaged for playback, and explicit silence retains pauses. Mixing follows the
+monotonic clock, so a late timer callback mixes every due frame. Each packet
+carries `MEDIA_OPUS_FRAME_MS` of audio (default 60 ms, 2,880 samples per channel)
+and is encoded as Opus for receive-only WebRTC; see [capacity](capacity.md).
 RTP timestamps use the 48 kHz timeline and preserve an interruption's time gap.
 
 The recognition branch consumes each member's PCM separately, before playback

@@ -1,17 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { and, asc, eq, isNull, or } from 'drizzle-orm'
-import type { Pool, PoolClient, QueryResultRow } from 'pg'
+import type { Pool } from 'pg'
 import type { Database } from './client.ts'
 import { room } from './schema/rooms.ts'
 import { voiceSourceRun } from './schema/voice-sources.ts'
 import { lockRuntimeOwner } from './runtime-owners.ts'
+import { lockVoiceSource, VoiceSourceOwnershipError } from './source-locks.ts'
 
 export type VoiceSourceConfiguration = typeof room.$inferSelect
-export class VoiceSourceOwnershipError extends Error {
-  constructor() {
-    super('Voice source ownership unavailable')
-  }
-}
+export { VoiceSourceOwnershipError } from './source-locks.ts'
 
 export function voiceSourceConfigured(source: VoiceSourceConfiguration) {
   if (source.audioSource === 'PLAYER') {
@@ -76,39 +73,19 @@ export async function claimVoiceSource(
     source.audioSource === 'PLAYER'
       ? `player:${source.id}`
       : `${botId}:${source.discordGuildId}`
-  const client = await pool.connect()
-  let released = false
   let invalid = false
-  let checking = false
-  let timer: ReturnType<typeof setInterval> | undefined
-  function invalidate() {
-    if (!invalid && !released) {
+  // Every source of this process shares one dedicated lock session.
+  // Called only when the shared session is lost, never on an orderly release.
+  const lock = await lockVoiceSource(pool, controlKey, () => {
+    if (!invalid) {
       invalid = true
       lost()
     }
-  }
-  client.on('error', invalidate)
-  client.on('end', invalidate)
+  })
   async function release() {
-    if (released) {
-      return
-    }
-    released = true
-    clearInterval(timer)
-    client.off('end', invalidate)
-    // Destroy this dedicated session. Returning it to the pool could retain a
-    // session advisory lock; closing it always releases the lock on PostgreSQL.
-    client.release(true)
+    await lock.release()
   }
   try {
-    const result = await boundedQuery<{ acquired: boolean }>(
-      client,
-      'select pg_try_advisory_lock(hashtextextended($1, 0)) as acquired',
-      [controlKey],
-    )
-    if (!result.rows[0]?.acquired) {
-      throw new VoiceSourceOwnershipError()
-    }
     const claimed = await db.transaction(async (tx) => {
       await lockRuntimeOwner(tx, ownerId)
       const [current] = await tx
@@ -173,21 +150,9 @@ export async function claimVoiceSource(
       })
       return { runId, source: { ...next, stopped: false } }
     })
-    timer = setInterval(() => {
-      if (checking || invalid || released) {
-        return
-      }
-      checking = true
-      void checkSession(client)
-        .catch(invalidate)
-        .finally(() => {
-          checking = false
-        })
-    }, 500)
-    timer.unref()
     return {
       source: claimed.source,
-      valid: () => !invalid && !released,
+      valid: () => !invalid && lock.valid(),
       abandon: release,
       async close() {
         // The caller must first stop publication and physically close both the
@@ -211,27 +176,5 @@ export async function claimVoiceSource(
   } catch (error) {
     await release()
     throw error
-  }
-}
-
-async function checkSession(client: PoolClient) {
-  await boundedQuery(client, 'select 1')
-}
-
-async function boundedQuery<T extends QueryResultRow>(
-  client: PoolClient,
-  text: string,
-  values: string[] = [],
-) {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  try {
-    return await Promise.race([
-      client.query<T>(text, values),
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new VoiceSourceOwnershipError()), 1_500)
-      }),
-    ])
-  } finally {
-    clearTimeout(timer)
   }
 }

@@ -38,7 +38,8 @@ state handling ignores other guilds and voice adapters use room-specific groups.
 
 The client loads Leaflet only on room pages. Original public tiles span zoom 0–7;
 map-space coordinates are shared by rendering, freehand input and eraser hit tests.
-Authenticated map polling repairs the full snapshot every two seconds. Writes
+Each room's player sockets receive a map revision digest; clients refetch the
+authenticated snapshot when it changes and repair it every 30 seconds. Writes
 share nickname locks with revocation and a room lock for bounded, idempotent
 insertion. Author metadata is derived from the session. Reads and writes reject
 old generations and cross-room credentials. Only the original session can delete
@@ -125,7 +126,8 @@ private worker readiness. See [output languages](output-languages.md).
 `apps/voice-worker` implements authenticated private media control and Werift
 0.25.1 receive-only admission. It rechecks persisted listener authorization,
 registers negotiations before creating peers, closes obsolete peers and persists
-the actual close acknowledgement. A PostgreSQL ownership session and durable
+the actual close acknowledgement. WebRTC peers run in worker threads; see
+[listener capacity](capacity.md). A PostgreSQL ownership session and durable
 source receipt exclude duplicate bot/guild controllers. The source controller
 connects Discord with DAVE, maintains separate member decoders and bounded PCM
 queues, and publishes mixed original audio independently of subtitle work. An
@@ -210,7 +212,7 @@ Audio fans out in parallel, without serial transcript-to-translation requests.
 Every target delta publishes immediately. Recognition and targets share one
 server-only encrypted key, fixed official destinations, bounded socket/audio
 queues and safe errors. Current listener/source/configuration checks run in one
-database round trip before delivery and fence obsolete work. Main page and PiP
+500 ms authorization snapshot before delivery and fence obsolete work. Main page and PiP
 consume the same incremental state. See [streaming processing](streaming-subtitles.md).
 See [provider configuration](providers-and-languages.md) for probe and sample limits.
 
@@ -221,8 +223,9 @@ See [provider configuration](providers-and-languages.md) for probe and sample li
    isolated receipt and rejoin are proven; per-member decoding, bounded mixing
    and exclusive source control are implemented.
 2. Complete player-network and performance acceptance. Production public TURN
-   routing and single-member audible playback pass; native AMD64 throughput,
-   restricted networks, background/game behavior and capacity remain unmeasured.
+   routing and single-member audible playback pass. 1,000 listeners in five rooms
+   pass locally on Linux arm64 ([capacity](capacity.md)); native AMD64 throughput,
+   restricted networks and background/game behavior remain unmeasured.
    Local Coturn UDP/TCP/TLS and credential expiry pass separate checks. See the
    [candidate evidence](media-compatibility.md).
 3. Complete production confirmation of Kubernetes container recovery, independent

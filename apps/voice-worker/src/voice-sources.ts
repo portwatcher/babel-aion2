@@ -11,6 +11,7 @@ import {
 } from '@babel/database/voice-sources'
 import { DiscordSource, describeError } from './discord-source.ts'
 import { GuildBroadcast } from './guild-broadcast.ts'
+import type { PacketDuration } from './room-audio.ts'
 import type { MediaPeers } from './media-peers.ts'
 import { PlayerSource } from './player-source.ts'
 import type { SubtitleService } from './subtitle-service.ts'
@@ -49,6 +50,7 @@ export class VoiceSources {
     private readonly cipher: CredentialCipher | null,
     private readonly subtitles: SubtitleService,
     private readonly ownerId: string,
+    private readonly packetMs: PacketDuration = 20,
   ) {
     this.timer = setInterval(() => this.check(), 500)
     this.timer.unref()
@@ -231,8 +233,12 @@ export class VoiceSources {
       source.lease?.valid() === true &&
       performance.now() < source.validUntil &&
       source.input?.ready() === true
-    source.broadcast = new GuildBroadcast(allowed, this.peers, this.subtitles, () =>
-      this.fail(source, inputFailure(configuration)),
+    source.broadcast = new GuildBroadcast(
+      allowed,
+      this.peers,
+      this.subtitles,
+      () => this.fail(source, inputFailure(configuration)),
+      this.packetMs,
     )
     await source.broadcast.reconcile(
       source.rooms.map((room) =>

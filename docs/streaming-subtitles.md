@@ -52,9 +52,13 @@ also honor the provider's actual `expires_at`; reconnecting clears stale text.
 ## Receive, push and display
 
 The private worker `/subtitles` HTTP response flushes its headers and streams
-NDJSON as events arrive. Each subtitle event checks listener/nickname/subscription
-revocation and source/path/provider/term versions in one database round trip.
-There is no permission cache or intentional send delay. Unsent obsolete revisions
+NDJSON as events arrive. Every 500 ms one query confirms every subscriber's
+listener/nickname/subscription fence and another reads the room sources and
+path/provider/term versions. An event is sent only while its subscriber and path
+were confirmed within the last 1.5 seconds; a newer source generation than the
+snapshot is confirmed with one room query first. Revocation closes the player
+socket, which carries every subtitle, before acknowledging. There is no
+intentional send delay. Unsent obsolete revisions
 are replaced immediately; a consumer queue is bounded to 16 events and HTTP
 buffering to 256 KiB. Slow clients close instead of falling progressively behind.
 

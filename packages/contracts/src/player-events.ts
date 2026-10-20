@@ -43,6 +43,8 @@ export const playerEventSchema = z.discriminatedUnion('type', [
     type: z.literal('configuration'),
     configuration: publicRoomConfigurationSchema,
   }),
+  // An opaque digest of the room's tactical map. Clients refetch when it changes.
+  z.object({ type: z.literal('map'), revision: z.string().max(128) }),
   z.object({ type: z.literal('ping'), nonce: z.uuid() }),
   z.object({
     type: z.literal('error'),

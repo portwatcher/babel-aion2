@@ -12,6 +12,7 @@ const {
   submitting,
   changingLanguage,
   connectionState,
+  mapRevision,
   subtitles,
   audioState,
   audioBlocked,
@@ -51,6 +52,7 @@ const {
       :room-number="roomNumber"
       :session="session"
       :credential="credential"
+      :revision="mapRevision"
     />
   </template>
   <section v-else-if="restoring" class="entry-panel" aria-busy="true" role="status">

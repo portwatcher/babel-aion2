@@ -48,6 +48,11 @@ export function usePlayerSession(
   let disposed = false
   const connection = usePlayerConnection(receive, invalidSession)
   const playerList = usePlayerList(connection.state, roomNumber)
+  // Pushed with the room snapshot; null whenever the socket is not current.
+  const receivedMapRevision = ref<string | null>(null)
+  const mapRevision = computed(() =>
+    connection.state.value === 'connected' ? receivedMapRevision.value : null,
+  )
   const subtitles = usePlayerSubtitles(
     session,
     connection.state,
@@ -148,6 +153,8 @@ export function usePlayerSession(
       accept(event.session)
     } else if (event.type === 'players') {
       playerList.accept(event.players)
+    } else if (event.type === 'map') {
+      receivedMapRevision.value = event.revision
     } else if (event.type === 'configuration') {
       configuration.value = event.configuration
       const current = session.value?.outputLanguage
@@ -395,6 +402,7 @@ export function usePlayerSession(
     leavePending,
     roomClosed,
     connectionState: connection.state,
+    mapRevision,
     subtitles: subtitles.presentation,
     audioState: audio.state,
     audioBlocked: audio.blocked,

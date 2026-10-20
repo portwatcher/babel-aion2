@@ -34,7 +34,8 @@ clear a registration until its owning transport is confirmed stopped.
 Migration 0008 adds the capture-mode enum and preserves selected-member scope on
 existing rooms. Readiness checks this column; a previous schema returns 503.
 Migration 0009 adds exclusive source ownership and durable close receipts.
-The receiving worker holds a dedicated PostgreSQL ownership session; loss of
+The receiving worker holds one dedicated PostgreSQL ownership session for all
+of its sources; loss of
 that session fences playback and subtitles. Unconfirmed ownership cannot be
 cleared merely because its heartbeat is old. See [original audio](original-audio.md).
 Migrations 0010 and 0011 add runtime ownership and indexed nullable player owners.
@@ -70,10 +71,16 @@ and [listener operations](listener-sessions.md).
 `NUXT_DATABASE_POOL_MAX` limits each web runtime's pool; it is a positive integer
 with a default of 10. `DATABASE_POOL_MAX` limits each of the worker's three
 independent pools (media, source control and subtitles); it defaults to 10 and
-must be at least 2. Source control holds a dedicated PostgreSQL session while
-other queries continue. Reserve one extra source-pool slot beyond the number of
-simultaneously held source sessions. The current public application configures
-one room. Each supervisor has a separate fixed one-connection pool.
+must be at least 2. Source control holds one dedicated PostgreSQL session for
+all of its sources while other queries continue, so two connections support any
+number of rooms. Each supervisor has a separate fixed one-connection pool.
+
+## Media capacity
+
+`MEDIA_WORKER_THREADS` (0–16, default 2) sets the worker threads that own WebRTC
+peers. `MEDIA_OPUS_FRAME_MS` (20, 40 or 60; default 60) sets the original-audio
+packet duration. See [listener capacity](capacity.md) for measurements and the
+CPU, TURN relay-port and bandwidth requirements of 1,000 listeners.
 
 For W web processes and V voice processes, plan for at most
 `W × (web pool + 1) + V × (3 × worker pool + 1)` application connections. Include

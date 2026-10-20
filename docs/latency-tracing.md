@@ -12,7 +12,7 @@ behind Grafana.
 | -------------------------------- | ------------- | ------------------------------------------------------------------ |
 | `babel.speech.turn` (root)       | `babel-voice` | First voiced Discord frame to last voiced frame of the turn        |
 | `babel.subtitle.translation`     | `babel-voice` | Speech onset to the first new translated revision per language     |
-| `babel.subtitle.worker_delivery` | `babel-voice` | Delivery queue wait plus per-event database authorization          |
+| `babel.subtitle.worker_delivery` | `babel-voice` | Delivery queue wait and snapshot authorization                     |
 | `babel.subtitle.web_relay`       | `babel-web`   | Private NDJSON chunk receipt to the player WebSocket write         |
 | `babel.subtitle.player_transit`  | `babel-web`   | Socket write to estimated browser receipt (half the heartbeat RTT) |
 | `babel.subtitle.browser_render`  | `babel-web`   | Browser receipt to the animation frame that paints the subtitle    |

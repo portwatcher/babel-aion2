@@ -7,9 +7,10 @@ import type {
 import type { Database } from '@babel/database'
 import type { CredentialCipher } from '@babel/database/credentials'
 import {
+  authorizedSubtitleListeners,
+  readRoomSources,
   readSubtitleListener,
   readSubtitlePaths,
-  subtitleDeliveryCurrent,
   type SubtitlePathStamp,
 } from '@babel/database/subtitles'
 import { babelTracer, parentContext, traceparent } from '@babel/telemetry'
@@ -29,10 +30,19 @@ interface Consumer extends SubtitleConsumer {
   sending: boolean
   closed: boolean
   state: string
+  // Start of the latest successful authorization that included this consumer.
+  authorizedAt: number
   sink: { send(event: SubtitleMessage): boolean; close(): void }
 }
 
 export class SubtitleDeliveryError extends Error {}
+
+// Authorization and path snapshots are refreshed every 500 ms. A delivery is only
+// sent while its listener and path were confirmed within this window.
+const VALIDITY_MS = 1_500
+// Consecutive storage failures tolerated before subscribers are disconnected.
+// Delivery already stops once VALIDITY_MS lapses.
+const MAX_REFRESH_FAILURES = 3
 
 /** Ephemeral delivery only. No subtitle history or raw audio is persisted. */
 export class SubtitleService {
@@ -41,6 +51,9 @@ export class SubtitleService {
   private paths = new Map<string, RunningSubtitlePath>()
   private pathVersion = 0
   private validUntil = 0
+  private roomSources = new Map<string, number>()
+  private readonly roomReads = new Map<string, Promise<void>>()
+  private failures = 0
   private readonly timer: ReturnType<typeof setInterval>
   private checking: Promise<void> | null = null
   private stopped = false
@@ -98,6 +111,7 @@ export class SubtitleService {
   }
 
   async subscribe(input: SubtitleSubscription, sink: Consumer['sink']) {
+    const checkedAt = performance.now()
     const listener = await readSubtitleListener(this.db, input)
     if (this.stopped || !listener?.outputLanguage) {
       throw new SubtitleDeliveryError('Listener unavailable')
@@ -116,6 +130,7 @@ export class SubtitleService {
       sending: false,
       closed: false,
       state: '',
+      authorizedAt: checkedAt,
       deliver: (message, stamp, current) =>
         this.enqueue(consumer, { message, stamp, current, queuedAt: Date.now() }),
     }
@@ -152,7 +167,7 @@ export class SubtitleService {
       return
     }
     // Replace an unsent revision of the same display window immediately. This
-    // bounds slow-client work without a debounce or an authorization cache.
+    // bounds slow-client work without a debounce.
     if (event.message.type === 'subtitle') {
       const incoming = event.message.value
       consumer.queue = consumer.queue.filter((pending) => {
@@ -200,31 +215,21 @@ export class SubtitleService {
       if (!event || event.current?.() === false) {
         continue
       }
-      if (event.message.type === 'subtitle') {
-        if (!event.stamp) {
-          continue
-        }
-        const value = event.message.value
-        const permitted = await subtitleDeliveryCurrent(
-          this.db,
-          consumer.input,
-          value.roomId,
-          value.sourceGeneration,
-          event.stamp,
-        )
-        if (!permitted.listener) {
-          this.close(consumer)
-          return
-        }
-        if (!permitted.path) {
-          continue
-        }
-      } else if (!(await readSubtitleListener(this.db, consumer.input))) {
-        this.close(consumer)
-        return
-      }
-      if (consumer.closed || event.current?.() === false) {
+      // Fail closed: without a recent confirmation the event is dropped.
+      if (performance.now() - consumer.authorizedAt >= VALIDITY_MS) {
         continue
+      }
+      if (event.message.type === 'subtitle') {
+        const value = event.message.value
+        if (
+          !event.stamp ||
+          !(await this.pathCurrent(value.roomId, value.sourceGeneration, event.stamp))
+        ) {
+          continue
+        }
+        if (consumer.closed || event.current?.() === false) {
+          continue
+        }
       }
       if (!this.send(consumer, event)) {
         this.close(consumer)
@@ -233,7 +238,41 @@ export class SubtitleService {
     }
   }
 
-  /** Queue wait and per-event authorization are part of speech-to-screen time. */
+  /** The room source and every revision of the language path are still current. */
+  private async pathCurrent(
+    roomId: string,
+    generation: number,
+    stamp: SubtitlePathStamp,
+  ) {
+    if (
+      performance.now() >= this.validUntil ||
+      this.paths.get(stamp.code)?.key !== JSON.stringify(stamp)
+    ) {
+      return false
+    }
+    const cached = this.roomSources.get(roomId)
+    if (cached === undefined || cached < generation) {
+      // A source started after the last snapshot: confirm it once, not per event.
+      let read = this.roomReads.get(roomId)
+      if (!read) {
+        read = readRoomSources(this.db, [roomId])
+          .then((sources) => {
+            const current = sources.get(roomId)
+            if (current === undefined) {
+              this.roomSources.delete(roomId)
+            } else {
+              this.roomSources.set(roomId, current)
+            }
+          })
+          .finally(() => this.roomReads.delete(roomId))
+        this.roomReads.set(roomId, read)
+      }
+      await read
+    }
+    return this.roomSources.get(roomId) === generation
+  }
+
+  /** Queue wait is part of speech-to-screen time. */
   private send(consumer: Consumer, event: Delivery) {
     const message = event.message
     if (message.type !== 'subtitle' || !message.value.latency) {
@@ -289,13 +328,17 @@ export class SubtitleService {
           : null,
       )
     }
+    const members = new Map<string, Consumer[]>()
+    for (const consumer of this.consumers.values()) {
+      const group = members.get(consumer.listener.roomId)
+      if (group) {
+        group.push(consumer)
+      } else {
+        members.set(consumer.listener.roomId, [consumer])
+      }
+    }
     for (const room of this.rooms.values()) {
-      room.reconcile(
-        [...this.consumers.values()].filter(
-          (consumer) => consumer.listener.roomId === room.roomId,
-        ),
-        this.paths,
-      )
+      room.reconcile(members.get(room.roomId) ?? [], this.paths)
     }
   }
 
@@ -304,7 +347,14 @@ export class SubtitleService {
       return
     }
     this.checking = this.refresh()
+      .then(() => {
+        this.failures = 0
+      })
       .catch(() => {
+        this.failures += 1
+        if (this.failures < MAX_REFRESH_FAILURES) {
+          return
+        }
         this.validUntil = 0
         for (const consumer of [...this.consumers.values()]) {
           this.close(consumer)
@@ -316,7 +366,16 @@ export class SubtitleService {
   }
 
   private async refresh() {
-    const saved = this.cipher ? await readSubtitlePaths(this.db, this.cipher) : []
+    const startedAt = performance.now()
+    const consumers = [...this.consumers.values()]
+    const [saved, authorized, sources] = await Promise.all([
+      this.cipher ? readSubtitlePaths(this.db, this.cipher) : [],
+      authorizedSubtitleListeners(
+        this.db,
+        consumers.map((consumer) => consumer.input),
+      ),
+      readRoomSources(this.db, [...this.rooms.keys()]),
+    ])
     if (this.stopped) {
       return
     }
@@ -336,14 +395,15 @@ export class SubtitleService {
       })
     }
     this.paths = paths
-    this.validUntil = performance.now() + 1_500
-    await Promise.all(
-      [...this.consumers.values()].map(async (consumer) => {
-        if (!(await readSubtitleListener(this.db, consumer.input))) {
-          this.close(consumer)
-        }
-      }),
-    )
+    this.roomSources = sources
+    this.validUntil = startedAt + VALIDITY_MS
+    for (const consumer of consumers) {
+      if (authorized.has(consumer.id)) {
+        consumer.authorizedAt = Math.max(consumer.authorizedAt, startedAt)
+      } else {
+        this.close(consumer)
+      }
+    }
     this.reconcileRooms()
   }
 

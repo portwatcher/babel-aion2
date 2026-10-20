@@ -7,9 +7,9 @@ import {
 } from '@babel/contracts'
 import {
   closePlayerConnection,
-  listPublicListeners,
   openPlayerConnection,
   readPlayerConnection,
+  readPlayerConnections,
   renewPlayerConnection,
   subtitleConnectionsStopped,
   ListenerError,
@@ -17,7 +17,7 @@ import {
 } from '@babel/database/listeners'
 import type { Hooks, Peer } from 'crossws'
 import { useDatabase } from './database'
-import { publicRoomConfiguration } from './room-configuration'
+import { createRoomViews, type RoomView } from './room-views'
 import { mediaReady, revokeMedia } from './media-control'
 import { createSubtitleRelay } from './subtitle-relay'
 import { SubtitleLatencyProbes } from './subtitle-latency'
@@ -32,6 +32,7 @@ interface Connection {
   lastState: string
   lastPlayers: string
   lastConfiguration: string
+  lastMap: string
   nonce: string | null
   pingAt: number
   pongAt: number
@@ -48,7 +49,17 @@ class PlayerProtocolError extends Error {}
 let timer: ReturnType<typeof setInterval> | undefined
 let running: Promise<void> | undefined
 
+/** One sweep's verified sessions and lazily shared room snapshots. */
+interface SweepContext {
+  sessions: Map<string, ListenerSnapshot>
+  room(roomId: string): Promise<RoomView>
+}
+
 function send(connection: Connection, event: PlayerEvent) {
+  sendText(connection, JSON.stringify(event))
+}
+
+function sendText(connection: Connection, text: string) {
   if (connection.closed || connection.closing) {
     return
   }
@@ -56,7 +67,7 @@ function send(connection: Connection, event: PlayerEvent) {
     end(connection, 1013, 'Connection too slow')
     return
   }
-  connection.peer.send(JSON.stringify(event))
+  connection.peer.send(text)
 }
 
 function end(connection: Connection, code: number, reason: string) {
@@ -97,7 +108,7 @@ async function persistClose(connection: Connection) {
   connection.acknowledgeClose()
 }
 
-async function refresh(connection: Connection) {
+async function refresh(connection: Connection, context?: SweepContext) {
   if (connection.closed) {
     await persistClose(connection)
     return
@@ -105,8 +116,11 @@ async function refresh(connection: Connection) {
   if (connection.closing || !connection.session) {
     return
   }
-  const session = await readPlayerConnection(useDatabase(), connection.session)
-  if (!session) {
+  const reference = connection.session
+  const session = context
+    ? context.sessions.get(reference.sessionId)
+    : await readPlayerConnection(useDatabase(), reference)
+  if (!session || session.nicknameGeneration !== reference.nicknameGeneration) {
     end(connection, 4401, 'Invalid listener')
     return
   }
@@ -125,25 +139,65 @@ async function refresh(connection: Connection) {
     connection.pingAt = now
     send(connection, { type: 'ping', nonce: connection.nonce })
   }
-  const players = await listPublicListeners(useDatabase(), session.roomId)
-  const playersKey = JSON.stringify(players)
-  if (playersKey !== connection.lastPlayers) {
-    send(connection, { type: 'players', players })
-    connection.lastPlayers = playersKey
+  // Room snapshots are informational, not authorization: a failed read skips
+  // this update instead of closing a verified socket.
+  const view = await (context ?? createSweepContext(new Map()))
+    .room(session.roomId)
+    .catch(() => null)
+  if (!view || connection.closing) {
+    return
   }
-  const configuration = await publicRoomConfiguration(undefined, session.roomId)
-  const configurationKey = JSON.stringify(configuration)
-  if (configurationKey !== connection.lastConfiguration) {
-    send(connection, { type: 'configuration', configuration })
-    connection.lastConfiguration = configurationKey
+  if (view.players !== connection.lastPlayers) {
+    sendText(connection, view.players)
+    connection.lastPlayers = view.players
+  }
+  if (view.configuration !== connection.lastConfiguration) {
+    sendText(connection, view.configuration)
+    connection.lastConfiguration = view.configuration
+  }
+  if (view.map !== null && view.map !== connection.lastMap) {
+    sendText(connection, view.map)
+    connection.lastMap = view.map
   }
 }
 
+function createSweepContext(sessions: Map<string, ListenerSnapshot>): SweepContext {
+  return { sessions, room: createRoomViews() }
+}
+
 async function sweep() {
+  const all = [...connections.values()]
+  const verified = new Set(
+    all.filter(
+      (connection) => connection.session && !connection.closed && !connection.closing,
+    ),
+  )
+  // One query verifies every socket on this replica; room data is read once per room.
+  let context: SweepContext | null = null
+  try {
+    context = createSweepContext(
+      await readPlayerConnections(
+        useDatabase(),
+        [...verified].flatMap((connection) =>
+          connection.session ? [connection.session] : [],
+        ),
+      ),
+    )
+  } catch {
+    /* Each verified socket below fails closed. */
+  }
   await Promise.allSettled(
-    [...connections.values()].map(async (connection) => {
+    all.map(async (connection) => {
       try {
-        await refresh(connection)
+        if (!verified.has(connection)) {
+          // Authenticated after the batch read: verify it individually.
+          await refresh(connection)
+          return
+        }
+        if (!context) {
+          throw new Error('Listener storage unavailable')
+        }
+        await refresh(connection, context)
       } catch {
         // A database failure never leaves an unverified delivery channel alive.
         send(connection, { type: 'error', code: 'UNAVAILABLE' })
@@ -232,6 +286,7 @@ export const playerWebSocketHooks: Partial<Hooks> = {
       lastState: '',
       lastPlayers: '',
       lastConfiguration: '',
+      lastMap: '',
       nonce: null,
       pingAt: 0,
       pongAt: Date.now(),

@@ -1,11 +1,10 @@
-import { randomInt } from 'node:crypto'
-import { performance } from 'node:perf_hooks'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { ListenerReference, MediaOffer } from '@babel/contracts'
 import type { Database } from '@babel/database'
 import { runtimeOwnerActive } from '@babel/database/runtime-owners'
 import { readUplinkHost } from '@babel/database/voice-sources'
 import {
+  authorizedMediaConnections,
   authorizeMediaSession,
   closeMediaConnection,
   earlierMediaConnectionsStopped,
@@ -14,16 +13,10 @@ import {
   openMediaConnection,
   ListenerError,
 } from '@babel/database/listeners'
-import {
-  MediaStreamTrack,
-  RTCPeerConnection,
-  RTCRtpCodecParameters,
-  RtpHeader,
-  RtpPacket,
-} from 'werift'
 import opus from '@discordjs/opus'
 import type { MediaNetwork } from './media-network.ts'
 import type { PlayerUplink } from './player-source.ts'
+import { MediaShards } from './media-shards.ts'
 
 interface Entry {
   id: string
@@ -32,11 +25,11 @@ interface Entry {
   roomId: string
   nickname: string
   roomEpoch: number
-  sequence: number
-  timestamp: number
-  startedAt: number
-  peer: RTCPeerConnection | null
-  track: MediaStreamTrack | null
+  // The peer exists on a shard (created or being created).
+  created: boolean
+  // A listener peer that receives the room's audio.
+  sending: boolean
+  connectionState: string
   // Set only for a PLAYER room host: this peer receives instead of sending.
   uplink: { id: string; decoder: InstanceType<typeof opus.OpusEncoder> } | null
   registered: boolean
@@ -57,19 +50,48 @@ export class MediaPeerError extends Error {
   }
 }
 
+// Consecutive storage failures tolerated before every peer is closed. Explicit
+// revocation closes peers directly; this sweep is the backstop for missed ones.
+const MAX_SWEEP_FAILURES = 3
+
 export class MediaPeers {
   private readonly entries = new Map<string, Entry>()
+  // Sending peers by room: publication touches only its room's listeners.
+  private readonly rooms = new Map<string, Set<Entry>>()
+  private sweepFailures = 0
   private readonly roomEpochs = new Map<string, number>()
   private readonly uplinks = new Map<string, PlayerUplink>()
   private stopping = false
   private sweeping: Promise<void> | null = null
   private readonly timer: ReturnType<typeof setInterval>
+  private readonly shards: MediaShards
 
   constructor(
     private readonly db: Database,
     private readonly network: MediaNetwork,
     private readonly ownerId: string,
+    // Worker threads for peers; 0 keeps them in-process. A lost thread is fatal.
+    options: { threads?: number; failed?: () => void } = {},
   ) {
+    this.shards = new MediaShards(
+      options.threads ?? 0,
+      {
+        state: (id, state) => this.changed(id, state),
+        uplink: (id, payload) => {
+          const entry = this.entries.get(id)
+          if (entry) {
+            this.receiveUplink(entry, payload)
+          }
+        },
+        failed: (id) => {
+          const entry = this.entries.get(id)
+          if (entry) {
+            void this.close(entry).catch(() => {})
+          }
+        },
+      },
+      options.failed ?? (() => {}),
+    )
     this.timer = setInterval(() => {
       if (!this.sweeping) {
         this.sweeping = this.sweep().finally(() => {
@@ -130,11 +152,9 @@ export class MediaPeers {
       roomId: listener.roomId,
       nickname: listener.nickname.normalize('NFC'),
       roomEpoch: this.roomEpochs.get(listener.roomId) ?? 0,
-      sequence: randomInt(65_536),
-      timestamp: randomInt(0x1_0000_0000),
-      startedAt: performance.now(),
-      peer: null,
-      track: null,
+      created: false,
+      sending: false,
+      connectionState: 'new',
       uplink: null,
       registered: false,
       closing: false,
@@ -148,6 +168,9 @@ export class MediaPeers {
       credentialExpiresAt: Infinity,
     }
     this.entries.set(id, entry)
+    const members = this.rooms.get(entry.roomId) ?? new Set<Entry>()
+    members.add(entry)
+    this.rooms.set(entry.roomId, members)
     entry.offer = this.create(entry, credential)
     return entry.offer
   }
@@ -218,48 +241,20 @@ export class MediaPeers {
       const host = await readUplinkHost(this.db, entry.roomId)
       const network = this.network.create()
       entry.credentialExpiresAt = network.expiresAt
-      const peer = new RTCPeerConnection({
-        ...network.worker,
-        codecs: {
-          audio: [
-            new RTCRtpCodecParameters({
-              mimeType: 'audio/opus',
-              clockRate: 48000,
-              channels: 2,
-              payloadType: 111,
-            }),
-          ],
-        },
-      })
-      entry.peer = peer
-      let uplink: ReturnType<RTCPeerConnection['addTransceiver']> | null = null
-      if (host !== null && host === entry.nickname) {
+      const uplink = host !== null && host === entry.nickname
+      if (uplink) {
         // The host publishes the room's audio and does not receive its own mix.
-        uplink = peer.addTransceiver('audio', { direction: 'recvonly' })
-        const decoder = new opus.OpusEncoder(48_000, 2)
-        entry.uplink = { id: `player:${entry.id}`, decoder }
-        uplink.onTrack.subscribe((track) => {
-          track.onReceiveRtp.subscribe((rtp) => this.receiveUplink(entry, rtp.payload))
-        })
+        entry.uplink = {
+          id: `player:${entry.id}`,
+          decoder: new opus.OpusEncoder(48_000, 2),
+        }
       } else {
-        entry.track = new MediaStreamTrack({ kind: 'audio' })
-        peer.addTransceiver(entry.track, { direction: 'sendonly' })
+        entry.sending = true
       }
-      peer.connectionStateChange.subscribe((state) => {
-        if (state === 'connected') {
-          entry.expiresAt = entry.credentialExpiresAt
-        }
-        if (state === 'failed' || state === 'closed') {
-          void this.close(entry).catch(() => {})
-        }
-      })
-      await peer.setLocalDescription(await peer.createOffer())
+      entry.created = true
+      const offer = await this.shards.create(entry.id, network.worker, uplink)
       await this.authorized(entry)
-      const description = peer.localDescription
-      if (!description || description.type !== 'offer') {
-        throw new MediaPeerError('UNAVAILABLE')
-      }
-      const candidates = description.sdp
+      const candidates = offer.sdp
         .split(/\r?\n/)
         .filter((line) => line.startsWith('a=candidate:'))
       if (
@@ -269,12 +264,12 @@ export class MediaPeers {
       ) {
         throw new MediaPeerError('UNAVAILABLE')
       }
-      if (uplink && !uplink.mid) {
+      if (uplink && !offer.uplinkMid) {
         throw new MediaPeerError('UNAVAILABLE')
       }
       result = {
         connectionId: entry.id,
-        uplinkMid: uplink?.mid ?? null,
+        uplinkMid: offer.uplinkMid,
         ice: {
           ...network.browser,
           renewAfterMs:
@@ -282,7 +277,7 @@ export class MediaPeers {
               ? null
               : Math.max(1_000, network.expiresAt - Date.now() - 30_000),
         },
-        description: { type: 'offer', sdp: description.sdp },
+        description: { type: 'offer', sdp: offer.sdp },
       }
     } catch (error) {
       failure = error
@@ -310,10 +305,10 @@ export class MediaPeers {
     this.match(entry, reference)
     await entry.initialized
     await this.authorized(entry)
-    if (!entry.peer || entry.answer) {
+    if (!entry.created || entry.answer) {
       throw new MediaPeerError('BUSY')
     }
-    entry.answer = entry.peer.setRemoteDescription(description)
+    entry.answer = this.shards.answer(entry.id, description.sdp)
     try {
       await entry.answer
       await this.authorized(entry)
@@ -334,7 +329,27 @@ export class MediaPeers {
     }
   }
 
+  private changed(id: string, state: string) {
+    const entry = this.entries.get(id)
+    if (!entry) {
+      return
+    }
+    entry.connectionState = state
+    if (state === 'connected') {
+      entry.expiresAt = entry.credentialExpiresAt
+      if (entry.sending && this.live(entry)) {
+        this.shards.deliver(entry.id, entry.roomId, entry.credentialExpiresAt)
+      }
+    }
+    if (state === 'failed' || state === 'closed') {
+      void this.close(entry).catch(() => {})
+    }
+  }
+
   private close(entry: Entry): Promise<void> {
+    if (!entry.closing && entry.created) {
+      this.shards.withhold(entry.id)
+    }
     entry.closing = true
     if (entry.closingTask) {
       return entry.closingTask
@@ -342,9 +357,10 @@ export class MediaPeers {
     entry.closingTask = (async () => {
       await entry.initialized
       await entry.answer?.catch(() => {})
-      entry.track?.stop()
       if (!entry.closed) {
-        await entry.peer?.close()
+        if (entry.created) {
+          await this.shards.close(entry.id)
+        }
         entry.closed = true
       }
       if (entry.uplink) {
@@ -355,6 +371,11 @@ export class MediaPeers {
       }
       if (this.entries.get(entry.id) === entry) {
         this.entries.delete(entry.id)
+      }
+      const members = this.rooms.get(entry.roomId)
+      members?.delete(entry)
+      if (members?.size === 0) {
+        this.rooms.delete(entry.roomId)
       }
     })().finally(() => {
       entry.closingTask = null
@@ -380,7 +401,7 @@ export class MediaPeers {
       !entry.closed &&
       Date.now() < entry.credentialExpiresAt &&
       entry.roomEpoch === (this.roomEpochs.get(entry.roomId) ?? 0) &&
-      entry.peer?.connectionState === 'connected'
+      entry.connectionState === 'connected'
     )
   }
 
@@ -409,56 +430,50 @@ export class MediaPeers {
     sink.receive(entry.uplink.id, entry.nickname, pcm)
   }
 
-  publish(roomId: string, payload: Buffer) {
-    const now = performance.now()
-    for (const entry of this.entries.values()) {
-      if (entry.roomId !== roomId || !entry.track || !this.live(entry)) {
-        continue
-      }
-      const elapsed = now - entry.startedAt
-      entry.timestamp =
-        (entry.timestamp + (elapsed > 40 ? Math.round(elapsed / 20) : 1) * 960) >>> 0
-      entry.startedAt = now
-      const header = new RtpHeader({
-        payloadType: 111,
-        sequenceNumber: entry.sequence++ % 65_536,
-        timestamp: entry.timestamp,
-      })
-      try {
-        entry.track.writeRtp(new RtpPacket(header, payload))
-      } catch {
-        void this.close(entry).catch(() => {})
-      }
+  /** Liveness of each peer is enforced by the shards' delivery membership. */
+  publish(roomId: string, payload: Buffer, durationMs = 20) {
+    if (this.rooms.has(roomId)) {
+      this.shards.publish(roomId, payload, durationMs)
     }
   }
 
   async closeRoom(roomId: string) {
     this.roomEpochs.set(roomId, (this.roomEpochs.get(roomId) ?? 0) + 1)
     await Promise.all(
-      [...this.entries.values()]
-        .filter((entry) => entry.roomId === roomId)
-        .map((entry) => this.close(entry)),
+      [...(this.rooms.get(roomId) ?? [])].map((entry) => this.close(entry)),
     )
   }
 
   private async sweep() {
+    const registered = [...this.entries.values()].filter((entry) => entry.registered)
+    if (!registered.length) {
+      return
+    }
+    let authorized: Set<string>
+    try {
+      authorized = await authorizedMediaConnections(
+        this.db,
+        registered.map((entry) => entry.id),
+        this.ownerId,
+      )
+      this.sweepFailures = 0
+    } catch {
+      // A storage failure is not proof of authorization. After repeated failures
+      // close every peer. Failed acknowledgement remains in storage and is retried.
+      this.sweepFailures += 1
+      if (this.sweepFailures >= MAX_SWEEP_FAILURES) {
+        await Promise.allSettled(registered.map((entry) => this.close(entry)))
+      }
+      return
+    }
     await Promise.allSettled(
-      [...this.entries.values()].map(async (entry) => {
-        if (!entry.registered) {
-          return
-        }
-        try {
-          if (
-            entry.closing ||
-            Date.now() >= entry.expiresAt ||
-            !(await mediaConnectionAuthorized(this.db, entry.id, this.ownerId))
-          ) {
-            await this.close(entry)
-          }
-        } catch {
-          // A storage failure closes the peer. Failed acknowledgement remains in
-          // storage and is retried; neither an exception nor a timeout is proof.
-          await this.close(entry).catch(() => {})
+      registered.map(async (entry) => {
+        if (
+          entry.closing ||
+          Date.now() >= entry.expiresAt ||
+          !authorized.has(entry.id)
+        ) {
+          await this.close(entry)
         }
       }),
     )
@@ -471,5 +486,6 @@ export class MediaPeers {
     await Promise.allSettled(
       [...this.entries.values()].map((entry) => this.close(entry)),
     )
+    await this.shards.stop()
   }
 }

@@ -98,7 +98,9 @@ export function usePlayerConnection(
         return
       }
       state.value = 'reconnecting'
-      retry = setTimeout(open, Math.min(15_000, 1_000 * 2 ** Math.min(attempts++, 4)))
+      // Jitter spreads reconnects when many players lose the server together.
+      const backoff = Math.min(15_000, 1_000 * 2 ** Math.min(attempts++, 4))
+      retry = setTimeout(open, backoff / 2 + Math.random() * (backoff / 2))
     }
     current.onerror = () => {
       /* onclose owns recovery of the same session. */

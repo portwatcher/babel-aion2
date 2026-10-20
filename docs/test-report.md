@@ -1171,6 +1171,24 @@ TCP 443; it now also allows the Cloudflare HTTPS-alternate ports (2053, 2083,
 | Voice pod reaches Discord voice gateway TCP 2083        | PASS   | Socket probe from the worker pod: timeout before the policy change, open after                                                                           |
 | Production stops flapping                               | PASS   | After the policy applied at 11:21 UTC, room `b99f0b7a…` generation 284 stayed open with no further `source-failed` logs; earlier runs closed after 3–5 s |
 
+## Listener capacity (2026-10-20)
+
+Target: five rooms with 1,000 listeners in total. See [listener capacity](capacity.md).
+
+| Check                                                    | Result                    | Evidence                                                                                                                                                                                         |
+| -------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1,000 listeners, 5 rooms, 60 ms packets, direct ICE      | PASS                      | `npm run test:capacity:db` in Linux arm64 Docker, worker pinned to 2 CPUs and web replicas to 1 CPU: all audio connected, 0 socket closes, 0 peer failures, 16.7 packets/s each, worker 0.58 CPU |
+| 1,000 listeners, 5 rooms, 60 ms packets, relay-only TURN | PASS                      | Same, worker over TURN/TCP and players over TURN/UDP through coturn 4.18 with 2,000 relay allocations: worker 0.65 CPU, coturn about 0.6 CPU                                                     |
+| 1,000 listeners, 5 rooms, 20 ms packets                  | PASS                      | Same as the first row: 49.3 packets/s each, worker 1.52 CPU                                                                                                                                      |
+| Chromium decodes shard-published audio                   | PASS                      | Built-in browser listener in a local player room: 16.7 packets/s, 0 lost, 0 concealed samples, rising decoded audio energy                                                                       |
+| Five sources on a two-connection worker pool             | PASS                      | `player-rooms.test.ts`: all five claims succeed, one session holds every lock, terminating it invalidates all five. The previous ownership code times out on the third claim                     |
+| Mixer keeps real time under late timer callbacks         | PASS                      | `room-audio.test.ts` with 21 ms callbacks: at least 49 frames per second and no discarded speech. The previous mixer fails this test                                                             |
+| 60 ms packets carry contiguous mixed frames              | PASS                      | `room-audio.test.ts`: three packets of 2,880 samples, first tone then directly the second                                                                                                        |
+| Map revision push across replicas                        | PASS                      | `npm run test:community:db`: a socket on replica A receives a new revision after a stroke through replica B and again after erasure                                                              |
+| Existing suites                                          | PASS                      | `npm run test:db`, `test:media:db`, `test:subtitles:db`, `test:ws:db`, `test:http:db`, `test:network:db`, `test:community:db`                                                                    |
+| DigitalOcean AMD64 capacity                              | NOT RUN                   | Requires production resources; see the requirements in [listener capacity](capacity.md)                                                                                                          |
+| Production TURN relay ports for 1,000 listeners          | WAITING FOR CONFIGURATION | The shared coturn exposes 40 relay ports per listener protocol; relay-only delivery needs two allocations per listener                                                                           |
+
 ## Git and task cleanup
 
 The implementation, release evidence, published-image rollback rehearsal

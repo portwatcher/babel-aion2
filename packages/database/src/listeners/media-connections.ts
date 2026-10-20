@@ -1,5 +1,5 @@
 import type { ListenerReference } from '@babel/contracts'
-import { and, eq, isNull, max, ne } from 'drizzle-orm'
+import { and, eq, inArray, isNull, max, ne } from 'drizzle-orm'
 import type { Database } from '../client.ts'
 import { mediaConnection } from '../schema/media-connections.ts'
 import { listenerSession, nickname } from '../schema/rooms.ts'
@@ -118,14 +118,26 @@ export async function mediaConnectionAuthorized(
   id: string,
   ownerId: string,
 ) {
-  const [record] = await db
+  return (await authorizedMediaConnections(db, [id], ownerId)).has(id)
+}
+
+/** The currently authorized subset, checked for every live peer in one query. */
+export async function authorizedMediaConnections(
+  db: Database,
+  ids: string[],
+  ownerId: string,
+) {
+  if (!ids.length) {
+    return new Set<string>()
+  }
+  const records = await db
     .select({ id: mediaConnection.id })
     .from(mediaConnection)
     .innerJoin(listenerSession, eq(listenerSession.id, mediaConnection.sessionId))
     .innerJoin(nickname, eq(nickname.key, listenerSession.nicknameKey))
     .where(
       and(
-        eq(mediaConnection.id, id),
+        inArray(mediaConnection.id, ids),
         eq(mediaConnection.ownerId, ownerId),
         eq(listenerSession.nicknameGeneration, mediaConnection.nicknameGeneration),
         eq(nickname.currentSessionId, listenerSession.id),
@@ -136,7 +148,7 @@ export async function mediaConnectionAuthorized(
         isNull(mediaConnection.closedAt),
       ),
     )
-  return Boolean(record)
+  return new Set(records.map((record) => record.id))
 }
 
 export async function earlierMediaConnectionsStopped(
