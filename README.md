@@ -1,4 +1,4 @@
-# Babel · AION2 深渊战
+# Babel Tower of AION2
 
 Live voice relay and subtitles for AION2 (Steam Global / Asia) battle groups.
 A host's voice reaches players as original audio, with real-time captions and
