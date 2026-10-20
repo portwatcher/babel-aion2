@@ -1,5 +1,18 @@
 # Validation
 
+## Visible original subtitles · 2026-10-21
+
+Scope: show the existing original transcript beneath the translated subtitle in
+both the listener panel and its shared compact Picture-in-Picture presentation.
+
+| Check                             | Status  | Evidence                                                                                                                                                                                                                                                |
+| --------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bilingual layout and reflow       | PASS    | Chrome/macOS local component preview with explicitly synthetic captions: 320, 375, 768 and 1280 px widths; standard, large and extra-large sizes; long and unbroken text. Source stays below translation, with no horizontal overflow or line clamping. |
+| Source and status states          | PASS    | The same preview covers source-before-translation, translation-before-source, whitespace-only source, waiting, reconnecting, language change and quota failure. Empty source rows are omitted and existing unavailable states remain visible.           |
+| Localization and contrast         | PASS    | Original/live labels render from all four existing catalogs; English, Japanese and Korean source text retain their own language metadata. Existing muted text measures 10.29:1 on the main subtitle surface and 9.95:1 on the compact base background.  |
+| Source and built runtime          | PASS    | `npm run ci:local`: formatting, source limits, strict workspace types, 32 unit tests, all builds and built HTTP smoke.                                                                                                                                  |
+| Native PiP, live speech and delay | NOT RUN | Compact component rendering was checked; native window chrome, game display modes and live provider/audio latency were not exercised. The change adds no provider or transport work.                                                                    |
+
 ## Player capture input selection · 2026-10-19
 
 Scope: the player-source option is named player capture; the host chooses and

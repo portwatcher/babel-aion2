@@ -67,6 +67,14 @@ revocable player WebSocket. Vue updates its shared presentation for every accept
 revision; the main page and Document PiP use the same state. No polling or debounce
 is used for player captions. Administration keeps ordinary HTTP and polling.
 
+Both views show the translation first and the original text beneath it, with a
+smaller, muted type size and a localized source-finality label. Source text appears
+as soon as it is available, without a disclosure or waiting for translation.
+Both rows wrap without truncation and follow the existing text-size setting.
+This uses the existing `originalText` payload; it adds no provider request, network
+subscription or synchronization wait. The independent streams are not presented
+as having sentence-by-sentence alignment.
+
 Source and credential replacement close obsolete provider sockets. Changed player
 languages abort the previous private subscription and clear page/PiP state while
 preserving listener identity and original audio. Nickname replacement still waits

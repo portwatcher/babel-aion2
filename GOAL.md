@@ -645,7 +645,10 @@ Keep these parts of a command:
 Do not add tactical advice.
 Do not infer a location from unclear words such as "here".
 
-Keep the source text available for comparison.
+Show the source text beneath the translation on the main page and PiP, without
+a disclosure. Use a smaller, readable type size and let long text wrap.
+Update source and translated text independently as each arrives; never wait for
+the two streams to align before displaying either one.
 Distinguish provisional subtitles from stable subtitles.
 
 Replace an existing subtitle when its revision changes.
@@ -688,7 +691,8 @@ Do not send earlier battle history to a new player by default.
 Make the original audio continue when the player returns to the game.
 
 Use Document Picture-in-Picture for a text-only subtitle window.
-Use a compact strip with one or two lines.
+Use a compact bilingual strip with translation above original text.
+Let long text wrap and remain reachable by scrolling in a small window.
 Let the player change text size.
 
 Show the current speaker and the selected output language's subtitle.

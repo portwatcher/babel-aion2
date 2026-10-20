@@ -5,12 +5,14 @@ Picture-in-Picture in a secure, top-level page. Opening requires the player's
 click or keyboard activation. An unsupported browser keeps the ordinary page
 usable and does not show this button. A rejected request shows a retry message.
 
-The window displays the latest member's selected-language subtitle and connection
-status from the same authorized stream as the main page. The compact text is
-limited to two lines and labels speaker/finality; the main page also offers the
-source text and up to two current speakers. No synthetic video, capture request
-or extra audio element is created. Text is cleared on subscription changes,
-source stop, connection loss or session retirement.
+The window displays the latest member's selected-language subtitle, original
+text and connection status from the same authorized stream as the main page.
+The translation is prominent, with smaller muted original text immediately
+beneath it and localized speaker/finality labels. Both rows wrap without
+truncation; the window can scroll when its size cannot fit longer text. The main
+page shows the same bilingual layout for up to two current speakers. No synthetic
+video, capture request or extra audio element is created. Text is cleared on
+subscription changes, source stop, connection loss or session retirement.
 
 ## Use and lifecycle
 

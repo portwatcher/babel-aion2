@@ -21,8 +21,9 @@ is in [design.md](design.md), mirrored in [GOAL.md](GOAL.md).
 - **Room lifecycle.** Empty rooms disband after five minutes. The host can close
   a room at any time. See [community rooms](docs/multi-room-and-map.md).
 - **Subtitles.** OpenAI realtime transcription and translation, pushed to the
-  page and a Picture-in-Picture window. Translation runs only for languages with
-  subscribers. See [streaming subtitles](docs/streaming-subtitles.md).
+  page and a Picture-in-Picture window. Original text stays visible beneath the
+  translation in both views, updating independently. Translation runs only for
+  languages with subscribers. See [streaming subtitles](docs/streaming-subtitles.md).
 - **Tactical map.** Shared drawing on the Lower Reshanta map, persisted per room.
 - **Interface languages.** English, Simplified Chinese, Japanese and Korean.
   See [interface localization](docs/interface-localization.md).
