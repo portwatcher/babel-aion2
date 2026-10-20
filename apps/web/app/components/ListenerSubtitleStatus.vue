@@ -76,12 +76,14 @@ const visible = computed(() =>
           (subtitle.failure ? t('translationUnavailable') : t('translating'))
         }}
       </p>
-      <details v-if="!compact" :open="!subtitle.translatedText">
-        <summary>
+      <p v-if="subtitle.originalText.trim()" class="subtitle-original">
+        <span class="subtitle-original-label">
           {{ t(subtitle.sourceIsFinal ? 'sourceFinal' : 'sourceInterim') }}
-        </summary>
-        <p :lang="subtitle.sourceLanguage">{{ subtitle.originalText }}</p>
-      </details>
+        </span>
+        <span :lang="subtitle.sourceLanguage" dir="auto">{{
+          subtitle.originalText
+        }}</span>
+      </p>
       <small v-if="!compact && subtitle.discontinuity" class="muted">{{
         t('subtitleDiscontinuity')
       }}</small>

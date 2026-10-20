@@ -299,14 +299,15 @@ small {
   gap: 4px;
   min-width: 0;
 }
-.subtitle-command details {
-  font-size: 0.875rem;
+.subtitle-original {
+  color: var(--babel-muted);
+  font-size: max(1rem, calc(var(--subtitle-text-size, 1.25rem) * 0.8));
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
-.subtitle-command summary {
-  cursor: pointer;
-  padding-block: 8px;
-  color: var(--babel-muted);
+.subtitle-original-label {
+  margin-inline-end: 0.5em;
+  font-size: 0.875rem;
 }
 .subtitle-pip-page {
   min-width: 0;
@@ -317,12 +318,6 @@ small {
   padding: 0;
   border: 0;
   background: none;
-}
-.listener-subtitles-compact .subtitle-message {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 .session-notice,
 .session-feedback {
