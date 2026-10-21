@@ -22,6 +22,12 @@ unavailable to the server, so a localStorage-only preference is applied after
 mounting on its first request. Blocked storage does not prevent the current
 choice or cookie persistence from working.
 
+The header also links to the Babel repository with GitHub's official white
+Invertocat from the [GitHub logo download](https://brand.github.com/foundations/logo),
+stored unchanged at `apps/web/public/brands/github-mark-white.svg`. The icon uses
+the shared PrimeVue button as a link, with a localized accessible name and a
+44 px target. It remains available in English on administrator pages.
+
 Changing the interface language preserves nickname input, the listener session,
 original audio, selected subtitle language, and PiP. Existing notices and PiP
 metadata update with the interface. Administrator-configured room/language names,

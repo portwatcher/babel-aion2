@@ -154,6 +154,12 @@ small {
   min-width: 8rem;
   max-width: 100%;
 }
+.github-link {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+}
 .main-content {
   padding-block: clamp(24px, 5vw, 48px) 64px;
 }
