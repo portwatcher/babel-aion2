@@ -35,6 +35,11 @@
   Do not stop at a local commit or ask for another push/merge confirmation.
   Respect an explicit user instruction to keep work unmerged. Resolve failures
   before merging and never bypass a required check or force-push `main`.
+- Automatically clean up local and remote task branches already merged into the
+  latest remote `main` and their completed worktrees at session start, after
+  merging a task, and before session completion. Do not wait for another cleanup
+  request or confirmation. Apply the removal checks below; preserve `main`, the
+  primary checkout, and unfinished work.
 - Before removal, verify task commits are contained in the latest remote
   integration branch, the worktree has no uncommitted or valuable untracked
   files, and no unfinished task is using it. If no remote exists, preserve the
