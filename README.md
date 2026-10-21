@@ -27,6 +27,7 @@ is in [design.md](design.md), mirrored in [GOAL.md](GOAL.md).
 - **Tactical map.** Shared drawing on the Lower Reshanta map, persisted per room.
 - **Interface languages.** English, Simplified Chinese, Japanese and Korean.
   See [interface localization](docs/interface-localization.md).
+- **Source code.** The header's GitHub icon links to this repository.
 - **Administration.** `/admin` is protected by Cloudflare Access and holds only
   the OpenAI API key and game terms. See [access control](docs/access-control.md).
 

@@ -1,5 +1,14 @@
 # Validation
 
+## GitHub repository link · 2026-10-21
+
+| Check                                 | Status  | Evidence                                                                                                                                                                         |
+| ------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source and built runtime              | PASS    | `npm run ci:local`: formatting, source limits, strict workspace types, 32 unit tests, all builds and built HTTP smoke.                                                           |
+| Header link and keyboard access       | PASS    | In-app browser preview: official GitHub asset loads, target measures 44 × 44 px, Tab shows a focus outline, and Enter navigates to `https://github.com/portwatcher/babel-aion2`. |
+| Localized accessible name             | PASS    | Switching the header selector through English, Simplified Chinese, Japanese and Korean updates the link's accessible name.                                                       |
+| Authenticated administrator rendering | NOT RUN | The shared header keeps the link and hides the language selector in administrator mode; no authenticated administrator browser session was used.                                 |
+
 ## Visible original subtitles · 2026-10-21
 
 Scope: show the existing original transcript beneath the translated subtitle in

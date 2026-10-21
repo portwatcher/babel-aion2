@@ -4,6 +4,7 @@
   "skipContent": "メインコンテンツへ移動",
   "home": "Babel ホーム",
   "navigation": "メインナビゲーション",
+  "githubRepository": "Babel の GitHub リポジトリ",
   "administration": "管理",
   "interfaceLanguage": "表示言語",
   "configurationUnavailable": "ルームを読み込めません",

@@ -4,6 +4,7 @@
   "skipContent": "Skip to main content",
   "home": "Babel home",
   "navigation": "Main navigation",
+  "githubRepository": "Babel on GitHub",
   "administration": "Administration",
   "interfaceLanguage": "Interface language",
   "configurationUnavailable": "Unable to load this room",
