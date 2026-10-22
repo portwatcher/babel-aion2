@@ -38,7 +38,7 @@ export class SpeakerSubtitles {
   private ready = false
   private closed = false
   private samples = 0
-  private lastTick = performance.now()
+  private nextFrameAt = performance.now() + 20
 
   constructor(
     private readonly roomId: string,
@@ -66,7 +66,7 @@ export class SpeakerSubtitles {
       .then(() => {
         if (!this.closed) {
           this.timeline.clear()
-          this.lastTick = performance.now()
+          this.nextFrameAt = performance.now() + 20
           this.ready = true
         }
       })
@@ -218,12 +218,21 @@ export class SpeakerSubtitles {
       return
     }
     const now = performance.now()
-    if (!this.allowed() || now - this.lastTick > 100) {
+    if (!this.allowed() || now - this.nextFrameAt > 100) {
       // A new stream gets a fresh generation; dropped time is never spliced into speech.
       this.finish('UNAVAILABLE')
       return
     }
-    this.lastTick = now
+    // Hardware continues at 48 kHz even when interval callbacks run late.
+    // Drain every due frame so ordinary timer drift cannot overflow the queue
+    // and repeatedly reset recognition and all translations for this speaker.
+    while (now >= this.nextFrameAt && !this.closed) {
+      this.nextFrameAt += 20
+      this.writeFrame(now)
+    }
+  }
+
+  private writeFrame(now: number) {
     const frame = this.timeline.take(now) ?? Buffer.alloc(PCM_FRAME_BYTES)
     const mono = Buffer.alloc(960 * 2)
     for (let i = 0; i < 960; i += 1) {

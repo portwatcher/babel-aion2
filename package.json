@@ -18,7 +18,7 @@
     "dev:worker": "npm run dev --workspace=@babel/voice-worker",
     "prepare": "npm run prepare --workspace=@babel/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "tsx --test packages/contracts/test/*.test.ts packages/telemetry/test/*.test.ts packages/auth/test/*.test.ts packages/providers/test/*.test.mjs apps/voice-worker/test/room-audio.test.ts apps/voice-worker/test/speech-turns.test.ts apps/web/test/*.test.ts",
+    "test": "tsx --test packages/contracts/test/*.test.ts packages/telemetry/test/*.test.ts packages/auth/test/*.test.ts packages/providers/test/*.test.mjs apps/voice-worker/test/room-audio.test.ts apps/voice-worker/test/speech-turns.test.ts apps/voice-worker/test/speaker-subtitles.test.mjs apps/web/test/*.test.ts",
     "test:db": "tsx --env-file=.env --test packages/database/test/*.test.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
