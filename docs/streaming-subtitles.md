@@ -19,6 +19,13 @@ keeps only the newest five frames (100 ms), marks discontinuity if older audio i
 lost, and never delays ready targets. The worker drops pre-ready audio
 instead of replaying seconds of history after a cold connection.
 
+Both host-capture and Discord subtitle streams schedule frames against the
+monotonic clock. A late timer callback forwards every due 20 ms frame rather than
+one frame per callback. Without this compensation, even 21 ms callbacks gradually
+fill the 100 ms queue, repeatedly disconnecting recognition and all translations.
+Real pauses still send silence. Queue overflow or a stall more than 100 ms behind
+the next due frame still retires the stream and discards obsolete audio.
+
 Every translation delta is appended exactly as received and published immediately.
 Event IDs deduplicate repeated packets; equal `elapsed_ms` values do not discard
 distinct fragments. Source recognition runs with `delay: minimal` and local source
