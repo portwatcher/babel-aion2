@@ -53,6 +53,11 @@ const status = computed(() => {
     return t(audioStatus[roomState].description)
   }
   if (captureState.value !== 'off') {
+    if (captureState.value === 'live' && props.audioState !== 'connected') {
+      return props.audioState === 'unavailable'
+        ? t('audioUnavailable')
+        : t('audioConnecting')
+    }
     return captureState.value === 'live' && props.capture.muted.value
       ? t('captureMuted')
       : t(captureStatus[captureState.value])

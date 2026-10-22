@@ -1,5 +1,26 @@
 # Validation
 
+## Browser media gathering timeout · 2026-10-22
+
+After the subtitle-clock repair, room `/rooms/5` still received zero host PCM
+frames. The room uses PLAYER capture; the host authorized sharing the existing
+Discord tab. Selecting that tab with audio sharing enabled still produced no
+frames. Stored media receipts and edge HTTP timings showed repeated attempts,
+while the page incorrectly reported broadcasting. The actual browser exception
+was `Media gathering timeout`, before the SDP answer was submitted.
+
+Browser negotiation now uses already collected candidates when the ten-second
+deadline expires, preserving the configured ICE policy. Empty discovery and
+cancellation still fail. The host status waits for an actual media connection,
+and controlled fault logs identify only the negotiation stage and HTTP status.
+
+| Check                                | Status  | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Regression discriminator             | PASS    | The extracted original gather behavior passes complete discovery and cancellation/empty controls, but rejects the partial-candidate deadline case. After repair, all three tests pass.                                                                                                                                                                                                                                                                                                                                                                                       |
+| Source and built HTTP runtime        | PASS    | Node 24.22.1 `npm run ci:local`: 37 tests, formatting, source limits, strict workspace types, all builds and built HTTP smoke.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Real browser and production relay    | PASS    | An isolated Chrome page uses synthetic oscillator audio and the real host-capture composable. Two local worker threads received and decoded its audio. A separate ephemeral probe inside the production voice Pod used the existing relay configuration and also received and decoded the generated audio. With an additional unresponsive TURN fixture, the repaired browser submitted after 10,006 ms while gathering was still pending and delivered 34/34 voiced packets without decode errors. No real audio was recorded and no production player or room was created. |
+| Human Discord subtitles after repair | NOT RUN | At source validation time, the corrected browser bundle was not yet deployed. The earlier server-clock release did not establish browser upload or human Discord delivery.                                                                                                                                                                                                                                                                                                                                                                                                   |
+
 ## Subtitle audio timer drift · 2026-10-22
 
 Room `/rooms/5` was a running PLAYER-source room; its browser reported unavailable

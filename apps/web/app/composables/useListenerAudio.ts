@@ -1,3 +1,4 @@
+import { gatherMediaCandidates } from '~/utils/media-gathering'
 import type { ListenerReference } from '@babel/contracts'
 import {
   PlayerApiError,
@@ -88,41 +89,6 @@ export function useListenerAudio(
     }, 1_500)
   }
 
-  async function gather(peer: RTCPeerConnection, signal: AbortSignal) {
-    if (peer.iceGatheringState === 'complete') {
-      return
-    }
-    await new Promise<void>((resolve, reject) => {
-      const deadline = setTimeout(
-        () => finish(new Error('Media gathering timeout')),
-        10_000,
-      )
-      const abort = () => finish(new Error('Media connection cancelled'))
-      const changed = () => {
-        if (peer.iceGatheringState === 'complete') {
-          finish()
-        }
-      }
-      function finish(error?: Error) {
-        clearTimeout(deadline)
-        peer.removeEventListener('icegatheringstatechange', changed)
-        signal.removeEventListener('abort', abort)
-        if (error) {
-          reject(error)
-        } else {
-          resolve()
-        }
-      }
-      peer.addEventListener('icegatheringstatechange', changed)
-      signal.addEventListener('abort', abort, { once: true })
-      if (signal.aborted) {
-        abort()
-      } else {
-        changed()
-      }
-    })
-  }
-
   async function begin(listener: SavedListener) {
     clearConnection()
     if (disposed || !desired || typeof RTCPeerConnection === 'undefined') {
@@ -138,6 +104,7 @@ export function useListenerAudio(
     }
     connection = active
     state.value = 'connecting'
+    let stage = 'offer'
     if (!sound) {
       sound = new Audio()
       sound.muted = muted.value
@@ -179,6 +146,7 @@ export function useListenerAudio(
       if (!offer || offer.connectionId !== active.id) {
         throw new Error('Invalid media offer')
       }
+      stage = 'configuration'
       active.peer.setConfiguration({
         iceServers: offer.ice.servers,
         iceTransportPolicy: offer.ice.policy,
@@ -190,6 +158,7 @@ export function useListenerAudio(
           }
         }, offer.ice.renewAfterMs)
       }
+      stage = 'description'
       await active.peer.setRemoteDescription(offer.description)
       if (offer.uplinkMid === null) {
         capture.stop()
@@ -202,8 +171,10 @@ export function useListenerAudio(
         }
         capture.attach(uplink)
       }
+      stage = 'answer'
       await active.peer.setLocalDescription(await active.peer.createAnswer())
-      await gather(active.peer, active.abort.signal)
+      stage = 'gathering'
+      await gatherMediaCandidates(active.peer, active.abort.signal)
       if (connection !== active) {
         return
       }
@@ -211,6 +182,7 @@ export function useListenerAudio(
       if (!description || description.type !== 'answer') {
         throw new Error('Media answer unavailable')
       }
+      stage = 'answer-delivery'
       await requestListenerMedia(
         listener,
         {
@@ -224,6 +196,11 @@ export function useListenerAudio(
       if (connection !== active) {
         return
       }
+      // Controlled diagnostics only: never log credentials, SDP or raw errors.
+      console.warn('Babel audio negotiation failed', {
+        stage,
+        status: error instanceof PlayerApiError ? error.status : null,
+      })
       clearConnection()
       if (error instanceof PlayerApiError && [401, 410].includes(error.status)) {
         desired = null

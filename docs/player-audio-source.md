@@ -61,6 +61,14 @@ without asking again. A chosen device is remembered in local storage and starts
 automatically on the next visit; computer audio always needs a click. Mute
 disables the track. Leaving the room stops the capture.
 
+The host reports broadcasting only after both capture and the media connection
+are ready. A selected live capture alone does not establish audio delivery.
+Browser candidate gathering waits up to ten seconds. If a discovery server is
+still pending at that deadline, negotiation uses the candidates already in the
+local description under the configured ICE policy. No candidates or cancellation
+still stops that attempt. Controlled negotiation-stage diagnostics omit SDP,
+credentials and raw transport errors.
+
 The worker decodes the host's Opus RTP to 48 kHz stereo PCM and feeds the same
 `GuildBroadcast` used for Discord: one Opus mix for room playback and an
 independent speaker timeline for subtitles. The host does not receive its own
