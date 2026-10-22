@@ -18,6 +18,8 @@ is in [design.md](design.md), mirrored in [GOAL.md](GOAL.md).
   or any input from the browser) or a _Discord_ voice channel via the bot.
   See [player audio source](docs/player-audio-source.md) and
   [original audio](docs/original-audio.md).
+  Host broadcasting status requires an established media connection; a pending
+  discovery server does not discard an already collected connection candidate.
 - **Room lifecycle.** Empty rooms disband after five minutes. The host can close
   a room at any time. See [community rooms](docs/multi-room-and-map.md).
 - **Subtitles.** OpenAI realtime transcription and translation, pushed to the
