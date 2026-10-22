@@ -1,5 +1,27 @@
 # Validation
 
+## CVE-2026-111497 runtime remediation · 2026-10-22
+
+The upstream Node.js security release fixes a Brotli decoder out-of-bounds write.
+The production web and voice binaries reported Node 24.18.0 before remediation.
+Build, web, voice, migration, recovery and media-validation pins now require
+Node 24.22.1; both official container bases are pinned by digest. Historical
+24.18.0 results below describe the runtime used for those earlier checks.
+
+| Check                                    | Status  | Evidence                                                                                                                                                                                                                                                                                                                                     |
+| ---------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Upstream regression discriminator        | PASS    | In a network-disabled, read-only, resource-limited container, Node 24.18.0 fails the upstream invalid-block-switch assertion with `ERR__ERROR_FORMAT_BLOCK_LENGTH_1` / -9. Node 24.22.1 rejects the same fixture with `ERR__ERROR_FORMAT_BLOCK_SWITCH` / -17, including byte-at-a-time streaming. No malformed input was sent to production. |
+| Official fixed container bases           | PASS    | The digest-pinned 24.22.1 Alpine and Debian slim images pass `scripts/check-node-runtime.mjs`; local macOS arm64 passes too.                                                                                                                                                                                                                 |
+| Source and built HTTP runtime            | PASS    | `npm run ci:local` on Node 24.22.1: runtime regression, formatting, source limits, strict workspace types, 32 unit tests, all builds and built HTTP smoke. Workflow validation also passes `actionlint`.                                                                                                                                     |
+| PostgreSQL contracts                     | PASS    | `npm run test:db`: all 20 tests pass against a task-owned disposable PostgreSQL 16 container.                                                                                                                                                                                                                                                |
+| HTTP and process integration             | PASS    | `test:management:db`, `test:providers:db`, `test:samples:db`, `test:languages:db`, `test:subtitles:db`, `test:recovery:db` and `test:community:db` pass on the fixed runtime. Provider replies are local fixtures.                                                                                                                           |
+| Native media and admission               | PASS    | `npm run test:media:db`: both native Opus/WebRTC source tests and the full media-admission smoke pass. Live Discord reception was not exercised.                                                                                                                                                                                             |
+| Production image publication and rollout | NOT RUN | At source validation time, the automatic main release remains pending. It must run the regression inside both completed production images before publishing, then reconcile all workloads through the existing GitOps path.                                                                                                                  |
+
+References: [Node.js advisory](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases),
+[fixed LTS release](https://nodejs.org/en/blog/release/v24.22.1/), and
+[upstream regression fixture](https://github.com/nodejs/node/commit/b5f41529df).
+
 ## GitHub repository link · 2026-10-21
 
 | Check                                 | Status  | Evidence                                                                                                                                                                         |

@@ -36,7 +36,8 @@ Current live acceptance status is tracked in the
 
 ## Start locally
 
-Requires Node 24.18.0 and Docker Compose.
+Requires Node 24.22.1 and Docker Compose. Older Node 24 releases are affected by
+[CVE-2026-111497](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases).
 
 ```sh
 nvm use
@@ -93,6 +94,7 @@ see [connection budgeting](docs/operations.md#database-connection-budget).
 | `npm run dev`            | Start the local Nuxt app                                    |
 | `npm run build`          | Build web, migrations and worker                            |
 | `npm start`              | Run the built, supervised server                            |
+| `npm run check:runtime`  | Verify pinned Node and the Brotli security regression       |
 | `npm run ci:local`       | Line limits, formatting, types, unit tests, build and smoke |
 | `npm run test:db`        | Database integration tests against local PostgreSQL         |
 | `npm run test:*:db`      | Built-server integration suites; see `package.json`         |

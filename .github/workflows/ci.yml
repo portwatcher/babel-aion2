@@ -203,6 +203,20 @@ jobs:
             --label "org.opencontainers.image.revision=$GITHUB_SHA" .
           node ../infra/.github/scripts/babel-worker-image-smoke.mjs
 
+      - name: Verify the packaged Node security fix
+        if: steps.release.outputs.current == 'true'
+        env:
+          IMAGE: ${{ steps.release.outputs.image }}
+          WORKER_IMAGE: ${{ steps.release.outputs.worker_image }}
+        run: |
+          set -euo pipefail
+          for image in "$IMAGE" "$WORKER_IMAGE"; do
+            docker run --rm --network none --read-only --cap-drop=ALL \
+              --security-opt=no-new-privileges --pids-limit=32 --memory=128m --cpus=1 \
+              --mount "type=bind,src=$PWD/scripts/check-node-runtime.mjs,dst=/check-node-runtime.mjs,readonly" \
+              --entrypoint node "$image" /check-node-runtime.mjs "$(cat .nvmrc)"
+          done
+
       - name: Publish validated images and update ArgoCD manifests
         if: steps.release.outputs.current == 'true'
         env:

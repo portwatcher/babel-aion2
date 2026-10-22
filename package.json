@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "engines": {
-    "node": ">=24.18.0 <25"
+    "node": ">=24.22.1 <25"
   },
   "scripts": {
     "dev": "npm run dev --workspace=@babel/web",
@@ -23,7 +23,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check:lines": "node scripts/check-lines.mjs",
-    "check": "npm run check:lines && npm run format:check && npm run typecheck && npm test",
+    "check:runtime": "node scripts/check-node-runtime.mjs",
+    "check": "npm run check:runtime && npm run check:lines && npm run format:check && npm run typecheck && npm test",
     "ci:local": "npm run check && npm run build && npm run test:http",
     "test:http": "node scripts/smoke.mjs",
     "test:http:db": "node --env-file=.env scripts/listener-smoke.mjs",
