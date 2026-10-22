@@ -14,7 +14,7 @@ See [source and secret boundaries](source-and-secrets.md).
 ## Application package
 
 `Dockerfile` builds the Nuxt Node server and a standalone PostgreSQL migration
-runner and the independent Pod-recovery entry point with Node 24.18.0. The runtime runs as UID 1000. It contains no production
+runner and the independent Pod-recovery entry point with Node 24.22.1. The runtime runs as UID 1000. It contains no production
 configuration or credentials and does not start the optional voice worker.
 The `voice-worker` build target packages Discord/DAVE reception, shared subtitle
 processing and private WebRTC admission with pruned dependencies and UID 1000.
@@ -51,6 +51,16 @@ Those resources are then committed in infra with the verified image reference.
 Subsequent releases update their image references through the same workflow,
 including the recovery controller's web-image reference.
 No production image is published from a local checkout.
+
+Node 24.22.1 includes the upstream fix for
+[CVE-2026-111497](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases).
+All build and runtime stages use its digest-pinned official Alpine image. The
+media-validation probe uses the matching digest-pinned Debian image. `check:runtime`
+verifies the exact Node version and the upstream malformed Brotli regression in
+both synchronous and streaming decoders. `ci:local` runs it before other checks;
+the release repeats it inside both packaged images with networking disabled and
+a read-only filesystem before publication. Web, migration and recovery share
+the verified web image.
 
 ## Automatic main releases
 

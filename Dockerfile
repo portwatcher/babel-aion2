@@ -1,4 +1,4 @@
-FROM node:24.18.0-alpine AS build
+FROM node:24.22.1-alpine@sha256:feb76650b7195319268c59cb2d419c732d6c499b13bf5296f16ab59eb1f0a4f3 AS build
 ARG TARGETARCH
 WORKDIR /app
 COPY . .
@@ -15,7 +15,7 @@ RUN npm run build
 FROM build AS worker-dependencies
 RUN npm prune --omit=dev --workspace=@babel/voice-worker --include-workspace-root=false
 
-FROM node:24.18.0-alpine AS voice-worker
+FROM node:24.22.1-alpine@sha256:feb76650b7195319268c59cb2d419c732d6c499b13bf5296f16ab59eb1f0a4f3 AS voice-worker
 ENV NODE_ENV=production
 ENV MEDIA_CONTROL_HOST=0.0.0.0
 WORKDIR /app
@@ -25,7 +25,7 @@ USER node
 EXPOSE 3100
 CMD ["node", "apps/voice-worker/dist/index.mjs"]
 
-FROM node:24.18.0-alpine AS runtime
+FROM node:24.22.1-alpine@sha256:feb76650b7195319268c59cb2d419c732d6c499b13bf5296f16ab59eb1f0a4f3 AS runtime
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3000

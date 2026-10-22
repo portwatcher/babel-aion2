@@ -41,7 +41,7 @@ Real Coturn UDP/TCP/TLS and temporary credentials have separate
 
 ## Reproduce the checks
 
-Use Node 24.18.0 and FFmpeg with `libopus`. `FFMPEG_PATH` can name an alternate
+Use Node 24.22.1 and FFmpeg with `libopus`. `FFMPEG_PATH` can name an alternate
 FFmpeg executable. These commands do not load `.env` or use a real credential:
 
 ```sh
