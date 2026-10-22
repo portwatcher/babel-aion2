@@ -7,6 +7,7 @@ import {
 } from '@babel/contracts'
 import type { InterfaceMessageKey } from '~/locales'
 import { playerErrorKey } from '~/utils/player-feedback'
+import { enterCreatedRoom } from '~/utils/created-room-entry'
 
 const { t } = useInterfaceLocale()
 const route = useRoute()
@@ -28,10 +29,14 @@ const installation = shallowRef<{
   name: string
   server: string
   allowedIds: string[]
+  hostId: string
   roomNumber: number | null
   channels: { id: string; name: string }[]
 } | null>(null)
 const busy = ref(false)
+// Keep a successful creation while admission retries, rather than creating
+// another empty room after a temporary character lookup or connection failure.
+const createdRoom = shallowRef<{ roomNumber: number; hostId: string } | null>(null)
 const errorKey = ref<InterfaceMessageKey | ''>(
   route.query.installationError ? 'installationFailed' : '',
 )
@@ -49,9 +54,16 @@ function roomSettings() {
   }
 }
 function submit() {
+  if (createdRoom.value) {
+    return retryCreatedRoom()
+  }
   return audioSource.value === 'PLAYER' ? createHosted() : install()
 }
 async function createHosted() {
+  if (createdRoom.value) {
+    await retryCreatedRoom()
+    return
+  }
   const parsed = playerRoomCreationSchema.safeParse(roomSettings())
   if (!parsed.success) {
     errorKey.value = !server.value ? 'serverMissing' : 'roomSettingsInvalid'
@@ -64,7 +76,26 @@ async function createHosted() {
       method: 'POST',
       body: parsed.data,
     })
-    await navigateTo(`/rooms/${result.roomNumber}`)
+    await finishCreation(result.roomNumber, parsed.data.hostId)
+  } catch (failure) {
+    errorKey.value = playerErrorKey(failure)
+  } finally {
+    busy.value = false
+  }
+}
+async function finishCreation(roomNumber: number, characterId: string) {
+  createdRoom.value = { roomNumber, hostId: characterId }
+  await enterCreatedRoom(roomNumber, characterId)
+  await navigateTo(`/rooms/${roomNumber}`)
+}
+async function retryCreatedRoom() {
+  if (!createdRoom.value) {
+    return
+  }
+  busy.value = true
+  errorKey.value = ''
+  try {
+    await finishCreation(createdRoom.value.roomNumber, createdRoom.value.hostId)
   } catch (failure) {
     errorKey.value = playerErrorKey(failure)
   } finally {
@@ -96,11 +127,11 @@ async function readInstallation() {
   errorKey.value = ''
   try {
     const result = await $fetch('/api/player/rooms/installation')
+    installation.value = result
     if (result.roomNumber) {
-      await navigateTo(`/rooms/${result.roomNumber}`)
+      await finishCreation(result.roomNumber, result.hostId)
       return
     }
-    installation.value = result
   } catch (failure) {
     errorKey.value = playerErrorKey(failure)
   } finally {
@@ -108,7 +139,11 @@ async function readInstallation() {
   }
 }
 async function create() {
-  if (!voiceChannelId.value) {
+  if (createdRoom.value) {
+    await retryCreatedRoom()
+    return
+  }
+  if (!voiceChannelId.value || !installation.value) {
     errorKey.value = 'channelMissing'
     return
   }
@@ -119,7 +154,7 @@ async function create() {
       method: 'POST',
       body: { voiceChannelId: voiceChannelId.value },
     })
-    await navigateTo(`/rooms/${result.roomNumber}`)
+    await finishCreation(result.roomNumber, installation.value.hostId)
   } catch (failure) {
     errorKey.value = playerErrorKey(failure)
   } finally {
@@ -155,7 +190,7 @@ onMounted(() => {
               option-label="label"
               option-value="value"
               :allow-empty="false"
-              :disabled="busy"
+              :disabled="busy || Boolean(createdRoom)"
               aria-labelledby="audio-source-label"
             />
           </div>
@@ -166,7 +201,7 @@ onMounted(() => {
               v-model="name"
               required
               maxlength="64"
-              :disabled="busy"
+              :disabled="busy || Boolean(createdRoom)"
             />
           </div>
           <div class="field">
@@ -175,7 +210,7 @@ onMounted(() => {
               input-id="room-server"
               v-model="server"
               :options="[...ASIA_SERVERS]"
-              :disabled="busy"
+              :disabled="busy || Boolean(createdRoom)"
               :placeholder="t('chooseServer')"
             />
           </div>
@@ -187,7 +222,7 @@ onMounted(() => {
               required
               maxlength="32"
               autocomplete="off"
-              :disabled="busy"
+              :disabled="busy || Boolean(createdRoom)"
               aria-describedby="host-id-help"
             />
             <small id="host-id-help" class="muted">{{
@@ -203,7 +238,7 @@ onMounted(() => {
             <Textarea
               id="allowed-ids"
               v-model="allowed"
-              :disabled="busy"
+              :disabled="busy || Boolean(createdRoom)"
               rows="4"
               aria-describedby="allowed-ids-help"
             />
@@ -242,7 +277,7 @@ onMounted(() => {
               option-label="name"
               option-value="id"
               :placeholder="t('chooseVoiceChannel')"
-              :disabled="busy"
+              :disabled="busy || Boolean(createdRoom)"
             />
             <small v-if="!installation.channels.length" class="muted">{{
               t('noVoiceChannels')
@@ -253,7 +288,7 @@ onMounted(() => {
               type="submit"
               :label="t('createAndJoin')"
               :loading="busy"
-              :disabled="!voiceChannelId"
+              :disabled="!voiceChannelId && !createdRoom"
             />
             <Button
               :label="t('refreshChannels')"

@@ -19,8 +19,11 @@ ID is checked against AION2 Index on the room's server, exactly as entry checks 
 character, and the index's exact character ID is stored as `room.host_character_id`.
 A non-empty allowlist always includes the host. The room is created running with
 `audio_source = 'PLAYER'`, a `community_room` row without guild or creator, and a
-`room.create` audit event. The page then opens the room; the host joins through
-ordinary character verification.
+`room.create` audit event. The creation page submits the supplied host ID through
+ordinary verified admission, saves the resulting per-tab listener credential,
+then opens the room directly. The host does not type the ID again. An admission
+retry retains the created room and the pending entry request, avoiding another
+room or nickname generation after a lost response.
 
 Migration `0018_player_audio_source` adds the `room_audio_source` enum (existing
 rooms default to `DISCORD`), `room.host_character_id`, and makes
