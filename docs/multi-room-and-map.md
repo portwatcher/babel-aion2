@@ -38,6 +38,14 @@ source readiness remains worker status, independently from the saved request.
 
 ## Room and character entry
 
+After either host-capture creation or Discord installation, the creator joins
+with the host ID already supplied. The installation response returns that ID
+only to the matching installation browser. The client uses ordinary room
+admission and the same output-language selection as verification, then saves
+the room-scoped listener credential before navigation. Refresh restores this
+session. Temporary entry failures retry the same room and request rather than
+creating a second room or asking the host to type the ID again.
+
 Room numbers start at 1: share `/rooms/1`, `/rooms/2`, and so on. Existing
 community rooms receive numbers in creation order. Numbers stay fixed and are
 not reused after deletion. UUID room links are not supported.

@@ -13,7 +13,8 @@ is in [design.md](design.md), mirrored in [GOAL.md](GOAL.md).
 - **Rooms.** Public directory at `/`, numbered rooms at `/rooms/:roomNumber`.
   Players enter with a character ID verified against AION2 Index; no account
   needed. Creators pick an Asia server and may restrict entry to up to 200
-  character IDs.
+  character IDs. Creation joins the host with the ID already supplied; no second
+  character-entry form is required.
 - **Audio sources.** Either _host capture_ (the host broadcasts computer audio
   or any input from the browser) or a _Discord_ voice channel via the bot.
   See [player audio source](docs/player-audio-source.md) and

@@ -20,6 +20,11 @@ room API parameters resolve a canonical positive number to the internal UUID.
 Sessions, source ownership, encryption contexts and management keep their UUIDs.
 Directory links and completed installations use only the public number.
 
+The creation page completes ordinary verified host admission before navigating
+to that number. It uses the host ID already entered, including the stored ID
+returned after Discord OAuth, and saves the listener in the existing per-tab
+store. Admission retries retain the created room and idempotent pending request.
+
 `/rooms/:roomNumber` and its nested `/verify` page share a parent listener controller.
 The browser restores its saved room credential before selecting the destination:
 valid sessions open the room, missing/ended sessions open verification, and

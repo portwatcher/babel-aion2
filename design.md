@@ -192,6 +192,12 @@ at any time: computer audio (so the host can talk without being broadcast) or
 any audio input device. Other listeners only receive. Discord capture keeps the
 existing installation flow.
 
+After either creation flow, join the creator using the host character ID already
+supplied. Complete ordinary verified admission and save its per-tab listener
+session before opening the room; do not ask the creator to enter the ID again.
+Retry temporary entry failures against the created room without creating another
+room or replacing a successful pending entry request.
+
 ### Host room closing · 2026-10-19
 
 Every community room names a host character ID at creation, for both player and

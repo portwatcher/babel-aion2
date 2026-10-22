@@ -1,5 +1,15 @@
 # Validation
 
+## Creator enters the room directly · 2026-10-22
+
+| Check                                        | Status  | Evidence                                                                                                                                                                                                                                                                                                                                |
+| -------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Host-capture creation and refresh            | PASS    | Chrome submitted the supplied host character once against the built app and a freshly migrated disposable PostgreSQL database. The room showed the host, one member and the tactical map without verification; refresh restored the same room. Character-index responses were local fixtures; no production room or player was created. |
+| Discord installation host handoff regression | PASS    | The real HTTP/PostgreSQL integration assertion fails against the previous installation response because `hostId` is absent. The repaired response retains the installation's host ID behind the existing browser binding.                                                                                                               |
+| Local source and runtime checks              | PASS    | Node 24.22.1 `npm run ci:local`: strict workspace types, formatting, source limits, 37 tests, all builds and built HTTP smoke. The repaired real HTTP/PostgreSQL community integration also passes.                                                                                                                                     |
+| Temporary admission failure and retry        | PASS    | In Chrome, an upstream fixture returns 503 on the second character lookup after creation. A second click enters the original room without retyping; the real disposable database contains exactly one room and one listener session after three lookups.                                                                                |
+| Actual Discord installation                  | NOT RUN | No real guild was reinstalled for this change. Existing installation permission checks remain exercised by the integration fixture.                                                                                                                                                                                                     |
+
 ## Browser media gathering timeout · 2026-10-22
 
 After the subtitle-clock repair, room `/rooms/5` still received zero host PCM

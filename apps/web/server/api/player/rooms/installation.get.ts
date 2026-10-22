@@ -16,10 +16,14 @@ export default defineEventHandler(async (event) => {
     if (!installation.authorizedAt || !installation.guildId) {
       throw createError({ statusCode: 401, statusMessage: '请先完成 Discord 安装' })
     }
+    if (!installation.hostId) {
+      throw createError({ statusCode: 409, statusMessage: '安装已过期，请重新安装' })
+    }
     return {
       name: installation.name,
       server: installation.server,
       allowedIds: installation.allowedIds,
+      hostId: installation.hostId,
       roomId: installation.consumedRoomId,
       roomNumber: installation.consumedRoomNumber,
       channels: (
