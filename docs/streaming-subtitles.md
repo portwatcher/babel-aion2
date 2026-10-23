@@ -56,6 +56,13 @@ listeners remain, the worker closes recognition too, even if output languages
 remain enabled. Original audio continues independently. Sessions rotate at 50 minutes and
 also honor the provider's actual `expires_at`; reconnecting clears stale text.
 
+Recognition hints use the same bounded terminology context as sample processing:
+the descriptive prompt stays within 1,024 characters while literal keywords and
+language hints are retained. Stream-end logs distinguish provider failures,
+audio backlog, clock stalls and authorization expiry, recording only controlled
+codes, generations, duration and audio counters. They contain no audio,
+transcript, terminology text, speaker display name or credential.
+
 ## Receive, push and display
 
 The private worker `/subtitles` HTTP response flushes its headers and streams
