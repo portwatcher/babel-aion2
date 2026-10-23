@@ -379,44 +379,64 @@ test('stalled source and target handshakes are isolated, targets recover and lat
     1,
   )
 })
-test('sample processing uses the same direct streaming path and hints apply only to recognition', async (t) => {
-  const network = await fixture(t)
-  const key = network.credential('speech')
-  const term = {
-    sourceTerm: 'TestSkill',
-    sourceLanguage: 'en',
-    alternatives: ['TS'],
-    category: 'skill',
-    context: 'Synthetic test term',
-    expressions: [{ language: 'ja', text: 'テスト' }],
-  }
-  const audio = readPcmWave(syntheticWave())
-  // A valid WAV may end on an odd input sample, rather than a full 20 ms frame.
-  audio.data = audio.data.subarray(0, audio.data.length - 2)
-  audio.durationMs = audio.data.length / 96
-  const result = await previewSubtitleSample({
-    recognition: { settings, credential: key, version: 1 },
-    translation: { settings, credential: key, version: 1 },
-    outputLanguage: 'ja',
-    audio,
-    terminology: { version: 1, terms: [term] },
+for (const long of [false, true]) {
+  test(`sample streaming bounds ${long ? 'long' : 'short'} recognition hints and keeps all keywords`, async (t) => {
+    const network = await fixture(t)
+    const key = network.credential('speech')
+    const term = {
+      sourceTerm: 'TestSkill',
+      sourceLanguage: 'en',
+      alternatives: ['TS'],
+      category: 'skill',
+      context: long ? '🛡'.repeat(150) : 'Synthetic test term',
+      expressions: [{ language: 'ja', text: 'テスト' }],
+    }
+    // Each context fits the catalog's 400-character field limit. Together,
+    // otherwise valid entries can exceed the provider's shorter prompt limit.
+    const terms = long
+      ? [
+          term,
+          ...['Second', 'Third', 'Last'].map((name) => ({
+            ...term,
+            sourceTerm: `${name}Skill`,
+            alternatives: [name],
+          })),
+        ]
+      : [term]
+    const audio = readPcmWave(syntheticWave())
+    // A valid WAV may end on an odd input sample, rather than a full 20 ms frame.
+    audio.data = audio.data.subarray(0, audio.data.length - 2)
+    audio.durationMs = audio.data.length / 96
+    const result = await previewSubtitleSample({
+      recognition: { settings, credential: key, version: 1 },
+      translation: { settings, credential: key, version: 1 },
+      outputLanguage: 'ja',
+      audio,
+      terminology: { version: 1, terms },
+    })
+    assert.equal(result.code, 'PASS')
+    const recognition = network.observations.find(
+      (value) => value.protocol === 'recognition',
+    )
+    const translation = network.observations.find(
+      (value) => value.protocol === 'translation',
+    )
+    assert.deepEqual(recognition.configuration.audio.input.transcription.keywords, [
+      'TestSkill',
+      'TS',
+      ...(long
+        ? ['SecondSkill', 'Second', 'ThirdSkill', 'Third', 'LastSkill', 'Last']
+        : []),
+    ])
+    const prompt = recognition.configuration.audio.input.transcription.prompt
+    assert.ok(prompt.length <= 1024, 'provider prompt character limit')
+    assert.equal(prompt.isWellFormed(), true, 'Unicode hints remain intact')
+    assert.deepEqual(
+      translation.configuration,
+      { audio: { output: { language: 'ja' } } },
+      'no unsupported translation prompt or glossary is sent',
+    )
+    assert.equal(result.segments.at(-1).translationTermCount, 0)
+    assert.ok(result.segments.at(-1).translationIsFinal)
   })
-  assert.equal(result.code, 'PASS')
-  const recognition = network.observations.find(
-    (value) => value.protocol === 'recognition',
-  )
-  const translation = network.observations.find(
-    (value) => value.protocol === 'translation',
-  )
-  assert.deepEqual(recognition.configuration.audio.input.transcription.keywords, [
-    'TestSkill',
-    'TS',
-  ])
-  assert.deepEqual(
-    translation.configuration,
-    { audio: { output: { language: 'ja' } } },
-    'no unsupported translation prompt or glossary is sent',
-  )
-  assert.equal(result.segments.at(-1).translationTermCount, 0)
-  assert.ok(result.segments.at(-1).translationIsFinal)
-})
+}

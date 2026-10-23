@@ -29,6 +29,8 @@ is in [design.md](design.md), mirrored in [GOAL.md](GOAL.md).
   languages with subscribers. Audio forwarding compensates for timer drift while
   preserving pauses and the 100 ms backlog limit. See
   [streaming subtitles](docs/streaming-subtitles.md).
+  Recognition prompts fit the provider's 1,024-character limit while retaining
+  all configured term keywords and alternatives.
 - **Tactical map.** Shared drawing on the Lower Reshanta map, persisted per room.
 - **Interface languages.** English, Simplified Chinese, Japanese and Korean.
   See [interface localization](docs/interface-localization.md).

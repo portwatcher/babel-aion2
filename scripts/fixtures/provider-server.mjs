@@ -67,6 +67,18 @@ export async function createProviderFixture() {
       const event = JSON.parse(raw.toString())
       if (event.type === 'session.update') {
         observation.configuration = event.session
+        if (
+          protocol === 'recognition' &&
+          event.session.audio?.input?.transcription?.prompt?.length > 1024
+        ) {
+          socket.send(
+            JSON.stringify({
+              type: 'error',
+              error: { code: 'string_above_max_length' },
+            }),
+          )
+          return
+        }
         if (mode === 'timeout') {
           return
         }

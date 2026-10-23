@@ -1,5 +1,20 @@
 # Validation
 
+## Recognition terminology prompt limit · 2026-10-23
+
+Room `/rooms/6` kept receiving host-browser audio, but its recognition setup
+rejected the saved terminology's 1,380-character prompt with
+`string_above_max_length` (maximum 1,024). That failure closed the shared speaker
+stream and its translation. Descriptive prose now fits the provider limit,
+preserving all literal keywords, alternatives and language hints separately.
+
+| Check                                      | Status  | Evidence                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Regression discriminator                   | PASS    | The sample-streaming fixture now rejects recognition prompts over 1,024 characters. The short-context control passed before repair; the long Unicode context returned INVALID_CONFIGURATION. Both pass after repair, retaining every keyword and well-formed Unicode.                                                                                                      |
+| Source and built runtime                   | PASS    | Node 24.22.1 `npm run ci:local`: 38 tests, formatting, source limits, strict types, all builds and built HTTP smoke.                                                                                                                                                                                                                                                       |
+| Saved production terminology and providers | PASS    | An isolated patched speaker pipeline ran inside the production worker using the saved key and all 16 enabled terms (22 keywords). Its prompt was 1,024 characters. Synthetic English speech produced original text and incremental Chinese, Japanese and Korean translations, with zero stream failures over 10 seconds. No production room, listener or settings changed. |
+| Deployment and human Discord-tab captions  | NOT RUN | Normal main release pending; no human audio was recorded.                                                                                                                                                                                                                                                                                                                  |
+
 ## Creator enters the room directly · 2026-10-22
 
 | Check                                        | Status  | Evidence                                                                                                                                                                                                                                                                                                                                |

@@ -15,12 +15,16 @@ export function recognitionTerminology(
   const keywords = [
     ...new Set(terms.flatMap((term) => [term.sourceTerm, ...term.alternatives])),
   ]
+  const description =
+    'AION2 Steam Global / Asia battle commands. ' +
+    terms
+      .map((term) => term.sourceTerm + ': ' + term.category + '; ' + term.context)
+      .join('\n')
   const context = {
-    prompt:
-      'AION2 Steam Global / Asia battle commands. ' +
-      terms
-        .map((term) => term.sourceTerm + ': ' + term.category + '; ' + term.context)
-        .join('\n'),
+    // The live transcription API accepts at most 1,024 prompt characters.
+    // Bound optional prose without splitting a surrogate pair; every literal
+    // term and alternative remains in the separate keyword hints below.
+    prompt: description.slice(0, 1024).replace(/[\uD800-\uDBFF]$/u, ''),
     keywords,
     languages: [
       ...new Set(terms.map((term) => new Intl.Locale(term.sourceLanguage).language)),

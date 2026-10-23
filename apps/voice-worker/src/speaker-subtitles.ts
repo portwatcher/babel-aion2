@@ -38,6 +38,8 @@ export class SpeakerSubtitles {
   private ready = false
   private closed = false
   private samples = 0
+  private receivedSamples = 0
+  private readonly startedAt = performance.now()
   private nextFrameAt = performance.now() + 20
 
   constructor(
@@ -60,7 +62,7 @@ export class SpeakerSubtitles {
     this.timer = setInterval(() => this.tick(), 20)
     this.timer.unref()
     // Rotate before the provider session limit; the adapter also honors expires_at.
-    this.rotation = setTimeout(() => this.finish(null), 50 * 60_000)
+    this.rotation = setTimeout(() => this.finish(null, 'rotation'), 50 * 60_000)
     this.rotation.unref()
     void this.stream.ready
       .then(() => {
@@ -71,10 +73,16 @@ export class SpeakerSubtitles {
         }
       })
       .catch((error: unknown) =>
-        this.finish(error instanceof ProviderFailure ? error.code : 'UNAVAILABLE'),
+        this.finish(
+          error instanceof ProviderFailure ? error.code : 'UNAVAILABLE',
+          'provider-session',
+        ),
       )
     void this.stream.finished.catch((error: unknown) => {
-      this.finish(error instanceof ProviderFailure ? error.code : 'UNAVAILABLE')
+      this.finish(
+        error instanceof ProviderFailure ? error.code : 'UNAVAILABLE',
+        'provider-session',
+      )
     })
   }
 
@@ -207,9 +215,10 @@ export class SpeakerSubtitles {
       return
     }
     this.turns.hear(pcm)
+    this.receivedSamples += pcm.length / 4
     const overflow = this.timeline.receive(pcm, performance.now())
     if (overflow && this.ready) {
-      this.finish('UNAVAILABLE')
+      this.finish('UNAVAILABLE', 'audio-backlog')
     }
   }
 
@@ -218,9 +227,13 @@ export class SpeakerSubtitles {
       return
     }
     const now = performance.now()
-    if (!this.allowed() || now - this.nextFrameAt > 100) {
+    if (!this.allowed()) {
+      this.finish('UNAVAILABLE', 'authorization')
+      return
+    }
+    if (now - this.nextFrameAt > 100) {
       // A new stream gets a fresh generation; dropped time is never spliced into speech.
-      this.finish('UNAVAILABLE')
+      this.finish('UNAVAILABLE', 'clock-stall')
       return
     }
     // Hardware continues at 48 kHz even when interval callbacks run late.
@@ -245,14 +258,32 @@ export class SpeakerSubtitles {
       this.stream.write(mono, this.samples)
       this.samples += 960
     } catch (error) {
-      this.finish(error instanceof ProviderFailure ? error.code : 'UNAVAILABLE')
+      this.finish(
+        error instanceof ProviderFailure ? error.code : 'UNAVAILABLE',
+        'provider-write',
+      )
     }
   }
 
-  private finish(code: Exclude<ProviderTestCode, 'PASS'> | null) {
+  private finish(code: Exclude<ProviderTestCode, 'PASS'> | null, reason: string) {
     if (this.closed) {
       return
     }
+    console.warn(
+      JSON.stringify({
+        component: 'speaker-subtitles',
+        event: 'stream-ended',
+        roomId: this.roomId,
+        sourceGeneration: this.sourceGeneration,
+        streamGeneration: this.streamGeneration,
+        reason,
+        code,
+        ready: this.ready,
+        elapsedMs: Math.round(performance.now() - this.startedAt),
+        receivedAudioMs: Math.round(this.receivedSamples / 48),
+        sentAudioMs: Math.round(this.samples / 48),
+      }),
+    )
     this.close()
     this.ended(code)
   }
