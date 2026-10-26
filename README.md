@@ -2,7 +2,7 @@
 
 Live voice relay and subtitles for AION2 (Steam Global / Asia) battle groups.
 A host's voice reaches players as original audio, with real-time captions and
-Chinese, Japanese and Korean translation.
+English, Chinese, Japanese and Korean subtitles.
 
 Built with Nuxt 4, Better Auth and PostgreSQL. Deployed at
 [babel.juryquinn.com](https://babel.juryquinn.com/). The product specification
@@ -29,6 +29,9 @@ is in [design.md](design.md), mirrored in [GOAL.md](GOAL.md).
   languages with subscribers. Audio forwarding compensates for timer drift while
   preserving pauses and the 100 ms backlog limit. See
   [streaming subtitles](docs/streaming-subtitles.md).
+  English source text is reused directly for English subtitles; other source
+  languages translate to English. Local text identification leaves uncertain
+  phrases on the translation path.
   Recognition prompts fit the provider's 1,024-character limit while retaining
   all configured term keywords and alternatives.
 - **Tactical map.** Shared drawing on the Lower Reshanta map, persisted per room.

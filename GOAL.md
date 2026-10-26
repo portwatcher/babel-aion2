@@ -404,13 +404,26 @@ Use BCP 47 language codes.
 Keep the website code separate from the provider's language parameter.
 Map between these codes in the provider adapter.
 
-Set up Simplified Chinese (`zh-Hans`), Japanese (`ja`) and Korean (`ko`) using
+Set up English (`en`), Simplified Chinese (`zh-Hans`), Japanese (`ja`) and Korean (`ko`) using
 the saved OpenAI key. Validate their actual paths before enabling them. Complete
 this production setup without asking the administrator to repeat language setup.
-Do not hard-code the player menu to these three languages.
+Do not hard-code the player menu to these initial languages.
 
 Show only the administrator's enabled languages in the player menu.
 Do the same language check on the server.
+
+### English captions · 2026-10-26
+
+Include English (`en`) in the validated output-language catalog. When locally
+identified English source text arrives, use the shared live transcription text
+for English subtitles, including incremental revisions, final corrections and
+retractions. Do not wait for or replace it with English translation output.
+Other or uncertain source languages retain direct speech translation to English.
+The realtime translator remains parallel so a speaker can change languages
+without losing the beginning of the next command. Language identification is a
+local text estimate, not provider-reported audio language; short or mixed-language
+commands can remain uncertain. Preserve subscription fences and do not replay
+captions from before a listener subscribed.
 
 ### Initial selection
 
@@ -546,7 +559,7 @@ In this state:
 - Do not show fabricated subtitles.
 - Do not show nonexistent language choices.
 
-Production setup includes the three requested languages. The administrator
+Production setup includes the four requested languages. The administrator
 provides only the OpenAI API Key and game terminology; do not require manual
 language creation, path configuration or activation in administration.
 
@@ -1042,7 +1055,7 @@ Give evidence for each PASS result.
 Delivery is complete when the required functions operate on the production domain and the core checks pass.
 The administrator can then configure providers and languages without another software change.
 
-Complete the requested Chinese, Japanese and Korean language setup before
+Complete the requested English, Chinese, Japanese and Korean language setup before
 handover when the authorized key is available. An empty language list is allowed
 when no valid credential exists.
 This state does not prove that live subtitle quality has passed.
@@ -1051,7 +1064,7 @@ Report the actual state of each subtitle provider and language.
 Do not report unperformed core audio, access, or session tests as complete.
 
 Give a final report for the website.
-State the actual enabled status of Chinese, Japanese and Korean.
+State the actual enabled status of English, Chinese, Japanese and Korean.
 State which live checks passed.
 State any remaining external inputs or measured limits.
 

@@ -3,7 +3,7 @@
 The administrator enters one **OpenAI API Key**. Model names and destinations
 are fixed in server code. No region, endpoint, second key or model selection is
 required. Administration contains only the website-wide key and game terms.
-Production setup provisions and validates Simplified Chinese (`zh-Hans`),
+Production setup provisions and validates English (`en`), Simplified Chinese (`zh-Hans`),
 Japanese (`ja`) and Korean (`ko`) with that key; no manual language setup is
 required in administration. Missing credentials never produce fabricated paths.
 
@@ -67,7 +67,8 @@ finite operation completes; live player captions are delivered incrementally.
 
 Samples have a 30-second deadline. They retain up to 32 bounded display windows,
 not a fabricated alignment of source and translated utterances. The original
-caption stream is marked independent, source language is `und`, and timestamps
+caption stream is marked independent for translations, source language is locally
+estimated (or `und` when uncertain), and timestamps
 are null because this model does not supply dependable per-utterance alignment
 between these separate sessions. Translation is final only after `session.close`
 is drained through `session.closed`. Validation requires nonempty completed
@@ -80,6 +81,9 @@ pronunciation guides. Saved target-language terminology remains catalog data for
 manual evaluation; it is not sent through an unsupported translation parameter.
 
 The translation model can omit speech already in the target language. Source
-captions and original audio remain available. The application does not infer a
-source language or relabel untranslated text as a translation. Test mixed-language
+captions and original audio remain available. For English output, a reliable local ELD text-language estimate selects the
+shared English transcript directly, including its revisions and finality. This
+is text identification, not language metadata from the recognition API. The
+translator remains parallel for unknown or changing source languages; this change
+does not eliminate that connection or its provider usage. Test mixed-language
 commands, names and terminology explicitly before enabling production languages.
