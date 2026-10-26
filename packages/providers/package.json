@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@babel/contracts": "*",
+    "eld": "2.1.0",
     "opencc-js": "1.4.2",
     "ws": "^8.22.0",
     "zod": "4.6.7"

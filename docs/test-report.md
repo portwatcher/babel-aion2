@@ -1,5 +1,15 @@
 # Validation
 
+## English subtitle output · 2026-10-26
+
+| Check                                                         | Status  | Evidence                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Regression discriminator                                      | PASS    | Before repair, English output remained empty despite a nonempty English transcript; the direct-caption and target-failure regressions failed. After repair, loopback WebSocket tests cover regional English, revisions, corrections, finality, retractions, late subscriptions, non-English/uncertain text, language switches and isolated target failure. |
+| Local source and built runtime                                | PASS    | Node 24.22.1 `npm run ci:local`: 41 tests, formatting, source limits, strict workspace types, all builds and built HTTP smoke.                                                                                                                                                                                                                             |
+| Saved-key English source                                      | PASS    | An isolated pipeline inside the production worker used the saved encrypted key and current terminology. A 3,684 ms synthetic English clip completed in 8,901 ms and produced three stable windows with identical original/output text, locally identified English and aligned text. No room or listener was created.                                       |
+| Saved-key Chinese to English                                  | PASS    | A 3,936 ms synthetic Chinese clip completed in 10,794 ms and produced a nonempty stable independent English translation. The normal provider lease and language-validation services persisted a CURRENT proof for `en`; activation follows the new worker rollout.                                                                                         |
+| Human speech, mixed-language accuracy and latency percentiles | NOT RUN | Synthetic speech establishes implemented provider paths, not human acceptance or a quality/latency benchmark. Local language identification can leave short or ambiguous commands uncertain. English translation remains parallel to preserve mixed-language audio; no provider-cost reduction is claimed.                                                 |
+
 ## Recognition terminology prompt limit · 2026-10-23
 
 Room `/rooms/6` kept receiving host-browser audio, but its recognition setup

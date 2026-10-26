@@ -36,9 +36,19 @@ sample pads a sub-100-ms tail so the provider can commit its final source buffer
 A continuous translation stream has no utterance-done event. Sentence boundaries and a 2,048-character limit define
 display windows carry a sequence/revision, and finality is set only after the
 provider acknowledges a drained session close. An independent source stream is
-shown as such; the application does not invent source timestamps, language
-identification, speaker labels or one-to-one source/target utterance alignment.
+shown as such; the application does not invent source timestamps, provider-reported
+language identification, speaker labels or one-to-one source/target utterance alignment.
 Chinese script formatting uses OpenCC locally on the accumulated window.
+
+English output reuses live transcription whenever the local ELD text classifier
+reliably identifies English. Those captions carry the source utterance identity,
+revisions and finality with aligned text; translator fragments and target faults
+cannot overwrite them. Corrections and retractions update the same caption.
+Other and uncertain languages retain the independent English translation stream.
+Both provider sessions still receive audio in parallel so language switching does
+not lose audio preceding the first new transcript. This is not a provider-cost
+reduction. Short, ambiguous or mixed-language text may stay on the translation
+path. A language change never starts another recognition session.
 
 Late subscribers receive subsequent fragments without replaying an accumulated
 prefix. Input/output alignment metadata does not establish which spoken utterance
