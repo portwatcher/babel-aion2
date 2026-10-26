@@ -29,9 +29,9 @@ is in [design.md](design.md), mirrored in [GOAL.md](GOAL.md).
   languages with subscribers. Audio forwarding compensates for timer drift while
   preserving pauses and the 100 ms backlog limit. See
   [streaming subtitles](docs/streaming-subtitles.md).
-  English source text is reused directly for English subtitles; other source
-  languages translate to English. Local text identification leaves uncertain
-  phrases on the translation path.
+  When the source language matches the selected subtitle language, captions reuse
+  transcription directly. Different or uncertain source languages use translation;
+  Chinese script choices retain local Simplified/Traditional conversion.
   Recognition prompts fit the provider's 1,024-character limit while retaining
   all configured term keywords and alternatives.
 - **Tactical map.** Shared drawing on the Lower Reshanta map, persisted per room.

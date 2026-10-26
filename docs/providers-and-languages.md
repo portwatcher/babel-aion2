@@ -81,8 +81,9 @@ pronunciation guides. Saved target-language terminology remains catalog data for
 manual evaluation; it is not sent through an unsupported translation parameter.
 
 The translation model can omit speech already in the target language. Source
-captions and original audio remain available. For English output, a reliable local ELD text-language estimate selects the
-shared English transcript directly, including its revisions and finality. This
+captions and original audio remain available. For every output language, a matching local source-language estimate selects the
+shared transcript directly, including its revisions and finality. Regional variants
+match their language family; Chinese script choices use local normalization. This
 is text identification, not language metadata from the recognition API. The
 translator remains parallel for unknown or changing source languages; this change
 does not eliminate that connection or its provider usage. Test mixed-language

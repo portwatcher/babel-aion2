@@ -40,15 +40,19 @@ shown as such; the application does not invent source timestamps, provider-repor
 language identification, speaker labels or one-to-one source/target utterance alignment.
 Chinese script formatting uses OpenCC locally on the accumulated window.
 
-English output reuses live transcription whenever the local ELD text classifier
-reliably identifies English. Those captions carry the source utterance identity,
+Every output reuses live transcription whenever the locally identified source
+language matches its target language family. Regional BCP 47 variants match that
+family, and Chinese text retains local Simplified/Traditional normalization. Those captions carry the source utterance identity,
 revisions and finality with aligned text; translator fragments and target faults
 cannot overwrite them. Corrections and retractions update the same caption.
-Other and uncertain languages retain the independent English translation stream.
-Both provider sessions still receive audio in parallel so language switching does
+Different and uncertain source languages retain their independent target translation stream.
+Recognition and target sessions still receive audio in parallel so language switching does
 not lose audio preceding the first new transcript. This is not a provider-cost
 reduction. Short, ambiguous or mixed-language text may stay on the translation
-path. A language change never starts another recognition session.
+path. Language identification uses the larger local ELD model; a local Franc
+check adds Indonesian identification when ELD reports Malay. Malay is not
+unconditionally relabeled Indonesian. A language change never starts another
+recognition session.
 
 Late subscribers receive subsequent fragments without replaying an accumulated
 prefix. Input/output alignment metadata does not establish which spoken utterance

@@ -214,10 +214,10 @@ tables and are not Better Auth user accounts.
 `@babel/providers` implements `gpt-live-transcribe` with minimal delay and one
 `gpt-realtime-translate` continuous audio session per active target language.
 Audio fans out in parallel, without serial transcript-to-translation requests.
-Every target delta publishes immediately. English output instead uses the shared
-transcript when local text identification reliably detects English; source revisions
-and finality drive that caption. Unknown and other source languages keep English
-translation. Recognition and targets share one
+Every target delta publishes immediately. Any output whose language family
+matches the locally identified source uses the shared transcript instead; source
+revisions and finality drive that caption. Unknown or different source languages
+keep translation to the selected target. Chinese script choices use local conversion. Recognition and targets share one
 server-only encrypted key, fixed official destinations, bounded socket/audio
 queues and safe errors. Current listener/source/configuration checks run in one
 500 ms authorization snapshot before delivery and fence obsolete work. Main page and PiP
