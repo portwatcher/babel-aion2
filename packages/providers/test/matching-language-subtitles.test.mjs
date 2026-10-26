@@ -62,12 +62,13 @@ async function fixture(t, outputLanguage = 'en') {
         target,
       )
     },
-    failTarget() {
+    async failTarget() {
       network.emit(
         key,
         { type: 'error', error: { code: 'insufficient_quota' } },
         target,
       )
+      await until(() => target.closed)
     },
     latest() {
       return subtitles(events).at(-1)?.value
@@ -131,7 +132,7 @@ test('a failed translation connection cannot prevent direct English captions', a
   f.source('english', 'Wait 3 seconds.')
   await until(() => f.latest()?.text === 'Wait 3 seconds.')
   const count = f.events.length
-  f.failTarget()
+  await f.failTarget()
   f.source('english', 'Wait 2 seconds.', true)
   await until(() => f.latest()?.translationIsFinal)
   assert.equal(f.latest().translatedText, 'Wait 2 seconds.')
@@ -169,6 +170,9 @@ for (const [output, language, text, expected] of [
 ]) {
   test(`${output} uses the matching source transcript, switches languages and survives target failure`, async (t) => {
     const f = await fixture(t, output)
+    const old = 'An earlier translation.'
+    f.target(old)
+    await until(() => f.latest()?.translatedText === old)
     f.source('same', text)
     await until(() => f.latest()?.text === text)
     assert.equal(f.latest().translatedText, expected ?? text)
@@ -176,7 +180,6 @@ for (const [output, language, text, expected] of [
     assert.equal(f.latest().sourceAlignment, 'aligned')
     const same = f.latest()
 
-    f.target('An unused translation must not overwrite matching-language text.')
     f.source('different', 'Wait 3 seconds.')
     await until(() => f.latest()?.text === 'Wait 3 seconds.')
     assert.equal(f.latest().translatedText, '', 'discard the unused translation window')
@@ -188,7 +191,7 @@ for (const [output, language, text, expected] of [
     f.source('same-again', text)
     await until(() => f.latest()?.text === text)
     const count = f.events.length
-    f.failTarget()
+    await f.failTarget()
     f.source('same-again', text, true)
     await until(() => f.latest()?.translationIsFinal)
     assert.equal(f.latest().translatedText, expected ?? text)
