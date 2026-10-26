@@ -412,18 +412,20 @@ Do not hard-code the player menu to these initial languages.
 Show only the administrator's enabled languages in the player menu.
 Do the same language check on the server.
 
-### English captions · 2026-10-26
+### Matching source and output languages · 2026-10-26
 
-Include English (`en`) in the validated output-language catalog. When locally
-identified English source text arrives, use the shared live transcription text
-for English subtitles, including incremental revisions, final corrections and
-retractions. Do not wait for or replace it with English translation output.
-Other or uncertain source languages retain direct speech translation to English.
-The realtime translator remains parallel so a speaker can change languages
-without losing the beginning of the next command. Language identification is a
-local text estimate, not provider-reported audio language; short or mixed-language
-commands can remain uncertain. Preserve subscription fences and do not replay
-captions from before a listener subscribed.
+Include English (`en`) in the validated output-language catalog. For every output
+language, when the locally identified source language matches the selected output
+language family, use the shared live transcription text directly. Preserve
+incremental revisions, final corrections and retractions, without waiting for or
+replacing it with translation output. BCP 47 regional variants share the language
+family; Chinese Simplified/Traditional choices retain local script normalization.
+Different or uncertain source languages retain direct speech translation to the
+selected output language. The realtime translator remains parallel so a speaker
+can change languages without losing the beginning of the next command. Language
+identification is a local text estimate, not provider-reported audio language;
+short or mixed-language commands can remain uncertain. Preserve subscription
+fences and do not replay captions from before a listener subscribed.
 
 ### Initial selection
 

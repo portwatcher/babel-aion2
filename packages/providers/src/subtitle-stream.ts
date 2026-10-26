@@ -112,7 +112,9 @@ export function openSharedSubtitleStream(input: {
                 ...value,
                 text: sourceText,
                 translatedText: direct
-                  ? sourceText
+                  ? sourceText === value.text
+                    ? value.translatedText
+                    : subtitleText(output.path.outputLanguage, sourceText)
                   : value.utteranceId === subscriber.window &&
                       subscriber.translationOffset > 0
                     ? subtitleText(
@@ -132,15 +134,12 @@ export function openSharedSubtitleStream(input: {
       }
     }
   }
-  function directEnglish(output: Output) {
-    return (
-      source?.language === 'en' &&
-      translationLanguage(output.path.outputLanguage) === 'en'
-    )
+  function usesTranscript(output: Output) {
+    return source?.language === translationLanguage(output.path.outputLanguage)
   }
   function publish(output: Output) {
     events += 1
-    const direct = directEnglish(output) ? source : undefined
+    const direct = usesTranscript(output) ? source : undefined
     const utteranceId = direct?.utteranceId ?? output.value.utteranceId
     if (output.displayWindow !== utteranceId) {
       output.displayWindow = utteranceId
@@ -154,7 +153,7 @@ export function openSharedSubtitleStream(input: {
         sequence: output.displaySequence,
         ...(direct
           ? {
-              translatedText: direct.text,
+              translatedText: subtitleText(output.path.outputLanguage, direct.text),
               translationRevision: direct.revision,
               translationIsFinal: direct.isFinal,
               sourceAlignment: 'aligned',
@@ -184,7 +183,7 @@ export function openSharedSubtitleStream(input: {
       output.retryAt = Date.now() + Math.min(5000, 250 * 2 ** output.attempt)
     }
     events += 1
-    if (!directEnglish(output)) {
+    if (!usesTranscript(output)) {
       deliver(output, { type: 'failure', code: output.value.failure })
     }
   }
@@ -228,7 +227,7 @@ export function openSharedSubtitleStream(input: {
         }
         output.value.translatedText += fragment
         output.value.translationRevision += 1
-        if (!directEnglish(output)) {
+        if (!usesTranscript(output)) {
           publish(output)
         }
       },
@@ -280,7 +279,7 @@ export function openSharedSubtitleStream(input: {
       .then(() => {
         if (ending && !closed) {
           output.value.translationIsFinal = true
-          if (!directEnglish(output)) {
+          if (!usesTranscript(output)) {
             publish(output)
           }
         }
@@ -330,11 +329,8 @@ export function openSharedSubtitleStream(input: {
       source = { ...value, language }
       sourceEvents += 1
       for (const output of outputs.values()) {
-        if (
-          previous?.language === 'en' &&
-          language !== 'en' &&
-          translationLanguage(output.path.outputLanguage) === 'en'
-        ) {
+        const target = translationLanguage(output.path.outputLanguage)
+        if (previous?.language === target && language !== target) {
           // Do not revive the translation window accumulated during direct output.
           output.value.utteranceId = randomUUID()
           output.value.translatedText = ''
@@ -384,7 +380,7 @@ export function openSharedSubtitleStream(input: {
         replacement.value.discontinuity = true
         outputs.set(code, replacement)
         events += 1
-        if (!directEnglish(replacement)) {
+        if (!usesTranscript(replacement)) {
           deliver(replacement, {
             type: 'reset',
             outputLanguage: code,

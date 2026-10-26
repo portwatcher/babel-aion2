@@ -62,12 +62,13 @@ async function fixture(t, outputLanguage = 'en') {
         target,
       )
     },
-    failTarget() {
+    async failTarget() {
       network.emit(
         key,
         { type: 'error', error: { code: 'insufficient_quota' } },
         target,
       )
+      await until(() => target.closed)
     },
     latest() {
       return subtitles(events).at(-1)?.value
@@ -131,7 +132,7 @@ test('a failed translation connection cannot prevent direct English captions', a
   f.source('english', 'Wait 3 seconds.')
   await until(() => f.latest()?.text === 'Wait 3 seconds.')
   const count = f.events.length
-  f.failTarget()
+  await f.failTarget()
   f.source('english', 'Wait 2 seconds.', true)
   await until(() => f.latest()?.translationIsFinal)
   assert.equal(f.latest().translatedText, 'Wait 2 seconds.')
@@ -140,4 +141,76 @@ test('a failed translation connection cannot prevent direct English captions', a
     f.events.slice(count).some((event) => event.type === 'failure'),
     false,
   )
+})
+
+for (const [output, language, text, expected] of [
+  ['es-MX', 'es', 'No ataques, retírate hacia la izquierda.'],
+  ['pt-BR', 'pt', 'Não ataque, recue para a esquerda.'],
+  ['fr-CA', 'fr', 'Ne pas attaquer, reculez vers la gauche.'],
+  ['ja-JP', 'ja', '攻撃しないで、左に撤退してください。'],
+  ['ru', 'ru', 'Не атакуйте, отступайте налево.'],
+  [
+    'zh-Hans',
+    'zh',
+    '不要進攻，等待三秒，然後向左撤退。',
+    '不要进攻，等待三秒，然后向左撤退。',
+  ],
+  [
+    'zh-Hant',
+    'zh',
+    '不要进攻，等待三秒，然后向左撤退。',
+    '不要進攻，等待三秒，然後向左撤退。',
+  ],
+  ['de-DE', 'de', 'Nicht angreifen, ziehen Sie sich nach links zurück.'],
+  ['ko-KR', 'ko', '공격하지 말고 왼쪽으로 후퇴하세요.'],
+  ['hi-IN', 'hi', 'हमला मत करो, तीन सेकंड रुको और फिर बाईं ओर पीछे हटो।'],
+  ['id-ID', 'id', 'Jangan menyerang, tunggu tiga detik lalu mundur ke kiri.'],
+  ['vi-VN', 'vi', 'Đừng tấn công, đợi ba giây rồi rút lui sang trái.'],
+  ['it-IT', 'it', 'Non attaccare, aspetta tre secondi e poi ritirati a sinistra.'],
+]) {
+  test(`${output} uses the matching source transcript, switches languages and survives target failure`, async (t) => {
+    const f = await fixture(t, output)
+    const old = 'An earlier translation.'
+    f.target(old)
+    await until(() => f.latest()?.translatedText === old)
+    f.source('same', text)
+    await until(() => f.latest()?.text === text)
+    assert.equal(f.latest().translatedText, expected ?? text)
+    assert.equal(f.latest().language, language)
+    assert.equal(f.latest().sourceAlignment, 'aligned')
+    const same = f.latest()
+
+    f.source('different', 'Wait 3 seconds.')
+    await until(() => f.latest()?.text === 'Wait 3 seconds.')
+    assert.equal(f.latest().translatedText, '', 'discard the unused translation window')
+    f.target('A fresh translation.')
+    await until(() => f.latest()?.translatedText === 'A fresh translation.')
+    assert.equal(f.latest().sourceAlignment, 'independent')
+    assert.ok(f.latest().sequence > same.sequence)
+
+    f.source('same-again', text)
+    await until(() => f.latest()?.text === text)
+    const count = f.events.length
+    await f.failTarget()
+    f.source('same-again', text, true)
+    await until(() => f.latest()?.translationIsFinal)
+    assert.equal(f.latest().translatedText, expected ?? text)
+    assert.equal(f.latest().failure, null)
+    assert.equal(
+      f.events.slice(count).some((event) => event.type === 'failure'),
+      false,
+    )
+  })
+}
+
+test('Malay text is not relabeled as Indonesian', async (t) => {
+  const f = await fixture(t, 'id')
+  const text =
+    'Semua manusia dilahirkan bebas dan sama rata dari segi kemuliaan dan hak-hak.'
+  f.source('malay', text)
+  await until(() => f.latest()?.text === text)
+  assert.equal(f.latest().translatedText, '')
+  f.target('An Indonesian translation.')
+  await until(() => f.latest()?.translatedText === 'An Indonesian translation.')
+  assert.equal(f.latest().sourceAlignment, 'independent')
 })

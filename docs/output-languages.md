@@ -7,8 +7,9 @@ list. No credentials or languages are seeded.
 
 The production catalog also includes validated English (`en`). It shares the
 saved OpenAI key and terminology with the existing Chinese, Japanese and Korean
-paths. English source captions reuse transcription; other source languages use
-English translation. Provisioning uses the normal validation and activation gates.
+paths. Every selected language reuses transcription when it matches the detected
+source language; other or uncertain source languages retain translation. Regional
+variants share the language family, and Chinese scripts are normalized locally. Provisioning uses the normal validation and activation gates.
 
 ## Administrator workflow
 
