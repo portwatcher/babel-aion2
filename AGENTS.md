@@ -105,6 +105,7 @@
 
 ## Interface and assets
 
+- Avoid unnecessary secondary labels and descriptions. Let the layout do the explaining.
 - Reuse established components and tokens. This scaffold follows Perohub's
   PrimeVue/Aura conventions. Extend or extract shared controls across Babel
   applications instead of making parallel button, input, select, or theme systems.
