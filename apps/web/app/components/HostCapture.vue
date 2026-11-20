@@ -52,8 +52,8 @@ function choose(value: string | null) {
         @click="choose(selected)"
       />
     </div>
-    <small v-if="selected === COMPUTER_AUDIO" id="host-input-help" class="muted">{{
-      t('computerAudioHelp')
+    <small id="host-input-help" class="muted">{{
+      t(selected === COMPUTER_AUDIO ? 'computerAudioHelp' : 'audioInputHelp')
     }}</small>
   </div>
 </template>
