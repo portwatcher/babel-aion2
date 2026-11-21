@@ -116,12 +116,12 @@ and restores encrypted history as a new version. Candidate connection changes
 must pass a probe before replacing saved settings. Database leases prevent
 duplicate tests across replicas and version checks reject late results.
 The audio-sample form holds the selected OpenAI configuration lease while a
-bounded authorized PCM WAV feeds original-caption recognition and direct-audio
-translation concurrently. Finite samples return their comparison after draining;
-player captions publish each fragment. The catalog's enabled source terms become
-recognition hints. Target expressions remain evaluation data because the realtime
-translator does not support custom prompts/glossaries. Independent source and
-translation streams are labeled accordingly; timestamps are not fabricated.
+bounded authorized PCM WAV feeds VAD-gated original-caption recognition and
+per-utterance streaming text translation. Finite samples return their comparison
+after draining; player captions publish each incremental fragment. Enabled catalog
+terms supply both recognition hints and target-language translation glossaries.
+Utterance-aligned translations preserve the source utterance identity; timestamps
+are not fabricated.
 The output-language editor stores provider references, terminology policy, order
 and a room default. Sample validation binds to the path and provider/catalog
 revisions; stale results cannot validate a replacement path. Last successful
@@ -211,17 +211,20 @@ stable administrator ID from the signed issuer and subject, saves the identity,
 and creates an HTTP-only session cookie. Player listener sessions use their own
 tables and are not Better Auth user accounts.
 
-`@babel/providers` implements `gpt-live-transcribe` with minimal delay and one
-`gpt-realtime-translate` continuous audio session per active target language.
-Audio fans out in parallel, without serial transcript-to-translation requests.
-Every target delta publishes immediately. Any output whose language family
-matches the locally identified source uses the shared transcript instead; source
-revisions and finality drive that caption. Unknown or different source languages
-keep translation to the selected target. Chinese script choices use local conversion. Recognition and targets share one
-server-only encrypted key, fixed official destinations, bounded socket/audio
-queues and safe errors. Current listener/source/configuration checks run in one
-500 ms authorization snapshot before delivery and fence obsolete work. Main page and PiP
-consume the same incremental state. See [streaming processing](streaming-subtitles.md).
+`@babel/providers` implements one shared `gpt-live-transcribe` session per active
+speaker with local VAD silence gating (160 ms pre-roll, 120 ms hangover, 90 s idle
+speaker release) and `gpt-4.1-nano` streaming SSE text translation per subscribed
+target language. Coalesced recognition deltas stream incremental translated text,
+and identical completed transcripts finalize without duplicate translation calls.
+Any output whose language family matches the locally identified source uses the
+shared transcript directly without calling translation. Unknown or different
+source languages translate to the selected target with target-language game
+terminology glossaries; Chinese script choices also apply local OpenCC conversion.
+Recognition and translation share one server-only encrypted key, fixed official
+destinations, bounded socket/audio queues and safe errors. Current
+listener/source/configuration checks run in one 500 ms authorization snapshot
+before delivery and fence obsolete work. Main page and PiP consume the same
+incremental state. See [streaming processing](streaming-subtitles.md).
 See [provider configuration](providers-and-languages.md) for probe and sample limits.
 
 ## Next implementation gates

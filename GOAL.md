@@ -420,9 +420,9 @@ language family, use the shared live transcription text directly. Preserve
 incremental revisions, final corrections and retractions, without waiting for or
 replacing it with translation output. BCP 47 regional variants share the language
 family; Chinese Simplified/Traditional choices retain local script normalization.
-Different or uncertain source languages retain direct speech translation to the
-selected output language. The realtime translator remains parallel so a speaker
-can change languages without losing the beginning of the next command. Language
+Different or uncertain source languages stream lightweight text translation from
+the shared transcription to the selected output language, without opening extra
+audio sessions or spending translation requests on matching-language speech. Language
 identification is a local text estimate, not provider-reported audio language;
 short or mixed-language commands can remain uncertain. Preserve subscription
 fences and do not replay captions from before a listener subscribed.
@@ -494,23 +494,24 @@ Show a fault for the selected language.
 Use only OpenAI for speech recognition and translation.
 The administrator enters one OpenAI API Key, with no endpoint, region, model,
 provider type or second credential to configure.
-Use `gpt-live-transcribe` with minimal transcription delay for original captions.
-Use `gpt-realtime-translate` for direct speech translation to each target language.
+Use `gpt-live-transcribe` with minimal transcription delay and local VAD silence
+gating (160 ms pre-roll, 120 ms trailing hangover, 90 s idle speaker release) for
+shared original captions.
+Use `gpt-4.1-nano` streaming text completions (`/v1/chat/completions`) to translate
+recognized utterances into each subscribed target language.
 Keep model names and official destinations in server code.
 
 Let the administrator replace the encrypted key and run a connection test that
-configures both actual model sessions. Show invalid key, unavailable model,
+verifies both actual model endpoints. Show invalid key, unavailable model,
 permission, rate limit and exhausted quota as safe, specific errors.
 Keep versioned encrypted history and tested restoration at the server boundary.
 One saved configuration can serve both recognition and translation references.
 
 Translation currently supports 13 target language families: es, pt, fr, ja, ru,
-zh, de, ko, hi, id, vi, it and en. Keep Chinese scripts distinct using local
-script normalization, and validate each chosen output path before enabling it.
-The translation API does not support custom prompts or glossaries. Use catalog
-terms only as supported recognition hints; evaluate target terminology manually.
-Already-target-language speech can produce no translation. Keep original captions
-and original audio available without silently relabeling them as translated text.
+zh, de, ko, hi, id, vi, it and en. Keep Chinese scripts distinct using target
+locale prompts and local script normalization, and validate each chosen output
+path before enabling it. Enabled catalog terms supply both recognition hints and
+target-language translation glossaries within bounded context budgets.
 
 ### Secret storage
 

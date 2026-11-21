@@ -57,11 +57,10 @@ tab hidden is counted as not visible.
 - The clock starts when the worker receives the first voiced packet, not when
   the speaker's microphone captured it. Discord capture, encoding and network
   time before the worker are not included.
-- The OpenAI realtime translator has no utterance alignment. After a short
-  pause, a fragment from the previous turn can arrive first and look fast. A
-  first fragment within 1.5 s of the previous fragment for that language is
-  `overlapped`. Dashboards should use `attribution="clean"`; it excludes some
-  real samples rather than include doubtful ones.
+- Translations are utterance-aligned with recognition, but rapid consecutive speech
+  within 1.5 s of the previous fragment for that language is still marked
+  `overlapped` so late trailing deltas from a prior utterance cannot skew turn
+  onset percentiles. Dashboards should use `attribution="clean"`.
 - A dropped or replaced queued revision passes its probe to the replacement,
   which is what the listener sees first.
 - Turns without listeners create no spans; speakers have streams only while a

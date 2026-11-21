@@ -7,7 +7,10 @@ import {
   type SubtitleStreamEvent,
 } from '@babel/providers'
 import { PCM_FRAME_BYTES, PcmTimeline } from './pcm-timeline.ts'
-import { SpeechTurns } from './speech-turns.ts'
+import { SpeechTurns, voiced } from './speech-turns.ts'
+
+/** Release an idle speaker's recognition WebSocket after 90 s without speech. */
+export const IDLE_SPEAKER_MS = 90_000
 
 export interface RunningSubtitlePath extends LiveSubtitlePath {
   key: string
@@ -40,6 +43,7 @@ export class SpeakerSubtitles {
   private samples = 0
   private receivedSamples = 0
   private readonly startedAt = performance.now()
+  private lastVoiceAt = performance.now()
   private nextFrameAt = performance.now() + 20
 
   constructor(
@@ -51,7 +55,10 @@ export class SpeakerSubtitles {
     readonly group: string,
     path: RunningSubtitlePath,
     private readonly allowed: () => boolean,
-    private readonly ended: (code: Exclude<ProviderTestCode, 'PASS'> | null) => void,
+    private readonly ended: (
+      code: Exclude<ProviderTestCode, 'PASS'> | null,
+      reason: string,
+    ) => void,
   ) {
     this.turns = new SpeechTurns(roomId)
     this.stream = openSharedSubtitleStream({
@@ -68,7 +75,9 @@ export class SpeakerSubtitles {
       .then(() => {
         if (!this.closed) {
           this.timeline.clear()
-          this.nextFrameAt = performance.now() + 20
+          const now = performance.now()
+          this.lastVoiceAt = now
+          this.nextFrameAt = now + 20
           this.ready = true
         }
       })
@@ -214,9 +223,13 @@ export class SpeakerSubtitles {
     if (this.closed || pcm.length % 4) {
       return
     }
+    const now = performance.now()
+    if (voiced(pcm)) {
+      this.lastVoiceAt = now
+    }
     this.turns.hear(pcm)
     this.receivedSamples += pcm.length / 4
-    const overflow = this.timeline.receive(pcm, performance.now())
+    const overflow = this.timeline.receive(pcm, now)
     if (overflow && this.ready) {
       this.finish('UNAVAILABLE', 'audio-backlog')
     }
@@ -236,9 +249,13 @@ export class SpeakerSubtitles {
       this.finish('UNAVAILABLE', 'clock-stall')
       return
     }
+    if (now - this.lastVoiceAt >= IDLE_SPEAKER_MS) {
+      this.finish(null, 'idle')
+      return
+    }
     // Hardware continues at 48 kHz even when interval callbacks run late.
     // Drain every due frame so ordinary timer drift cannot overflow the queue
-    // and repeatedly reset recognition and all translations for this speaker.
+    // and repeatedly reset recognition for this speaker.
     while (now >= this.nextFrameAt && !this.closed) {
       this.nextFrameAt += 20
       this.writeFrame(now)
@@ -281,12 +298,13 @@ export class SpeakerSubtitles {
         ready: this.ready,
         elapsedMs: Math.round(performance.now() - this.startedAt),
         receivedAudioMs: Math.round(this.receivedSamples / 48),
-        sentAudioMs: Math.round(this.samples / 48),
+        sentAudioMs: Math.round(this.stream.sentAudioMs()),
       }),
     )
     this.close()
-    this.ended(code)
+    this.ended(code, reason)
   }
+
   close() {
     this.closed = true
     clearInterval(this.timer)

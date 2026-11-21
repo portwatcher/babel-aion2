@@ -23,17 +23,16 @@ is in [design.md](design.md), mirrored in [GOAL.md](GOAL.md).
   discovery server does not discard an already collected connection candidate.
 - **Room lifecycle.** Empty rooms disband after five minutes. The host can close
   a room at any time. See [community rooms](docs/multi-room-and-map.md).
-- **Subtitles.** OpenAI realtime transcription and translation, pushed to the
-  page and a Picture-in-Picture window. Original text stays visible beneath the
-  translation in both views, updating independently. Translation runs only for
-  languages with subscribers. Audio forwarding compensates for timer drift while
-  preserving pauses and the 100 ms backlog limit. See
-  [streaming subtitles](docs/streaming-subtitles.md).
-  When the source language matches the selected subtitle language, captions reuse
-  transcription directly. Different or uncertain source languages use translation;
+- **Subtitles.** Shared OpenAI live transcription (`gpt-live-transcribe`) with
+  local VAD silence gating and idle speaker release, plus `gpt-4.1-nano`
+  streaming text translation per subscribed language, pushed to the page and a
+  Picture-in-Picture window. Original text stays visible beneath the translation
+  in both views. Translation runs only for languages with subscribers and skips
+  utterances whose source language already matches the selected subtitle language;
   Chinese script choices retain local Simplified/Traditional conversion.
-  Recognition prompts fit the provider's 1,024-character limit while retaining
-  all configured term keywords and alternatives.
+  Enabled game terms guide both live recognition and target-language translation
+  within bounded prompt budgets. See
+  [streaming subtitles](docs/streaming-subtitles.md).
 - **Tactical map.** Shared drawing on the Lower Reshanta map, persisted per room.
 - **Interface languages.** English, Simplified Chinese, Japanese and Korean.
   See [interface localization](docs/interface-localization.md).

@@ -158,13 +158,13 @@ export async function createLiveSubtitleFixture(mediaEnvironment = {}) {
         },
       }),
     )
-    async function language(code) {
+    async function language(code, selectedTranslationId = translationId) {
       const saved = await json(
         await management(`/languages/${code}`, 'PUT', {
           expectedVersion: 0,
           name: `Fixture ${code}`,
           recognitionConfigurationId: recognitionId,
-          translationConfigurationId: translationId,
+          translationConfigurationId: selectedTranslationId,
           includeTerms: false,
         }),
       )
