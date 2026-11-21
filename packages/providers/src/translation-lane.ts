@@ -19,7 +19,7 @@ interface InFlightTranslation {
 }
 
 /** Batch rapid 20 ms recognition deltas without delaying incremental captions. */
-const COALESCE_MS = 40
+const COALESCE_MS = 80
 
 /** Single-flight streaming text translation coordinator for one target language. */
 export function createTranslationLane(input: {

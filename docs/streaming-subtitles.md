@@ -38,7 +38,7 @@ marks discontinuity if older audio is lost, and drops pre-ready history.
 ## Utterance-aligned streaming text translation
 
 Every recognized utterance carries a stable `utteranceId` (`sourceAlignment:
-'aligned'`). Rapid provisional recognition deltas coalesce over a 40 ms window
+'aligned'`). Rapid provisional recognition deltas coalesce over an 80 ms window
 while streaming SSE tokens from `gpt-4.1-nano` immediately as they arrive;
 single-flight scheduling prevents abort starvation on longer sentences while
 keeping only the latest pending revision queued. When a finalized transcript

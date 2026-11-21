@@ -67,12 +67,18 @@ test('one shared recognition stream drives streaming text translations before au
   await s.prepare()
   const sent = sendPcmAudio(s, readPcmWave(syntheticWave()), AbortSignal.timeout(8000))
   await until(
-    () => values(a).some((value) => value.translatedText.includes('Wait 3 seconds.')),
+    () =>
+      values(a).some((value) => value.translatedText.includes('Wait 3 seconds.')) &&
+      values(korean).some((value) => value.translatedText.includes('Wait 3 seconds.')),
     'incremental translation before audio finishes',
   )
   const recognitions = network.observations.filter(
     (value) => value.protocol === 'recognition',
   )
+  const translationCalls = () =>
+    network.observations.filter((value) => value.protocol === 'translation')
+  const callsBeforeCommit = translationCalls().length
+  assert.ok(callsBeforeCommit >= 2)
   assert.equal(recognitions.length, 1, 'exactly one recognition socket')
   assert.ok(recognitions[0].frames.length < 50)
   assert.ok(values(a).some((value) => value.translatedText && !value.isFinal))
@@ -98,12 +104,10 @@ test('one shared recognition stream drives streaming text translations before au
         value.audioEndMs === null,
     ),
   )
-  const translations = network.observations.filter(
-    (value) => value.protocol === 'translation',
-  )
+  const translations = translationCalls()
   assert.equal(
     translations.length,
-    2,
+    callsBeforeCommit,
     'identical completed transcript reuses streamed translation without a second HTTP call',
   )
   assert.ok(translations.every((item) => item.model === 'gpt-4.1-nano' && item.stream))

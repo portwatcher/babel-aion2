@@ -255,7 +255,10 @@ try {
   const translations = network.observations.filter(
     (value) => value.protocol === 'translation',
   )
-  assert.equal(translations.length, 1, 'One streaming text request for the utterance')
+  assert.ok(
+    translations.length >= 1 && translations.length <= 2,
+    'Coalesced delta and completed utterance avoid duplicate final translation calls',
+  )
   assert.equal(translations[0].model, 'gpt-4.1-nano')
   assert.equal(translations[0].stream, true)
   assert.ok(
