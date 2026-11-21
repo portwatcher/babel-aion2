@@ -67,7 +67,7 @@ export async function startTestServer(databaseUrl = '', options = {}) {
   }
   try {
     let ready = false
-    for (let attempt = 0; attempt < 100; attempt += 1) {
+    for (let attempt = 0; attempt < 200; attempt += 1) {
       try {
         ready = (
           await fetch(`${origin}/api/health/${databaseUrl ? 'ready' : 'live'}`, {

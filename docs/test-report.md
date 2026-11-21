@@ -1,5 +1,13 @@
 # Validation
 
+## CI/CD transient bridge socket and Node 24 action hardening · 2026-11-22
+
+| Check                                    | Status | Evidence                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vanished-interface UDP socket regression | PASS   | `apps/voice-worker/test/candidate-sockets.test.mjs` binds a real loopback UDP socket alongside an unconfigured RFC 5737 `198.51.100.1` endpoint (`EADDRNOTAVAIL`); before repair `portsBusy` threw `Cannot inspect local candidate socket`, and after repair busy/released checks verify surviving sockets while rejecting all-vanished sets. |
+| Workflow lint and Node 24 actions        | PASS   | `actionlint` passes with zero warnings; `actions/checkout` (`v7.0.1`) and `actions/setup-node` (`v7.1.0`) use pinned `node24` commit SHAs, and `.env.example` / CI `NUXT_DATABASE_URL` bind IPv4 `127.0.0.1`.                                                                                                                                 |
+| Local CI and recovery smoke              | PASS   | Node 24.22.1 `npm run ci:local` (57 unit tests, line limits, formatting, strict types, builds and HTTP smoke) and `npm run test:recovery:db` pass cleanly.                                                                                                                                                                                    |
+
 ## VAD silence gating and streaming text translation · 2026-11-22
 
 | Check                                 | Status  | Evidence                                                                                                                                                                                                                                                                                                                                                        |
