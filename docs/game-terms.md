@@ -46,16 +46,11 @@ the private catalog.
 ## Applying terms to an audio sample
 
 **使用已启用的游戏术语提示** is checked by default in the sample form. Uncheck it
-to compare the same sample without terminology. Enabled terms go only to the
-OpenAI original-caption recognizer as supported `prompt`, `keywords` and language
-hints. The recognition context is independent of the output language.
+to compare the same sample without terminology. Enabled terms supply supported
+`prompt`, `keywords` and language hints to the OpenAI original-caption
+recognizer, and matching output-language expressions form a required terminology
+glossary in the `gpt-4.1-nano` translation system prompt (`translationTermCount`).
 Connection-only probes do not send this catalog.
-
-`gpt-realtime-translate` consumes the same audio directly and does not support
-custom prompts, glossaries or pronunciation guides. Target expressions remain
-saved for manual evaluation; no unsupported translation context is sent. A
-recognition hint cannot enforce how the separate translator renders a game term.
-See [OpenAI's translation guide](https://developers.openai.com/cookbook/examples/voice_solutions/realtime_translation_guide).
 
 The recognizer's descriptive `prompt` is limited to 1,024 UTF-16 code units,
 without splitting a Unicode surrogate pair. Longer catalog descriptions are

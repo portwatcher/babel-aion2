@@ -82,7 +82,8 @@ async function save(input: TermSave) {
     if (!disposed) {
       query.value = ''
       await readPage(0)
-      notice.value = 'Term saved. Live recognition will use the updated catalog.'
+      notice.value =
+        'Term saved. Live recognition and translation will use the updated catalog.'
     }
   } catch (failure) {
     if (!disposed) {
@@ -142,7 +143,8 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <p class="muted">
-      Verified AION2 Global terms only. Terms guide recognition, not translation.
+      Verified AION2 Global terms only. Terms guide live recognition and subtitle
+      translation.
     </p>
     <form class="entry-form" @submit.prevent="load()">
       <div class="field">

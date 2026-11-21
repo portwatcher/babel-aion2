@@ -4,9 +4,11 @@ import {
   type RunningSubtitlePath,
   type SubtitleConsumer,
 } from './speaker-subtitles.ts'
+import { voiced } from './speech-turns.ts'
 
 interface Speaker {
   name: string
+  active: boolean
   streams: Map<string, SpeakerSubtitles>
   retries: Map<string, { at: number; failedAt: number; attempt: number }>
 }
@@ -47,13 +49,16 @@ export class RoomSubtitles {
       }
     }
     for (const [group, stream] of speaker.streams) {
-      if (!groups.has(group)) {
+      if (!groups.has(group) || !speaker.active) {
         stream.close()
         speaker.streams.delete(group)
         speaker.retries.delete(group)
       } else {
         stream.reconcile(this.consumers.values(), this.paths)
       }
+    }
+    if (!speaker.active) {
+      return
     }
     for (const [group, path] of groups) {
       if (
@@ -74,11 +79,19 @@ export class RoomSubtitles {
           group,
           path,
           () => !this.closed && this.allowed(),
-          (code) => {
+          (code, reason) => {
             if (speaker.streams.get(group)?.streamGeneration !== generation) {
               return
             }
             speaker.streams.delete(group)
+            if (reason === 'idle') {
+              speaker.retries.delete(group)
+              if (speaker.streams.size === 0) {
+                speaker.active = false
+              }
+              this.status(id, generation, group, 'WAITING', null)
+              return
+            }
             const previous = speaker.retries.get(group)
             const now = Date.now()
             const attempt =
@@ -91,7 +104,13 @@ export class RoomSubtitles {
                 ? Math.min(5000, 250 * 2 ** attempt)
                 : 30_000
             speaker.retries.set(group, { at: now + delay, failedAt: now, attempt })
-            this.failure(id, generation, group, code)
+            this.status(
+              id,
+              generation,
+              group,
+              code ? 'UNAVAILABLE' : 'CONNECTING',
+              code,
+            )
           },
         )
         speaker.streams.set(group, stream)
@@ -102,15 +121,16 @@ export class RoomSubtitles {
           failedAt: Date.now(),
           attempt: 0,
         })
-        this.failure(id, generation, group, 'INVALID_CONFIGURATION')
+        this.status(id, generation, group, 'UNAVAILABLE', 'INVALID_CONFIGURATION')
       }
     }
   }
 
-  private failure(
+  private status(
     id: string,
     generation: number,
     group: string,
+    state: 'WAITING' | 'CONNECTING' | 'UNAVAILABLE',
     code: Exclude<ProviderTestCode, 'PASS'> | null,
   ) {
     for (const consumer of this.consumers.values()) {
@@ -124,7 +144,7 @@ export class RoomSubtitles {
         speakerId: id,
         streamGeneration: generation,
         outputLanguage: consumer.outputLanguage,
-        state: code ? 'UNAVAILABLE' : 'CONNECTING',
+        state,
         failure: code,
       })
     }
@@ -134,13 +154,27 @@ export class RoomSubtitles {
     if (this.closed || !this.allowed()) {
       return
     }
+    const hasVoice = voiced(pcm)
     let speaker = this.speakers.get(id)
     if (!speaker) {
-      speaker = { name, streams: new Map(), retries: new Map() }
+      if (!hasVoice) {
+        return
+      }
+      speaker = { name, active: true, streams: new Map(), retries: new Map() }
       this.speakers.set(id, speaker)
       this.reconcileSpeaker(id, speaker)
+    } else {
+      speaker.name = name
+      if (!speaker.active) {
+        if (!hasVoice) {
+          return
+        }
+        speaker.active = true
+        this.reconcileSpeaker(id, speaker)
+      } else if (speaker.streams.size === 0 && this.consumers.size > 0) {
+        this.reconcileSpeaker(id, speaker)
+      }
     }
-    speaker.name = name
     for (const stream of speaker.streams.values()) {
       stream.receive(pcm)
     }
