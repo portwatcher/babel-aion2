@@ -1,5 +1,20 @@
 # Validation
 
+## Five-minute in-memory translation history in room UI · 2026-11-26
+
+Active room listeners now see a rolling five-minute translation history for
+their selected output language in the room UI, backed by an ephemeral in-memory
+cache on `apps/voice-worker` (`SubtitleHistoryCache`) populated strictly from
+authorized deliveries for subscribed languages.
+
+| Check                                          | Status  | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ---------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Worker five-minute cache and bounds            | PASS    | `apps/voice-worker/test/subtitle-history.test.ts` (3 tests) verifies per-room/per-language isolation, on-demand language population, in-place utterance revision updates, stale-revision and mid-utterance-slice rejection, retraction removal, failure/empty filtering, latency-trace stripping, disabled-language filtering, five-minute TTL expiry, and the 200-entry per-language cap.                                     |
+| Browser history merge and clock-skew expiry    | PASS    | `apps/web/test/subtitle-history.test.ts` (2 tests) verifies `serverNow`-anchored five-minute expiration under a two-hour browser clock offset, chronological merging of live WebSocket updates arriving during in-flight HTTP fetches, retraction removal, cross-language filtering, and clean reset on language switch.                                                                                                       |
+| End-to-end PostgreSQL and worker history suite | PASS    | `npm run test:subtitles:db` against disposable PostgreSQL and built `apps/web` verifies late listeners read prior five-minute cached records while live WebSockets keep subscription fences, switching to an enabled unlistened language (`zh-Hans`) returns zero records, switching back restores cached `ja` records, obsolete sources are excluded, revoked sessions receive HTTP 410, and zero-listener gaps retain cache. |
+| Local CI and database suites                   | PASS    | Node 24.22.1 `npm run ci:local` (65 unit tests, line limits, Prettier formatting, strict workspace typecheck, web/worker/migration/recovery builds, and built HTTP smoke) and `npm run test:db` (20 tests) pass cleanly.                                                                                                                                                                                                       |
+| Live multi-user browser visual check           | NOT RUN | Automated tests cover the worker cache, authenticated HTTP proxy, client view state, and built SSR/HTTP smoke; live multi-player Chrome rendering with real OpenAI traffic remains unmeasured in this run.                                                                                                                                                                                                                     |
+
 ## Translation model migration to `gpt-5.4-nano` and multilingual STT keyword isolation · 2026-11-26
 
 Post-deploy isolated read-only probes inside `babel-voice` revealed two remaining

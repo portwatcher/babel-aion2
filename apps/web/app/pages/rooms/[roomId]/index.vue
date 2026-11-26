@@ -14,6 +14,8 @@ const {
   connectionState,
   mapRevision,
   subtitles,
+  subtitleHistory,
+  refreshSubtitleHistory,
   audioState,
   audioBlocked,
   muted,
@@ -34,6 +36,7 @@ const {
         :configuration="configuration"
         :connection-state="connectionState"
         :subtitles="subtitles"
+        :subtitle-history="subtitleHistory"
         :audio-state="audioState"
         :audio-blocked="audioBlocked"
         :muted="muted"
@@ -45,6 +48,7 @@ const {
         @language="changeLanguage"
         @play-audio="playAudio"
         @toggle-mute="toggleMute"
+        @retry-history="refreshSubtitleHistory"
       />
       <PlayerList :players="players" :current="playersCurrent" />
     </div>

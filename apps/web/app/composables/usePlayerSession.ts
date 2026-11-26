@@ -59,6 +59,12 @@ export function usePlayerSession(
     changingLanguage,
     connection.send,
   )
+  const subtitleHistory = useSubtitleHistory(
+    session,
+    credential,
+    connection.state,
+    changingLanguage,
+  )
   const audio = useListenerAudio((reference) => {
     if (
       !access ||
@@ -74,6 +80,7 @@ export function usePlayerSession(
 
   function clearAccess() {
     subtitles.clear()
+    subtitleHistory.clear()
     audio.stop()
     access = null
     credential.value = null
@@ -148,6 +155,7 @@ export function usePlayerSession(
   function receive(event: PlayerEvent) {
     if (event.type === 'subtitles') {
       subtitles.receive(event)
+      subtitleHistory.receive(event)
     } else if (event.type === 'session') {
       error.value = ''
       accept(event.session)
@@ -404,6 +412,8 @@ export function usePlayerSession(
     connectionState: connection.state,
     mapRevision,
     subtitles: subtitles.presentation,
+    subtitleHistory: subtitleHistory.state,
+    refreshSubtitleHistory: subtitleHistory.refresh,
     audioState: audio.state,
     audioBlocked: audio.blocked,
     muted: audio.muted,

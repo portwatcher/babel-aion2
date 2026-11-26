@@ -31,7 +31,9 @@ is in [design.md](design.md), mirrored in [GOAL.md](GOAL.md).
   utterances whose source language already matches the selected subtitle language;
   Chinese script choices retain local Simplified/Traditional conversion.
   Enabled game terms guide both live recognition and target-language translation
-  within bounded prompt budgets. See
+  within bounded prompt budgets. The room page also shows a rolling five-minute
+  in-memory translation history for the selected language whenever listeners
+  were subscribed to it. See
   [streaming subtitles](docs/streaming-subtitles.md).
 - **Tactical map.** Shared drawing on the Lower Reshanta map, persisted per room.
 - **Interface languages.** English, Simplified Chinese, Japanese and Korean.

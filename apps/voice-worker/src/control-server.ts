@@ -4,6 +4,7 @@ import {
   mediaControlRequestSchema,
   listenerReferenceSchema,
   voiceSourceRequestSchema,
+  subtitleHistoryRequestSchema,
   subtitleSubscriptionSchema,
 } from '@babel/contracts'
 import { ListenerError } from '@babel/database/listeners'
@@ -50,6 +51,19 @@ export function createControlServer(
       if (request.url === '/subtitles/ready' && request.method === 'GET') {
         const ready = await subtitles.ready()
         json(response, ready ? 200 : 503, { ready })
+        return
+      }
+      if (request.url === '/subtitles/history' && request.method === 'POST') {
+        const parsed = subtitleHistoryRequestSchema.safeParse(await input(request))
+        if (!parsed.success) {
+          json(response, 400, { code: 'INVALID_REQUEST' })
+          return
+        }
+        json(
+          response,
+          200,
+          await subtitles.readHistory(parsed.data.reference, parsed.data.credential),
+        )
         return
       }
       if (request.url === '/subtitles' && request.method === 'POST') {

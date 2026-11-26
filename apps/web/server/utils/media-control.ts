@@ -1,8 +1,10 @@
 import {
   mediaOfferSchema,
+  subtitleHistorySchema,
   voiceSourceStatusSchema,
   type ListenerReference,
   type MediaRequest,
+  type SubtitleHistory,
 } from '@babel/contracts'
 
 async function control(path: string, body?: unknown, timeout = 8_000) {
@@ -96,4 +98,37 @@ export async function mediaOperation(
     throw createError({ statusCode: 503, statusMessage: 'Media operation unconfirmed' })
   }
   return { accepted: true }
+}
+
+export async function subtitleHistory(
+  reference: ListenerReference,
+  credential: string,
+): Promise<SubtitleHistory> {
+  const result = await control(
+    '/subtitles/history',
+    {
+      reference: {
+        sessionId: reference.sessionId,
+        nicknameGeneration: reference.nicknameGeneration,
+      },
+      credential,
+    },
+    5_000,
+  )
+  if (!result || result.status !== 200) {
+    const status =
+      result && [400, 401, 404, 410].includes(result.status) ? result.status : 503
+    throw createError({
+      statusCode: status,
+      statusMessage: 'Subtitle history unavailable',
+    })
+  }
+  const parsed = subtitleHistorySchema.safeParse(result.data)
+  if (!parsed.success) {
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'Subtitle history unavailable',
+    })
+  }
+  return parsed.data
 }
