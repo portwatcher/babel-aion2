@@ -259,11 +259,11 @@ try {
     translations.length >= 1 && translations.length <= 2,
     'Coalesced delta and completed utterance avoid duplicate final translation calls',
   )
-  assert.equal(translations[0].model, 'gpt-4.1-nano')
+  assert.equal(translations[0].model, 'gpt-5.4-nano')
   assert.equal(translations[0].stream, true)
   assert.ok(
     translations[0].messages[0].content.includes('attack (engage) => 測試攻擊'),
-    'Target terminology glossary is passed to gpt-4.1-nano',
+    'Target terminology glossary is passed to gpt-5.4-nano',
   )
   assert.equal(preview.segments.at(-1).translationTermCount, 1)
   const saved = (

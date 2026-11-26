@@ -4,7 +4,7 @@ import { testProviderConnection } from '../src/index.ts'
 import { createProviderFixture } from '../../../scripts/fixtures/provider-server.mjs'
 import { routeProviderNetwork } from '../../../scripts/fixtures/provider-network.mjs'
 
-test('OpenAI probes authenticate recognition WebSocket and gpt-4.1-nano translation HTTP endpoint', async (t) => {
+test('OpenAI probes authenticate recognition WebSocket and gpt-5.4-nano translation HTTP endpoint', async (t) => {
   const fixture = await createProviderFixture()
   const restore = routeProviderNetwork(fixture.origin)
   t.after(async () => {
@@ -36,8 +36,10 @@ test('OpenAI probes authenticate recognition WebSocket and gpt-4.1-nano translat
       },
     },
   })
-  assert.equal(translation.model, 'gpt-4.1-nano')
+  assert.equal(translation.model, 'gpt-5.4-nano')
   assert.equal(translation.stream, false)
+  assert.equal(translation.configuration.reasoning_effort, 'none')
+  assert.equal(translation.configuration.max_completion_tokens, 16)
   for (const [mode, code] of [
     ['invalid', 'INVALID_CREDENTIAL'],
     ['model', 'MODEL_UNAVAILABLE'],

@@ -110,7 +110,14 @@ test('one shared recognition stream drives streaming text translations before au
     callsBeforeCommit,
     'identical completed transcript reuses streamed translation without a second HTTP call',
   )
-  assert.ok(translations.every((item) => item.model === 'gpt-4.1-nano' && item.stream))
+  assert.ok(
+    translations.every(
+      (item) =>
+        item.model === 'gpt-5.4-nano' &&
+        item.stream &&
+        item.configuration.reasoning_effort === 'none',
+    ),
+  )
   assert.ok(
     recognitions[0].frames.every((frame) => frame.bytes === 960),
     'recognition receives 24 kHz 20 ms PCM',
@@ -534,10 +541,78 @@ for (const long of [false, true]) {
       undefined,
       'omit languages so gpt-live-transcribe auto-detects spoken language freely',
     )
-    assert.equal(translation.model, 'gpt-4.1-nano')
+    assert.equal(translation.model, 'gpt-5.4-nano')
     const systemPrompt = translation.messages.find((m) => m.role === 'system').content
     assert.ok(systemPrompt.includes('TestSkill (TS) => テスト'))
     assert.equal(result.segments.at(-1).translationTermCount, terms.length)
     assert.ok(result.segments.at(-1).translationIsFinal)
   })
 }
+
+test('multilingual terminology catalog keeps recognition prompt neutral without mixed-script keywords while supplying cross-language translation glossary', async (t) => {
+  const network = await fixture(t)
+  const key = network.credential('speech')
+  const terms = [
+    {
+      sourceTerm: '키스크',
+      sourceLanguage: 'ko',
+      alternatives: [],
+      category: 'Resurrection point',
+      context: 'Portable resurrection point.',
+      expressions: [
+        { language: 'zh-Hans', text: '奇斯克' },
+        { language: 'ja', text: 'キスク' },
+        { language: 'ko', text: '키스크' },
+      ],
+    },
+    {
+      sourceTerm: 'Kisk',
+      sourceLanguage: 'en',
+      alternatives: [],
+      category: 'Resurrection point',
+      context: 'Portable resurrection point.',
+      expressions: [
+        { language: 'zh-Hans', text: '奇斯克' },
+        { language: 'ja', text: 'キスク' },
+        { language: 'ko', text: '키스크' },
+      ],
+    },
+  ]
+  const s = stream(network, key, { version: 2, terms })
+  t.after(() => s.close())
+  const events = []
+  s.subscribe(path(key, 'en'), (event) => events.push(event))
+  await s.prepare()
+  const recognition = network.observations.find(
+    (value) => value.protocol === 'recognition',
+  )
+  assert.equal(
+    recognition.configuration.audio.input.transcription.keywords,
+    undefined,
+    'multilingual catalog omits mixed-script keywords from STT to avoid cross-script hijacking',
+  )
+  assert.equal(
+    recognition.configuration.audio.input.transcription.prompt,
+    'AION2 Steam Global / Asia voice chat battle commands.',
+  )
+  network.emit(
+    key,
+    {
+      type: 'conversation.item.input_audio_transcription.completed',
+      item_id: 'jp_1',
+      transcript: 'キスクを壊して左に集まって',
+    },
+    recognition,
+  )
+  await until(
+    () => values(events).at(-1)?.translationIsFinal,
+    'Japanese transcript translates to English with cross-language glossary',
+  )
+  const translation = network.observations.find(
+    (value) => value.protocol === 'translation',
+  )
+  assert.equal(translation.model, 'gpt-5.4-nano')
+  const systemPrompt = translation.messages.find((m) => m.role === 'system').content
+  assert.ok(systemPrompt.includes('- Kisk (奇斯克, キスク, 키스크) => Kisk'))
+  assert.equal(values(events).at(-1).translationTermCount, 1)
+})

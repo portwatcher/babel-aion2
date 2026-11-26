@@ -497,8 +497,9 @@ provider type or second credential to configure.
 Use `gpt-live-transcribe` with minimal transcription delay and local VAD silence
 gating (160 ms pre-roll, 500 ms trailing hangover, 90 s idle speaker release) for
 shared original captions.
-Use `gpt-4.1-nano` streaming text completions (`/v1/chat/completions`) to translate
-recognized utterances into each subscribed target language.
+Use `gpt-5.4-nano` (`reasoning_effort: none`) streaming text completions
+(`/v1/chat/completions`) to translate recognized utterances into each subscribed
+target language.
 Keep model names and official destinations in server code.
 
 Let the administrator replace the encrypted key and run a connection test that
