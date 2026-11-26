@@ -24,7 +24,7 @@ is in [design.md](design.md), mirrored in [GOAL.md](GOAL.md).
 - **Room lifecycle.** Empty rooms disband after five minutes. The host can close
   a room at any time. See [community rooms](docs/multi-room-and-map.md).
 - **Subtitles.** Shared OpenAI live transcription (`gpt-live-transcribe`) with
-  local VAD silence gating and idle speaker release, plus `gpt-4.1-nano`
+  local VAD silence gating and idle speaker release, plus `gpt-5.4-nano`
   streaming text translation per subscribed language, pushed to the page and a
   Picture-in-Picture window. Original text stays visible beneath the translation
   in both views. Translation runs only for languages with subscribers and skips

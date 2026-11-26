@@ -99,7 +99,7 @@ test('English output uses incremental original captions, corrections and finalit
   )
 })
 
-test('non-English and uncertain source text stream gpt-4.1-nano English translation and can follow direct English', async (t) => {
+test('non-English and uncertain source text stream gpt-5.4-nano English translation and can follow direct English', async (t) => {
   const f = await fixture(t)
   f.source('english', 'Wait 3 seconds.')
   await until(() => f.latest()?.text === 'Wait 3 seconds.')

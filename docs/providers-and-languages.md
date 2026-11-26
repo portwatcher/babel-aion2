@@ -7,10 +7,10 @@ Production setup provisions and validates English (`en`), Simplified Chinese (`z
 Japanese (`ja`) and Korean (`ko`) with that key; no manual language setup is
 required in administration. Missing credentials never produce fabricated paths.
 
-| Purpose                    | Model                                   | Connection                                              |
-| -------------------------- | --------------------------------------- | ------------------------------------------------------- |
-| Shared original captions   | `gpt-live-transcribe`, `delay: minimal` | `wss://api.openai.com/v1/realtime?intent=transcription` |
-| Streaming text translation | `gpt-4.1-nano` (`stream: true`)         | `https://api.openai.com/v1/chat/completions`            |
+| Purpose                    | Model                                                     | Connection                                              |
+| -------------------------- | --------------------------------------------------------- | ------------------------------------------------------- |
+| Shared original captions   | `gpt-live-transcribe`, `delay: minimal`                   | `wss://api.openai.com/v1/realtime?intent=transcription` |
+| Streaming text translation | `gpt-5.4-nano` (`stream: true`, `reasoning_effort: none`) | `https://api.openai.com/v1/chat/completions`            |
 
 Both endpoints use `api.openai.com` and server-only Authorization headers.
 One VAD-gated recognition stream runs per active speaker; streaming SSE text
@@ -43,7 +43,8 @@ serve both recognition and translation references; its lease is acquired once.
 Conflicting reference versions reject before provider work.
 
 A connection probe configures the recognition WebSocket session and executes a
-1-token `gpt-4.1-nano` completion probe in parallel.
+minimal `gpt-5.4-nano` (`reasoning_effort: none`, `max_completion_tokens: 16`)
+completion probe in parallel.
 It verifies key/model access, without claiming that audio or language quality was
 validated. Errors are reduced to safe credential, model, quota, rate, permission,
 configuration, response, timeout or availability categories. Untrusted endpoint
@@ -71,15 +72,18 @@ segments (`sourceAlignment: 'aligned'`), source language is locally estimated
 every non-empty recognized utterance to reach final source and translated output,
 checked against the saved path and catalog versions.
 
-Recognition terms become `prompt` and `keywords` hints (without restricting
-`transcription.languages`, so `gpt-live-transcribe` auto-detects spoken languages
-freely); matching target-language expressions become a required terminology
-glossary for `gpt-4.1-nano` translation (`translationTermCount`). Both contexts
-enforce a 6,000-byte UTF-8 budget; terms are never silently truncated.
+Recognition terms supply `prompt` and `keywords` hints for single-language
+catalogs, or a neutral scene `prompt` without mixed-script `keywords` for
+multilingual catalogs (without restricting `transcription.languages`, so
+`gpt-live-transcribe` auto-detects spoken languages freely); matching
+target-language expressions (plus source-term fallbacks with cross-language
+aliases) become a required terminology glossary for `gpt-5.4-nano` translation
+(`translationTermCount`). Both contexts enforce a 6,000-byte UTF-8 budget; terms
+are never silently truncated.
 
 For every output language, a matching local source-language estimate selects the
 shared transcript directly, including its revisions and finality, with zero
 translation API requests. Regional variants match their language family; Chinese
 script choices use local normalization. Different or uncertain source languages
-stream `gpt-4.1-nano` translations. Test mixed-language commands, names and
+stream `gpt-5.4-nano` translations. Test mixed-language commands, names and
 terminology explicitly before enabling production languages.

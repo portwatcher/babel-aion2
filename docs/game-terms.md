@@ -46,11 +46,14 @@ the private catalog.
 ## Applying terms to an audio sample
 
 **使用已启用的游戏术语提示** is checked by default in the sample form. Uncheck it
-to compare the same sample without terminology. Enabled terms supply supported
-`prompt`, `keywords` and language hints to the OpenAI original-caption
-recognizer, and matching output-language expressions form a required terminology
-glossary in the `gpt-4.1-nano` translation system prompt (`translationTermCount`).
-Connection-only probes do not send this catalog.
+to compare the same sample without terminology. For single-language catalogs,
+enabled terms supply bounded `prompt` and `keywords` hints to the OpenAI
+original-caption recognizer; for multilingual catalogs spanning multiple scripts,
+recognition keeps a neutral scene prompt without mixed-script `keywords` so
+onset syllables are not hijacked across scripts, while matching output-language
+expressions (including source-term fallbacks with cross-language aliases) form a
+required terminology glossary in the `gpt-5.4-nano` translation system prompt
+(`translationTermCount`). Connection-only probes do not send this catalog.
 
 The recognizer's descriptive `prompt` is limited to 1,024 UTF-16 code units,
 without splitting a Unicode surrogate pair. Longer catalog descriptions are

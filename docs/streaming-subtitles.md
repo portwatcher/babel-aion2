@@ -4,8 +4,8 @@ Each active Discord member has an independent mono audio timeline. Original
 playback remains on its existing media path. Caption processing opens a
 recognition WebSocket (`gpt-live-transcribe`, `delay: minimal`) only after the
 member actually produces voiced audio, gates prolonged silence locally, and
-streams incremental text translations (`gpt-4.1-nano` SSE over
-`/v1/chat/completions`) per subscribed target language. Listeners sharing a
+streams incremental text translations (`gpt-5.4-nano`, `reasoning_effort: none`,
+SSE over `/v1/chat/completions`) per subscribed target language. Listeners sharing a
 speaker and language share the translation request.
 
 ## VAD silence gating, idle release and bounds
@@ -46,7 +46,7 @@ newest five frames (100 ms) and marks discontinuity if older audio is lost.
 
 Every recognized utterance carries a stable `utteranceId` (`sourceAlignment:
 'aligned'`). Rapid provisional recognition deltas coalesce over an 80 ms window
-while streaming SSE tokens from `gpt-4.1-nano` immediately as they arrive;
+while streaming SSE tokens from `gpt-5.4-nano` immediately as they arrive;
 single-flight scheduling prevents abort starvation on longer sentences while
 keeping only the latest pending revision queued. When a finalized transcript
 matches the already-translated delta text, `translationIsFinal` is set
@@ -58,7 +58,7 @@ Every output reuses live transcription directly whenever the locally identified
 source language matches its target language family, spending zero translation
 requests. Regional BCP 47 variants match that family, and Chinese text retains
 local Simplified/Traditional normalization. Different and uncertain source
-languages stream `gpt-4.1-nano` translations. Language identification uses the
+languages stream `gpt-5.4-nano` translations. Language identification uses the
 larger local ELD model; a local Franc check distinguishes Indonesian when ELD
 reports Malay.
 
@@ -74,8 +74,10 @@ subscribed languages run translations; the last unsubscribe immediately aborts
 any in-flight HTTP request for that language. When no subtitle listeners remain,
 the worker closes recognition too. Original audio continues independently.
 
-Enabled game terms supply both bounded recognition hints (1,024-character prompt
-limit plus full literal keywords, leaving spoken-language detection automatic) and
+Enabled game terms supply bounded recognition hints (single-language catalogs
+include 1,024-character `prompt` and literal `keywords`; multilingual catalogs
+use a neutral scene `prompt` without mixed-script `keywords` so onset syllables
+are not hijacked across scripts, leaving spoken-language detection automatic) and
 target-language translation glossaries (`translationTermCount`). Stream-end logs distinguish
 provider failures, audio backlog, clock stalls, idle release and authorization
 expiry, recording controlled codes, generations, elapsed duration, received

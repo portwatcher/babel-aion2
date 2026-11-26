@@ -1,5 +1,20 @@
 # Validation
 
+## Translation model migration to `gpt-5.4-nano` and multilingual STT keyword isolation · 2026-11-26
+
+Post-deploy isolated read-only probes inside `babel-voice` revealed two remaining
+production issues: OpenAI deprecated `gpt-4.1-nano` (HTTP 404 `model_not_found`),
+causing all cross-language translations to fail, and passing mixed-script
+`keywords` (Korean Hangul, Japanese Katakana, Chinese Hanzi and Latin together)
+into `gpt-live-transcribe` hijacked Japanese onset syllables into Korean
+(`聞こえますか` → `키こえますか？`, `ちょっと` → `첫と`).
+
+| Check                                           | Status | Evidence                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gpt-5.4-nano` probe and streaming translation  | PASS   | Live read-only checks against OpenAI confirmed `gpt-5.4-nano` with `reasoning_effort: 'none'`, `temperature: 0` and `max_completion_tokens: 16` passes probing (HTTP 200) and streams accurate Japanese, Korean and Chinese to English and Simplified Chinese translations (~440–675 ms TTFT), recovering phonetic STT near-misses (`ティスク`, `奇思克`) to `Kisk` / `奇斯克`. |
+| Multilingual STT neutrality and English aliases | PASS   | `packages/providers/test/subtitle-stream.test.mjs` verifies multilingual term catalogs emit a neutral scene `prompt` without mixed-script `keywords` while `translationTerminology` supplies source-term fallbacks with cross-language aliases (`- Kisk (奇斯克, キスク, 키스크) => Kisk`). Single-language catalogs retain `keywords`.                                         |
+| Local CI and PostgreSQL subtitle/sample suites  | PASS   | Node 24.22.1 `npm run ci:local` (60 unit tests, line limits, formatting, strict workspace types, builds and built HTTP smoke), `npm run test:subtitles:db`, `npm run test:samples:db`, and `npm run test:languages:db` pass cleanly.                                                                                                                                            |
+
 ## Live speech capture, TLS pre-roll buffer and language detection repair · 2026-11-26
 
 Production `babel-voice` logs over four days after PR #51 showed 483 `provider-write`

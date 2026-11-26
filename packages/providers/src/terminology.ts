@@ -4,7 +4,7 @@ import { subtitleText } from './subtitle-text.ts'
 
 export interface RecognitionContext {
   prompt: string
-  keywords: string[]
+  keywords?: string[]
 }
 
 export interface TranslationTerminology {
@@ -29,7 +29,7 @@ export function recognitionTerminology(
     terms
       .map((term) => term.sourceTerm + ': ' + term.category + '; ' + term.context)
       .join('\n')
-  const context = {
+  const fullContext = {
     // The live transcription API accepts at most 1,024 prompt characters.
     // Bound optional prose without splitting a surrogate pair; every literal
     // term and alternative remains in the separate keyword hints below.
@@ -39,21 +39,35 @@ export function recognitionTerminology(
     keywords,
   }
   if (
-    Buffer.byteLength(JSON.stringify(context)) > 6000 ||
+    Buffer.byteLength(JSON.stringify(fullContext)) > 6000 ||
     keywords.some((term) => /[<>\r\n]/u.test(term))
   ) {
     throw new ProviderFailure('CONTEXT_TOO_LARGE')
   }
-  return context
+  // When the global term catalog spans multiple languages/scripts (e.g. Hangul,
+  // Katakana, Hanzi and Latin), passing mixed-script keywords or prompts into
+  // gpt-live-transcribe hijacks onset syllables across scripts (such as
+  // transcribing Japanese syllables as Korean Hangul). Keep recognition neutral
+  // for multilingual catalogs and enforce exact terms in translation glossaries.
+  const sourceFamilies = new Set(
+    terms.map((term) => new Intl.Locale(term.sourceLanguage).language),
+  )
+  if (sourceFamilies.size > 1) {
+    return { prompt: 'AION2 Steam Global / Asia voice chat battle commands.' }
+  }
+  return fullContext
 }
 
-function matchExpression(term: GameTerm, outputLanguage: string): string | null {
+function matchExpression(
+  term: GameTerm,
+  outputLanguage: string,
+): { text: string; fromSource: boolean } | null {
   const canonical = new Intl.Locale(outputLanguage)
   const exact = term.expressions.find(
     (item) => new Intl.Locale(item.language).baseName === canonical.baseName,
   )
   if (exact) {
-    return exact.text
+    return { text: exact.text, fromSource: false }
   }
   if (canonical.language === 'zh') {
     const targetScript = canonical.maximize().script
@@ -62,17 +76,32 @@ function matchExpression(term: GameTerm, outputLanguage: string): string | null 
       return locale.language === 'zh' && locale.maximize().script === targetScript
     })
     if (sameScript) {
-      return sameScript.text
+      return { text: sameScript.text, fromSource: false }
     }
     const bareChinese = term.expressions.find(
       (item) => new Intl.Locale(item.language).baseName === 'zh',
     )
-    return bareChinese ? subtitleText(outputLanguage, bareChinese.text) : null
+    if (bareChinese) {
+      return { text: subtitleText(outputLanguage, bareChinese.text), fromSource: false }
+    }
+  } else {
+    const family = term.expressions.find(
+      (item) => new Intl.Locale(item.language).language === canonical.language,
+    )
+    if (family) {
+      return { text: family.text, fromSource: false }
+    }
   }
-  const family = term.expressions.find(
-    (item) => new Intl.Locale(item.language).language === canonical.language,
-  )
-  return family ? family.text : null
+  if (new Intl.Locale(term.sourceLanguage).language === canonical.language) {
+    return {
+      text:
+        canonical.language === 'zh'
+          ? subtitleText(outputLanguage, term.sourceTerm)
+          : term.sourceTerm,
+      fromSource: true,
+    }
+  }
+  return null
 }
 
 export function translationTerminology(
@@ -93,14 +122,30 @@ export function translationTerminology(
     ) {
       throw new ProviderFailure('CONTEXT_TOO_LARGE')
     }
-    const target = matchExpression(term, outputLanguage)
-    if (!target) {
+    const matched = matchExpression(term, outputLanguage)
+    if (!matched) {
       continue
     }
+    const target = matched.text
     if (/[<>\r\n]/u.test(target)) {
       throw new ProviderFailure('CONTEXT_TOO_LARGE')
     }
-    const aliases = term.alternatives.length ? ` (${term.alternatives.join(', ')})` : ''
+    const aliasValues = matched.fromSource
+      ? [
+          ...new Set([
+            ...term.alternatives,
+            ...term.expressions
+              .map((item) => item.text)
+              .filter(
+                (item) =>
+                  item !== term.sourceTerm &&
+                  item !== target &&
+                  !/[<>\r\n]/u.test(item),
+              ),
+          ]),
+        ]
+      : term.alternatives
+    const aliases = aliasValues.length ? ` (${aliasValues.join(', ')})` : ''
     const note = term.context ? `${term.category}; ${term.context}` : term.category
     lines.push(`- ${term.sourceTerm}${aliases} => ${target} [${note}]`)
   }
