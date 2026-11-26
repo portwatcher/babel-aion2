@@ -1,5 +1,25 @@
 # Validation
 
+## Live speech capture, TLS pre-roll buffer and language detection repair · 2026-11-26
+
+Production `babel-voice` logs over four days after PR #51 showed 483 `provider-write`
+failures (323 at `sentAudioMs: 120`) and 18 `audio-backlog` failures across active rooms.
+Isolated read-only probes against OpenAI Realtime reproduced every failure mode:
+flushing 8 pre-roll frames over TLS (`wss://`) pushed `socket.bufferedAmount` to
+8,010 bytes on frame 6 (`> 6,800`), killing the WebSocket on speech onset; `120 ms`
+silence commits chopped spoken Japanese into eight fragments at geminates (`っ`) and
+breaths; clearing `PcmTimeline` on `stream.ready` discarded opening speech captured
+during the handshake; sending `transcription.languages` derived from `game_term` rows
+(where Korean sorted first) misrecognized Japanese `テスト` as Korean `테스터`; and the
+100 ms live subtitle queue dropped streams on short UDP bursts.
+
+| Check                                       | Status | Evidence                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Real TLS (`wss://`) pre-roll burst          | PASS   | `packages/providers/test/subtitle-stream.test.mjs` streams silence, 8-frame pre-roll flushes and two consecutive utterances over an ephemeral loopback `https`/`wss` TLS server; before raising `socket.bufferedAmount` from `6,800` to `131,072` bytes it failed at `sentAudioMs: 120`, and after repair both utterances complete with zero provider failures.                                      |
+| 500 ms hangover and language auto-detection | PASS   | `subtitle-stream.test.mjs` verifies a 240 ms mid-sentence pause does not split an utterance, 500 ms trailing silence commits and gates subsequent silence, and `transcription.languages` is omitted. Isolated live Japanese TTS probes confirmed incremental deltas stream before commit (`firstDeltaBeforeFirstCommit: true`), coherent sentences, and `テスト 聞こえますか？` without Korean bias. |
+| Handshake pre-connect buffer and UDP bursts | PASS   | `apps/voice-worker/test/speaker-subtitles.test.mjs` verifies 500 ms (25 frames) of opening speech received during handshake flushes once ready, a 200 ms receive burst stays within the 400 ms live queue, and genuine >400 ms overflow still retires with `audio-backlog`.                                                                                                                          |
+| Local CI and live subtitle PostgreSQL suite | PASS   | Node 24.22.1 `npm run ci:local` (59 unit tests, line limits, formatting, strict workspace types, builds and built HTTP smoke), `npm run test:subtitles:db`, and `npm run test:samples:db` pass cleanly.                                                                                                                                                                                              |
+
 ## CI/CD transient bridge socket and Node 24 action hardening · 2026-11-22
 
 | Check                                    | Status | Evidence                                                                                                                                                                                                                                                                                                                                                     |

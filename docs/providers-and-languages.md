@@ -60,7 +60,7 @@ storage.
 An authorized administrator can upload 0.2–10 seconds of mono PCM16 WAV at 16 or
 48 kHz, at most 1 MB. The JSON limit is 1,400,000 bytes, including chunked requests.
 Audio is paced in 20 ms frames, converted once to 24 kHz PCM16, and gated by local
-VAD (160 ms pre-roll, 120 ms trailing hangover) so pure silence is not streamed.
+VAD (160 ms pre-roll, 500 ms trailing hangover) so pure silence is not streamed.
 The finite sample waits for the recognition handshake, then uses the same
 streaming engine as the worker. The sample comparison is displayed when the
 finite operation completes; live player captions are delivered incrementally.
@@ -71,10 +71,11 @@ segments (`sourceAlignment: 'aligned'`), source language is locally estimated
 every non-empty recognized utterance to reach final source and translated output,
 checked against the saved path and catalog versions.
 
-Recognition terms become `prompt`, `keywords` and language hints; matching
-target-language expressions become a required terminology glossary for
-`gpt-4.1-nano` translation (`translationTermCount`). Both contexts enforce a
-6,000-byte UTF-8 budget; terms are never silently truncated.
+Recognition terms become `prompt` and `keywords` hints (without restricting
+`transcription.languages`, so `gpt-live-transcribe` auto-detects spoken languages
+freely); matching target-language expressions become a required terminology
+glossary for `gpt-4.1-nano` translation (`translationTermCount`). Both contexts
+enforce a 6,000-byte UTF-8 budget; terms are never silently truncated.
 
 For every output language, a matching local source-language estimate selects the
 shared transcript directly, including its revisions and finality, with zero

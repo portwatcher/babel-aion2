@@ -9,7 +9,7 @@ import {
 } from '@babel/telemetry'
 
 /** Int16 peak treated as speech; Discord also sends decoded near-silence frames. */
-const VOICE_PEAK = 600
+const VOICE_PEAK = 400
 /** Speech after this much silence starts a new measured turn. */
 export const TURN_GAP_MS = 800
 /** A first translation this soon after the previous one may be a prior turn's tail. */

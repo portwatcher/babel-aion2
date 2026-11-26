@@ -212,7 +212,7 @@ and creates an HTTP-only session cookie. Player listener sessions use their own
 tables and are not Better Auth user accounts.
 
 `@babel/providers` implements one shared `gpt-live-transcribe` session per active
-speaker with local VAD silence gating (160 ms pre-roll, 120 ms hangover, 90 s idle
+speaker with local VAD silence gating (160 ms pre-roll, 500 ms hangover, 90 s idle
 speaker release) and `gpt-4.1-nano` streaming SSE text translation per subscribed
 target language. Coalesced recognition deltas stream incremental translated text,
 and identical completed transcripts finalize without duplicate translation calls.

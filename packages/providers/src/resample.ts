@@ -39,7 +39,7 @@ export function createPcm24k(sampleRate: 16_000 | 48_000) {
     return {
       audio: output.toString('base64'),
       durationMs: (count / sampleRate) * 1000,
-      speech: energy / count >= 250 * 250,
+      speech: energy / count >= 180 * 180,
     }
   }
 }
