@@ -3,12 +3,22 @@ import { and, asc, eq, isNull, or } from 'drizzle-orm'
 import type { Pool } from 'pg'
 import type { Database } from './client.ts'
 import { room } from './schema/rooms.ts'
+import { runtimeOwner } from './schema/runtime-owners.ts'
 import { voiceSourceRun } from './schema/voice-sources.ts'
 import { lockRuntimeOwner } from './runtime-owners.ts'
 import { lockVoiceSource, VoiceSourceOwnershipError } from './source-locks.ts'
 
 export type VoiceSourceConfiguration = typeof room.$inferSelect
 export { VoiceSourceOwnershipError } from './source-locks.ts'
+
+export interface ActiveVoiceSourceOwner {
+  runId: string
+  roomId: string
+  discordGuildId: string | null
+  ownerId: string
+  controlUrl: string | null
+  sourceGeneration: number
+}
 
 export function voiceSourceConfigured(source: VoiceSourceConfiguration) {
   if (source.audioSource === 'PLAYER') {
@@ -41,6 +51,93 @@ export async function readVoiceSourceGroups(db: Database) {
       rooms,
     }
   })
+}
+
+/** Live source runs across all workers so peer replicas do not contend for owned rooms. */
+export async function readActiveVoiceSourceOwners(
+  db: Pick<Database, 'select'>,
+): Promise<ActiveVoiceSourceOwner[]> {
+  const rows = await db
+    .select({
+      runId: voiceSourceRun.id,
+      roomId: voiceSourceRun.roomId,
+      discordGuildId: room.discordGuildId,
+      ownerId: voiceSourceRun.ownerId,
+      controlUrl: runtimeOwner.controlUrl,
+      exitedAt: runtimeOwner.exitedAt,
+      sourceGeneration: voiceSourceRun.sourceGeneration,
+    })
+    .from(voiceSourceRun)
+    .innerJoin(room, eq(room.id, voiceSourceRun.roomId))
+    .leftJoin(runtimeOwner, eq(runtimeOwner.id, voiceSourceRun.ownerId))
+    .where(isNull(voiceSourceRun.closedAt))
+  return rows.map((row) => ({
+    runId: row.runId,
+    roomId: row.roomId,
+    discordGuildId: row.discordGuildId,
+    ownerId: row.ownerId,
+    controlUrl: row.exitedAt ? null : (row.controlUrl ?? null),
+    sourceGeneration: row.sourceGeneration,
+  }))
+}
+
+/**
+ * Resolves the live worker owning a room's audio/subtitle source, including
+ * sibling community rooms that share a single Discord guild receiver.
+ */
+export async function readRoomVoiceOwner(
+  db: Pick<Database, 'select'>,
+  roomId: string,
+): Promise<ActiveVoiceSourceOwner | null> {
+  const [target] = await db
+    .select({
+      id: room.id,
+      discordGuildId: room.discordGuildId,
+      sourceGeneration: room.sourceGeneration,
+    })
+    .from(room)
+    .where(eq(room.id, roomId))
+    .limit(1)
+  if (!target) {
+    return null
+  }
+  const [row] = await db
+    .select({
+      runId: voiceSourceRun.id,
+      roomId: voiceSourceRun.roomId,
+      discordGuildId: room.discordGuildId,
+      ownerId: voiceSourceRun.ownerId,
+      controlUrl: runtimeOwner.controlUrl,
+      exitedAt: runtimeOwner.exitedAt,
+      sourceGeneration: voiceSourceRun.sourceGeneration,
+    })
+    .from(voiceSourceRun)
+    .innerJoin(room, eq(room.id, voiceSourceRun.roomId))
+    .leftJoin(runtimeOwner, eq(runtimeOwner.id, voiceSourceRun.ownerId))
+    .where(
+      and(
+        isNull(voiceSourceRun.closedAt),
+        target.discordGuildId
+          ? or(
+              eq(voiceSourceRun.roomId, roomId),
+              eq(room.discordGuildId, target.discordGuildId),
+            )
+          : eq(voiceSourceRun.roomId, roomId),
+      ),
+    )
+    .limit(1)
+  if (!row) {
+    return null
+  }
+  return {
+    runId: row.runId,
+    roomId: row.roomId,
+    discordGuildId: row.discordGuildId,
+    ownerId: row.ownerId,
+    controlUrl: row.exitedAt ? null : (row.controlUrl ?? null),
+    sourceGeneration:
+      row.roomId === target.id ? row.sourceGeneration : target.sourceGeneration,
+  }
 }
 
 /** The exact host character whose media peer may publish a room's audio. */

@@ -34,8 +34,11 @@ again. Active sessions still rotate at 50 minutes and honor the provider's
 Both host-capture and Discord subtitle streams schedule frames against the
 monotonic clock. A late timer callback forwards every due 20 ms frame rather than
 one frame per callback. A 400 ms live receive queue absorbs ordinary UDP jitter
-bursts while still retiring genuine backlogs, and a stall more than 100 ms behind
-the next due frame retires the stream and discards obsolete audio. WebSockets
+bursts while still retiring genuine backlogs, and a stall more than 500 ms behind
+the next due frame retires the stream and discards obsolete audio. Once the
+recognition WebSocket completes `session.updated`, listeners transition out of
+`CONNECTING` to `WAITING` before buffered opening speech flushes so non-speech
+triggers cannot remain stuck on a connecting state. WebSockets
 disable message compression and TCP packet coalescing; a recognition send backlog
 over 128 KiB (~2 seconds of 24 kHz PCM16 base64 JSON) fails the socket while
 accommodating TLS record framing, pre-roll and connect-buffer flushes.
@@ -89,10 +92,11 @@ transcripts, terminology text, display names or credentials.
 The private worker `/subtitles` HTTP response flushes its headers and streams
 NDJSON as events arrive. Every 500 ms one query confirms every subscriber's
 listener/nickname/subscription fence and another reads the room sources and
-path/provider/term versions. An event is sent only while its subscriber and path
-were confirmed within the last 1.5 seconds; a newer source generation than the
-snapshot is confirmed with one room query first. Revocation closes the player
-socket, which carries every subtitle, before acknowledging. Unsent obsolete
+cached path/provider/term version stamps (reloading decrypted credentials and
+game terms only when a version changes). An event is sent only while its
+subscriber and path were confirmed within the last 5 seconds; a newer source
+generation than the snapshot is confirmed with one room query first. Revocation
+closes the player socket, which carries every subtitle, before acknowledging. Unsent obsolete
 revisions are replaced immediately; a consumer queue is bounded to 16 events and
 HTTP buffering to 256 KiB. Slow clients close instead of falling behind.
 

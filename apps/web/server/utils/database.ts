@@ -13,6 +13,7 @@ export function useDatabase(event?: H3Event) {
       })
     }
     connection = createDatabase(config.databaseUrl, {
+      queryTimeoutMs: 5_000,
       maxConnections: databasePoolSize(config.databasePoolMax),
     })
   }

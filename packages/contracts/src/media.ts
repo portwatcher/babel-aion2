@@ -53,5 +53,33 @@ export const mediaOfferSchema = z.object({
       .max(64 * 1024),
   }),
 })
+export const audioRelayRequestSchema = z
+  .object({
+    roomId: z.uuid(),
+  })
+  .strict()
+
+export const audioRelayEventSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      type: z.literal('start'),
+      roomId: z.uuid(),
+      sourceGeneration: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('frame'),
+      durationMs: z.union([z.literal(20), z.literal(40), z.literal(60)]),
+      payload: z
+        .string()
+        .min(1)
+        .max(32 * 1024),
+    })
+    .strict(),
+])
+
 export type MediaRequest = z.infer<typeof mediaRequestSchema>
 export type MediaOffer = z.infer<typeof mediaOfferSchema>
+export type AudioRelayRequest = z.infer<typeof audioRelayRequestSchema>
+export type AudioRelayEvent = z.infer<typeof audioRelayEventSchema>
