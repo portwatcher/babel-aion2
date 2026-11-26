@@ -94,9 +94,10 @@ export function openOpenAISession(input: {
     ) {
       throw new ProviderFailure('UNAVAILABLE')
     }
-    // 100 ms of 24 kHz PCM16 is 4,800 bytes before base64. Never accumulate
-    // seconds of obsolete battle commands behind a congested provider socket.
-    if (socket.bufferedAmount > 6_800) {
+    // Allow pre-roll, initial connect-buffer flushes, TLS record framing, and
+    // timer catch-up bursts (~2 s of 24 kHz PCM16 base64 JSON) while still
+    // failing fast if the provider socket genuinely stalls behind stale audio.
+    if (socket.bufferedAmount > 131_072) {
       fail(new ProviderFailure('UNAVAILABLE'))
       throw new ProviderFailure('UNAVAILABLE')
     }

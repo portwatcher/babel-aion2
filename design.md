@@ -495,7 +495,7 @@ Use only OpenAI for speech recognition and translation.
 The administrator enters one OpenAI API Key, with no endpoint, region, model,
 provider type or second credential to configure.
 Use `gpt-live-transcribe` with minimal transcription delay and local VAD silence
-gating (160 ms pre-roll, 120 ms trailing hangover, 90 s idle speaker release) for
+gating (160 ms pre-roll, 500 ms trailing hangover, 90 s idle speaker release) for
 shared original captions.
 Use `gpt-4.1-nano` streaming text completions (`/v1/chat/completions`) to translate
 recognized utterances into each subscribed target language.

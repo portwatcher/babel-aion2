@@ -14,26 +14,33 @@ Stereo 48 kHz Discord PCM is downmixed per member and converted once to 24 kHz
 PCM16. While no speech is active, `openRecognition` retains a rolling 160 ms
 (eight-frame) pre-roll buffer in memory without sending frames over the network.
 When voiced energy arrives, the pre-roll frames and speech stream immediately so
-initial consonants are not clipped. After 120 ms of trailing silence, the worker
+initial consonants are not clipped. After 500 ms of trailing silence, the worker
 commits the spoken utterance and closes the VAD gate; prolonged silence sends
-zero provider audio frames. Continuous speech commits an intermediate chunk at
-five seconds while keeping the gate open. An ending finite sample pads a
-sub-100-ms voiced tail before committing.
+zero provider audio frames. Because `gpt-live-transcribe` streams incremental
+deltas before commit, the 500 ms hangover avoids splitting natural breaths, stop
+consonants and Japanese geminates without delaying live captions. Continuous
+speech commits an intermediate chunk at 15 seconds while keeping the gate open.
+An ending finite sample pads a sub-100-ms voiced tail before committing.
 
-In live rooms, silent unmuted microphones do not open recognition sessions. An
-open speaker session that receives no voiced audio for 90 seconds closes cleanly
+In live rooms, silent unmuted microphones do not open recognition sessions. While
+a new speaker's recognition WebSocket completes its handshake, the worker retains
+up to 1.5 seconds of opening speech in a bounded pre-connect buffer and flushes
+it once ready so cold-start and idle-wake phrases are not dropped. An open
+speaker session that receives no voiced audio for 90 seconds closes cleanly
 (`reason: 'idle'`) and returns listeners to `WAITING` until that speaker talks
 again. Active sessions still rotate at 50 minutes and honor the provider's
 `expires_at`.
 
 Both host-capture and Discord subtitle streams schedule frames against the
 monotonic clock. A late timer callback forwards every due 20 ms frame rather than
-one frame per callback. Queue overflow or a stall more than 100 ms behind the
-next due frame retires the stream and discards obsolete audio. WebSockets disable
-message compression and TCP packet coalescing; a recognition send backlog over
-approximately 100 ms fails the socket rather than accumulating stale commands.
-A connecting recognition session retains only the newest five frames (100 ms),
-marks discontinuity if older audio is lost, and drops pre-ready history.
+one frame per callback. A 400 ms live receive queue absorbs ordinary UDP jitter
+bursts while still retiring genuine backlogs, and a stall more than 100 ms behind
+the next due frame retires the stream and discards obsolete audio. WebSockets
+disable message compression and TCP packet coalescing; a recognition send backlog
+over 128 KiB (~2 seconds of 24 kHz PCM16 base64 JSON) fails the socket while
+accommodating TLS record framing, pre-roll and connect-buffer flushes.
+At the provider-stream layer, a connecting recognition session retains only the
+newest five frames (100 ms) and marks discontinuity if older audio is lost.
 
 ## Utterance-aligned streaming text translation
 
@@ -68,8 +75,8 @@ any in-flight HTTP request for that language. When no subtitle listeners remain,
 the worker closes recognition too. Original audio continues independently.
 
 Enabled game terms supply both bounded recognition hints (1,024-character prompt
-limit plus full literal keywords and language hints) and target-language
-translation glossaries (`translationTermCount`). Stream-end logs distinguish
+limit plus full literal keywords, leaving spoken-language detection automatic) and
+target-language translation glossaries (`translationTermCount`). Stream-end logs distinguish
 provider failures, audio backlog, clock stalls, idle release and authorization
 expiry, recording controlled codes, generations, elapsed duration, received
 audio milliseconds and actual VAD-gated sent audio milliseconds without audio,

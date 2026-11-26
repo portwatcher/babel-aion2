@@ -6,10 +6,12 @@ import type { RecognitionContext } from './terminology.ts'
 
 /** 160 ms of 20 ms pre-roll frames kept locally so speech onsets are not clipped. */
 const PREROLL_FRAMES = 8
-/** Trailing silence that commits the spoken turn and closes the VAD gate. */
-const COMMIT_SILENCE_MS = 120
+/** Trailing silence that commits the spoken turn and closes the VAD gate.
+ * 500 ms rides over stop consonants, geminates (e.g. Japanese っ) and breaths
+ * without adding incremental caption latency because deltas stream live. */
+const COMMIT_SILENCE_MS = 500
 /** Maximum continuous speech buffered before an intermediate source commit. */
-const MAX_BUFFER_MS = 5000
+const MAX_BUFFER_MS = 15_000
 
 export function openRecognition(input: {
   settings: OpenAISettings

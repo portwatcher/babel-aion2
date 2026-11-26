@@ -5,7 +5,6 @@ import { subtitleText } from './subtitle-text.ts'
 export interface RecognitionContext {
   prompt: string
   keywords: string[]
-  languages: string[]
 }
 
 export interface TranslationTerminology {
@@ -34,11 +33,10 @@ export function recognitionTerminology(
     // The live transcription API accepts at most 1,024 prompt characters.
     // Bound optional prose without splitting a surrogate pair; every literal
     // term and alternative remains in the separate keyword hints below.
+    // Omit transcription.languages so gpt-live-transcribe auto-detects any
+    // spoken language instead of biasing toward the term catalog's sort order.
     prompt: description.slice(0, 1024).replace(/[\uD800-\uDBFF]$/u, ''),
     keywords,
-    languages: [
-      ...new Set(terms.map((term) => new Intl.Locale(term.sourceLanguage).language)),
-    ],
   }
   if (
     Buffer.byteLength(JSON.stringify(context)) > 6000 ||

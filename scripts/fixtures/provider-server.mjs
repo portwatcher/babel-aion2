@@ -1,7 +1,44 @@
+import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { createServer } from 'node:http'
+import { createServer as createTlsServer } from 'node:https'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { promisify } from 'node:util'
 import { WebSocketServer } from 'ws'
+
+const exec = promisify(execFile)
+
+async function ephemeralTlsCredentials() {
+  const dir = await mkdtemp(join(tmpdir(), 'babel-provider-tls-'))
+  try {
+    const keyPath = join(dir, 'key.pem')
+    const certPath = join(dir, 'cert.pem')
+    await exec('openssl', [
+      'req',
+      '-x509',
+      '-newkey',
+      'rsa:2048',
+      '-nodes',
+      '-days',
+      '1',
+      '-subj',
+      '/CN=api.openai.com',
+      '-addext',
+      'subjectAltName=DNS:api.openai.com,IP:127.0.0.1',
+      '-keyout',
+      keyPath,
+      '-out',
+      certPath,
+    ])
+    const [key, cert] = await Promise.all([readFile(keyPath), readFile(certPath)])
+    return { key, cert }
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+}
 
 function extractTargetLanguage(messages) {
   const system = messages?.find((message) => message.role === 'system')?.content ?? ''
@@ -17,15 +54,16 @@ function extractTargetLanguage(messages) {
 }
 
 // Deliberately synthetic wire responses, never a provider-quality benchmark.
-export async function createProviderFixture() {
+export async function createProviderFixture(options = {}) {
   const credentials = new Map()
   const observations = []
   const connections = new Map()
   const httpResponses = new Map()
   const emitters = new Map()
   const holds = new Map()
+  const tls = options.tls ? await ephemeralTlsCredentials() : null
 
-  const listener = createServer((request, response) => {
+  const handleRequest = (request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost')
     if (request.method !== 'POST' || url.pathname !== '/v1/chat/completions') {
       response.writeHead(404).end()
@@ -151,7 +189,10 @@ export async function createProviderFixture() {
         respond()
       }
     })
-  })
+  }
+  const listener = tls
+    ? createTlsServer({ key: tls.key, cert: tls.cert }, handleRequest)
+    : createServer(handleRequest)
 
   const sockets = new WebSocketServer({ server: listener, maxPayload: 128 * 1024 })
   sockets.on('connection', (socket, request) => {
@@ -307,9 +348,10 @@ export async function createProviderFixture() {
   })
   listener.listen(0, '127.0.0.1')
   await once(listener, 'listening')
-  const origin = 'http://127.0.0.1:' + listener.address().port
+  const origin = `${tls ? 'https' : 'http'}://127.0.0.1:${listener.address().port}`
   return {
     origin,
+    ca: tls?.cert,
     observations,
     credential(mode = 'pass') {
       const key = 'local-' + randomUUID()

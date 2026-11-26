@@ -168,7 +168,11 @@ try {
   )
 
   network.setMode(recognitionKey, 'sentences')
-  const validated = await value(await sample(language))
+  const validated = await value(
+    await sample(language, first, {
+      audioBase64: syntheticWave(48_000, 1_800).toString('base64'),
+    }),
+  )
   network.setMode(recognitionKey, 'speech')
   assert.equal(
     validated.sample.segments.length,

@@ -121,7 +121,7 @@ test('one shared recognition stream drives streaming text translations before au
   )
 })
 
-test('VAD silence gating drops prolonged silence while preserving 160 ms pre-roll and 120 ms trailing hangover', async (t) => {
+test('VAD silence gating drops prolonged silence, preserves 160 ms pre-roll, rides over short pauses, and commits after 500 ms hangover', async (t) => {
   const network = await fixture(t)
   const key = network.credential('pass')
   const s = stream(network, key)
@@ -159,19 +159,90 @@ test('VAD silence gating drops prolonged silence while preserving 160 ms pre-rol
     true,
   )
 
-  // 30 frames (600 ms) of silence: sends only 6 hangover frames (120 ms), commits, then gates.
+  // 12 frames (240 ms) mid-sentence pause + 10 frames speech: must NOT split utterance.
+  for (let i = 0; i < 12; i++) {
+    s.write(silent, offset)
+    offset += 960
+  }
+  for (let i = 0; i < 10; i++) {
+    s.write(voiced, offset)
+    offset += 960
+  }
+  await until(
+    () => recognition.frames.length === 40,
+    'pause and resumed speech stay open',
+  )
+  assert.equal(recognition.end, false, '240 ms breath/geminate pause does not commit')
+
+  // 40 frames (800 ms) of silence: sends 25 hangover frames (500 ms), commits, then gates.
+  for (let i = 0; i < 40; i++) {
+    s.write(silent, offset)
+    offset += 960
+  }
+  await until(() => recognition.end === true, '500 ms silence commits utterance')
+  await setTimeout(20)
+  assert.equal(
+    recognition.frames.length,
+    65,
+    '8 pre-roll + 10 voiced + 12 pause + 10 voiced + 25 hangover; remaining 15 gated',
+  )
+  assert.equal(s.sentAudioMs(), 1300)
+})
+
+test('TLS wss:// pre-roll bursts across multiple utterances never trip socket bufferedAmount limit', async (t) => {
+  const network = await createProviderFixture({ tls: true })
+  const restore = routeProviderNetwork(network.origin, { ca: network.ca })
+  t.after(async () => {
+    restore()
+    await network.close()
+  })
+  const key = network.credential('sentences')
+  const s = stream(network, key)
+  t.after(() => s.close())
+  const events = []
+  s.subscribe(path(key, 'en'), (event) => events.push(event))
+  await s.prepare()
+  const recognition = network.observations.find(
+    (value) => value.protocol === 'recognition',
+  )
+  let offset = 0
+  const silent = Buffer.alloc(1920)
+  const voiced = speechFrame()
+
+  // Utterance 1 after prolonged silence (fills all 8 pre-roll frames before onset).
+  for (let i = 0; i < 20; i++) {
+    s.write(silent, offset)
+    offset += 960
+  }
+  for (let i = 0; i < 10; i++) {
+    s.write(voiced, offset)
+    offset += 960
+  }
+  // 700 ms silence: commits utterance 1, closes VAD gate, and refills all 8 pre-roll frames.
+  for (let i = 0; i < 35; i++) {
+    s.write(silent, offset)
+    offset += 960
+  }
+  // Utterance 2 after second pre-roll burst.
+  for (let i = 0; i < 10; i++) {
+    s.write(voiced, offset)
+    offset += 960
+  }
   for (let i = 0; i < 30; i++) {
     s.write(silent, offset)
     offset += 960
   }
-  await until(() => recognition.end === true, '120 ms silence commits utterance')
-  await setTimeout(20)
-  assert.equal(
-    recognition.frames.length,
-    24,
-    '8 pre-roll + 10 voiced + 6 hangover frames; remaining 24 silent frames gated',
+  await until(
+    () =>
+      values(events).some((value) => value.text === 'Do not attack.' && value.isFinal),
+    'both utterances complete cleanly over real TLS without bufferedAmount crash',
   )
-  assert.equal(s.sentAudioMs(), 480)
+  assert.equal(
+    events.some((event) => event.type === 'failure'),
+    false,
+    'TLS pre-roll bursts emit zero provider failures',
+  )
+  assert.equal(recognition.closed, false)
 })
 
 test('unused targets cancel in-flight translation immediately and reopen cleanly for new subscribers', async (t) => {
@@ -458,6 +529,11 @@ for (const long of [false, true]) {
     const prompt = recognition.configuration.audio.input.transcription.prompt
     assert.ok(prompt.length <= 1024, 'provider prompt character limit')
     assert.equal(prompt.isWellFormed(), true, 'Unicode hints remain intact')
+    assert.equal(
+      recognition.configuration.audio.input.transcription.languages,
+      undefined,
+      'omit languages so gpt-live-transcribe auto-detects spoken language freely',
+    )
     assert.equal(translation.model, 'gpt-4.1-nano')
     const systemPrompt = translation.messages.find((m) => m.role === 'system').content
     assert.ok(systemPrompt.includes('TestSkill (TS) => テスト'))

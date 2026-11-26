@@ -11,6 +11,11 @@ import { SpeechTurns, voiced } from './speech-turns.ts'
 
 /** Release an idle speaker's recognition WebSocket after 90 s without speech. */
 export const IDLE_SPEAKER_MS = 90_000
+/** Absorb ordinary Discord UDP bursts without retiring a live speaker stream. */
+const LIVE_QUEUE_MS = 400
+/** Retain opening speech during initial WebSocket handshake so cold-start
+ * and idle-wake phrases are never dropped before recognition becomes ready. */
+const CONNECT_BUFFER_MS = 1_500
 
 export interface RunningSubtitlePath extends LiveSubtitlePath {
   key: string
@@ -30,7 +35,8 @@ export interface SubtitleConsumer {
 /** One speaker and recognition configuration; all matching languages share its PCM. */
 export class SpeakerSubtitles {
   private readonly stream: ReturnType<typeof openSharedSubtitleStream>
-  private readonly timeline = new PcmTimeline()
+  private readonly timeline = new PcmTimeline(LIVE_QUEUE_MS)
+  private readonly preconnect = new PcmTimeline(CONNECT_BUFFER_MS)
   private readonly turns: SpeechTurns
   private readonly subscribers = new Map<
     string,
@@ -79,6 +85,14 @@ export class SpeakerSubtitles {
           this.lastVoiceAt = now
           this.nextFrameAt = now + 20
           this.ready = true
+          // Flush opening speech captured during handshake so the speaker's
+          // first phrase on cold start or idle wake is not discarded.
+          let buffered = this.preconnect.take(now)
+          while (buffered && !this.closed) {
+            this.writePcm(buffered)
+            buffered = this.preconnect.take(now)
+          }
+          this.preconnect.clear()
         }
       })
       .catch((error: unknown) =>
@@ -229,8 +243,12 @@ export class SpeakerSubtitles {
     }
     this.turns.hear(pcm)
     this.receivedSamples += pcm.length / 4
+    if (!this.ready) {
+      this.preconnect.receive(pcm, now)
+      return
+    }
     const overflow = this.timeline.receive(pcm, now)
-    if (overflow && this.ready) {
+    if (overflow) {
       this.finish('UNAVAILABLE', 'audio-backlog')
     }
   }
@@ -264,6 +282,10 @@ export class SpeakerSubtitles {
 
   private writeFrame(now: number) {
     const frame = this.timeline.take(now) ?? Buffer.alloc(PCM_FRAME_BYTES)
+    this.writePcm(frame)
+  }
+
+  private writePcm(frame: Buffer) {
     const mono = Buffer.alloc(960 * 2)
     for (let i = 0; i < 960; i += 1) {
       mono.writeInt16LE(
@@ -310,6 +332,7 @@ export class SpeakerSubtitles {
     clearInterval(this.timer)
     clearTimeout(this.rotation)
     this.timeline.clear()
+    this.preconnect.clear()
     this.turns.close()
     for (const subscriber of this.subscribers.values()) {
       subscriber.remove()
