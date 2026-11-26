@@ -106,6 +106,26 @@ smaller, muted type size and a localized source-finality label. Source text
 appears as soon as recognition emits it, without waiting for translation tokens.
 Both rows wrap without truncation and follow the existing text-size setting.
 
+## Five-minute translation history
+
+`SubtitleService` retains a bounded, ephemeral in-memory cache
+(`SubtitleHistoryCache`, 5-minute rolling TTL, up to 200 utterances per room
+and language, never written to disk or PostgreSQL) of authorized translated
+utterances delivered to active listeners. Languages appear in the cache only
+when at least one listener was subscribed to that language and translations
+were actually produced; switching to a language nobody listened to returns no
+records and triggers no retroactive translation.
+
+Active listeners fetch their room's cached history for their selected output
+language through `GET /api/player/sessions/:id/subtitle-history`, proxied to
+the voice worker's private `POST /subtitles/history` endpoint so all web
+replicas read the same cache. Reads re-verify the listener credential, current
+nickname generation, active unrevoked state, non-disbanded room and enabled
+output languages, failing closed on replacement or removal. Live WebSocket
+streams and Document PiP stay live-only and preserve subscription fences; the
+room page merges the five-minute snapshot with incoming live utterances and
+expires aged entries locally using the server's `serverNow` clock reference.
+
 ## Evidence and limits
 
 Protocol tests exercise real loopback WebSocket handshakes and HTTP SSE streams

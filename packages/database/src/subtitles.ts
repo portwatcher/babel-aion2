@@ -1,6 +1,7 @@
-import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
 import {
   providerSettingsSchema,
+  type ListenerReference,
   type OpenAISettings,
   type SubtitleSubscription,
   type TerminologySnapshot,
@@ -16,7 +17,7 @@ import {
 } from './schema/rooms.ts'
 import { playerConnection } from './schema/player-connections.ts'
 import { createTermService } from './terms.ts'
-import { snapshot } from './listeners/model.ts'
+import { ListenerError, snapshot, verifyCredential } from './listeners/model.ts'
 
 export interface SubtitlePathStamp {
   code: string
@@ -230,4 +231,55 @@ export async function subtitleDeliveryCurrent(
     select exists (${listenerQuery(db, input)}) as listener,
            exists (${pathQuery(roomId, generation, stamp)}) as path`)
   return result.rows[0] ?? { listener: false, path: false }
+}
+
+/**
+ * Authorize an active listener session to read its room's ephemeral subtitle
+ * history, returning only currently enabled validated output languages.
+ */
+export async function authorizeSubtitleHistory(
+  db: Pick<Database, 'select'>,
+  reference: ListenerReference,
+  credential: string,
+) {
+  const [record] = await db
+    .select()
+    .from(listenerSession)
+    .where(eq(listenerSession.id, reference.sessionId))
+  const session = verifyCredential(record, credential)
+  const [current] = await db
+    .select({
+      currentSessionId: nickname.currentSessionId,
+      generation: nickname.generation,
+      disbandedAt: room.disbandedAt,
+    })
+    .from(nickname)
+    .innerJoin(room, eq(room.id, session.roomId))
+    .where(eq(nickname.key, session.nicknameKey))
+  if (
+    session.nicknameGeneration !== reference.nicknameGeneration ||
+    session.state !== 'ACTIVE' ||
+    session.revokedAt ||
+    current?.currentSessionId !== session.id ||
+    current.generation !== reference.nicknameGeneration ||
+    current.disbandedAt
+  ) {
+    throw new ListenerError('SESSION_ENDED')
+  }
+  const languages = await db
+    .select({ code: outputLanguage.code })
+    .from(outputLanguage)
+    .where(
+      and(eq(outputLanguage.enabled, true), isNotNull(outputLanguage.pathValidatedAt)),
+    )
+    .orderBy(asc(outputLanguage.order), asc(outputLanguage.code))
+  const enabledLanguages = languages.map((language) => language.code)
+  return {
+    roomId: session.roomId,
+    outputLanguage:
+      session.outputLanguage && enabledLanguages.includes(session.outputLanguage)
+        ? session.outputLanguage
+        : null,
+    enabledLanguages,
+  }
 }

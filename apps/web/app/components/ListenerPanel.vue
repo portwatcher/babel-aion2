@@ -2,6 +2,7 @@
 import type { ListenerSnapshot, PublicRoomConfiguration } from '@babel/contracts'
 import { audioStatus } from '~/utils/audio-status'
 import type { useHostCapture } from '~/composables/useHostCapture'
+import type { SubtitleHistoryState } from '~/composables/useSubtitleHistory'
 import type { SubtitlePresentation } from '~/utils/subtitle-view'
 const { t } = useInterfaceLocale()
 const props = defineProps<{
@@ -15,6 +16,7 @@ const props = defineProps<{
   busy: boolean
   changingLanguage: boolean
   subtitles: SubtitlePresentation
+  subtitleHistory: SubtitleHistoryState
 }>()
 const emit = defineEmits<{
   leave: []
@@ -22,6 +24,7 @@ const emit = defineEmits<{
   language: [language: string | null]
   playAudio: []
   toggleMute: []
+  retryHistory: []
 }>()
 const pip = useSubtitlePictureInPicture(
   () => `${props.session.sessionId}:${props.session.nicknameGeneration}`,
@@ -175,6 +178,13 @@ const languageName = computed(
         />
       </template>
     </div>
+    <SubtitleHistory
+      :session="session"
+      :language-name="languageName"
+      :changing-language="changingLanguage"
+      :history="subtitleHistory"
+      @retry="emit('retryHistory')"
+    />
     <Teleport v-if="target" :to="target">
       <ListenerSubtitleStatus
         :session="session"

@@ -709,6 +709,20 @@ Use a documented mapping between source audio and subtitle segments.
 
 Do not send earlier battle history to a new player by default.
 
+### Five-minute translation history · 2026-11-26
+
+This amendment refines battle history for active room listeners. The room UI
+displays a rolling five-minute translation history for the listener's selected
+output language, backed by an ephemeral in-memory server cache keyed by room
+and output language (no subtitle history is persisted to disk or PostgreSQL).
+Supported history languages depend strictly on translated records present in
+the server cache: do not translate languages without active subscribers, and
+show no history records when a player switches to a language that nobody has
+listened to within the last five minutes. Live subtitle WebSocket delivery and
+Document PiP preserve strict subscription fences and never replay
+pre-subscription commands; history reads require an active, unrevoked listener
+session for the room and return only currently enabled output languages.
+
 ## 14. Background audio and PiP
 
 Make the original audio continue when the player returns to the game.

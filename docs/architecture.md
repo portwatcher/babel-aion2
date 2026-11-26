@@ -144,6 +144,12 @@ writes a `source-failed` JSON line with the room and reason. Source
 retirement closes old browser peers before acknowledging shutdown. Separate
 member timelines feed shared provider jobs only while language demand exists.
 Version-checked private HTTP streams feed actual registered player sockets.
+`SubtitleService` also maintains a bounded, ephemeral five-minute in-memory
+translation cache per room and output language (populated strictly from
+authorized deliveries for subscribed languages, never persisted). Active
+listeners fetch it through `GET /api/player/sessions/:id/subtitle-history` via
+the worker's private `POST /subtitles/history` route so all web replicas share
+one room cache while Document PiP and live sockets remain live-only.
 See [original audio](original-audio.md) and
 [media admission](media-admission.md).
 Explicit [STUN/TURN configuration](media-network.md) issues separate temporary

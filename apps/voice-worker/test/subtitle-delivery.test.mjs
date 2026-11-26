@@ -31,9 +31,17 @@ test(
     )
     await f.language('ja')
     await f.language('ko', koreanTranslationId)
+    await f.language('zh-Hans')
     const a = await f.enter('subtitle-a', 'ja'),
       b = await f.enter('subtitle-b', 'ja'),
       c = await f.enter('subtitle-c', 'ko')
+    const readHistory = (client, expectedStatus = 200) =>
+      client
+        .request(
+          `/api/player/sessions/${client.session.sessionId}/subtitle-history`,
+          'GET',
+        )
+        .then((response) => f.json(response, expectedStatus))
     await until(
       () => [a, b, c].every((client) => client.subtitles().length),
       'private subscriptions established',
@@ -164,6 +172,65 @@ test(
       'never replay a pre-subscription utterance to a late listener',
     )
 
+    // Five-minute server cache serves translated history only for listened languages.
+    const lateJaHistory = await readHistory(late)
+    assert.equal(lateJaHistory.outputLanguage, 'ja')
+    assert.deepEqual(
+      lateJaHistory.availableLanguages.slice().sort(),
+      ['ja', 'ko'],
+      'unlistened zh-Hans is absent from cached available languages',
+    )
+    assert.ok(
+      lateJaHistory.items.some((item) =>
+        item.translatedText.includes('fixture:ja:Wait here.'),
+      ),
+      'late listener can read prior five-minute history for its listened language',
+    )
+    assert.ok(
+      lateJaHistory.items.some((item) =>
+        item.translatedText.includes('fixture:ja:Held Japanese.'),
+      ),
+    )
+    assert.doesNotMatch(
+      JSON.stringify(lateJaHistory),
+      /traceparent|speechStartedAt/u,
+      'private latency trace context is stripped from history responses',
+    )
+    const unauthenticatedHistory = await fetch(
+      `${f.web.origin}/api/player/sessions/${late.session.sessionId}/subtitle-history`,
+    )
+    assert.equal(unauthenticatedHistory.status, 401)
+
+    // Switching to an enabled language nobody listened on yields no history records.
+    await f.json(
+      await late.request(
+        `/api/player/sessions/${late.session.sessionId}/language`,
+        'PATCH',
+        {
+          outputLanguage: 'zh-Hans',
+        },
+      ),
+    )
+    const lateZhHistory = await readHistory(late)
+    assert.equal(lateZhHistory.outputLanguage, 'zh-Hans')
+    assert.deepEqual(lateZhHistory.items, [])
+    assert.equal(lateZhHistory.availableLanguages.includes('zh-Hans'), false)
+    await f.json(
+      await late.request(
+        `/api/player/sessions/${late.session.sessionId}/language`,
+        'PATCH',
+        {
+          outputLanguage: 'ja',
+        },
+      ),
+    )
+    assert.ok(
+      (await readHistory(late)).items.some((item) =>
+        item.translatedText.includes('fixture:ja:Wait here.'),
+      ),
+      'switching back to ja restores cached ja history',
+    )
+
     const beforeSwitch = a.subtitles().length
     await f.json(
       await a.request(`/api/player/sessions/${a.session.sessionId}/language`, 'PATCH', {
@@ -222,6 +289,19 @@ test(
       [a, b, c, late].some((client) => has(client, 'Obsolete source.')),
       false,
     )
+    const postSourceKoHistory = await readHistory(a)
+    assert.equal(
+      postSourceKoHistory.items.some((item) =>
+        item.translatedText.includes('Obsolete source.'),
+      ),
+      false,
+      'obsolete source utterances never enter subtitle history',
+    )
+    assert.ok(
+      postSourceKoHistory.items.some((item) =>
+        item.translatedText.includes('fixture:ko:Fresh source.'),
+      ),
+    )
 
     f.network.setMode(f.translationKey, 'quota')
     source('Korean still works.', fresh, true)
@@ -256,6 +336,16 @@ test(
       'replacement receives fresh utterances',
     )
     assert.equal(a.values().length, oldCount)
+    assert.equal(
+      (
+        await a.request(
+          `/api/player/sessions/${a.session.sessionId}/subtitle-history`,
+          'GET',
+        )
+      ).status,
+      410,
+      'replaced listener is immediately revoked from reading subtitle history',
+    )
 
     for (const client of [b, c, late, replacement]) {
       client.socket.close()
@@ -277,6 +367,18 @@ test(
       'returning listener receives fresh streaming output',
     )
     assert.equal(has(returning, 'Current listener only.'), false)
+    const returningKoHistory = await readHistory(returning)
+    assert.ok(
+      returningKoHistory.items.some((item) =>
+        item.translatedText.includes('fixture:ko:Current listener only.'),
+      ),
+      'five-minute server cache survives temporary zero-listener gaps',
+    )
+    assert.ok(
+      returningKoHistory.items.some((item) =>
+        item.translatedText.includes('fixture:ko:Returning listener only.'),
+      ),
+    )
 
     const languages = await f.json(await f.management('/languages'))
     for (const language of languages.items) {
@@ -295,5 +397,9 @@ test(
       (await f.json(await fetch(`${f.web.origin}/api/player/config`))).outputLanguages,
       [],
     )
+    const disabledHistory = await readHistory(returning)
+    assert.equal(disabledHistory.outputLanguage, null)
+    assert.deepEqual(disabledHistory.availableLanguages, [])
+    assert.deepEqual(disabledHistory.items, [])
   },
 )

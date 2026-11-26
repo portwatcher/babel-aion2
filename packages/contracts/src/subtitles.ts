@@ -1,7 +1,9 @@
 import { z } from 'zod'
 import { languageCodeSchema } from './languages.ts'
-import { listenerReferenceSchema } from './listeners.ts'
+import { listenerCredentialSchema, listenerReferenceSchema } from './listeners.ts'
 import { providerTestCodeSchema } from './providers.ts'
+
+export const SUBTITLE_HISTORY_WINDOW_MS = 5 * 60_000
 
 export const subtitleLatencySchema = z
   .object({
@@ -64,7 +66,51 @@ export const subtitleSubscriptionSchema = z
   })
   .strict()
 
+export const subtitleHistoryItemSchema = z
+  .object({
+    roomId: z.uuid(),
+    sourceGeneration: z.number().int().nonnegative(),
+    streamGeneration: z.number().int().positive(),
+    speakerId: z.string().min(1).max(80),
+    speakerDisplayName: z.string().max(256),
+    utteranceId: z.uuid(),
+    sourceRevision: z.number().int().positive(),
+    translationRevision: z.number().int().nonnegative(),
+    sequence: z.number().int().positive(),
+    sourceLanguage: z.string().min(2).max(35),
+    originalText: z.string().max(4096),
+    outputLanguage: languageCodeSchema,
+    translatedText: z.string().min(1).max(16_384),
+    sourceIsFinal: z.boolean(),
+    translationIsFinal: z.boolean(),
+    configurationVersion: z.number().int().positive(),
+    recordedAt: z.iso.datetime({ offset: true }),
+    updatedAt: z.iso.datetime({ offset: true }),
+  })
+  .strict()
+
+export const subtitleHistoryRequestSchema = z
+  .object({
+    reference: listenerReferenceSchema,
+    credential: listenerCredentialSchema,
+  })
+  .strict()
+
+export const subtitleHistorySchema = z
+  .object({
+    roomId: z.uuid(),
+    outputLanguage: languageCodeSchema.nullable(),
+    windowMs: z.number().int().positive(),
+    availableLanguages: z.array(languageCodeSchema),
+    items: z.array(subtitleHistoryItemSchema),
+    serverNow: z.iso.datetime({ offset: true }),
+  })
+  .strict()
+
 export type SubtitleLatency = z.infer<typeof subtitleLatencySchema>
 export type Subtitle = z.infer<typeof subtitleSchema>
 export type SubtitleMessage = z.infer<typeof subtitleMessageSchema>
 export type SubtitleSubscription = z.infer<typeof subtitleSubscriptionSchema>
+export type SubtitleHistoryItem = z.infer<typeof subtitleHistoryItemSchema>
+export type SubtitleHistoryRequest = z.infer<typeof subtitleHistoryRequestSchema>
+export type SubtitleHistory = z.infer<typeof subtitleHistorySchema>
