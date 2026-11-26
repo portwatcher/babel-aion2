@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import {
+  audioRelayRequestSchema,
   mediaControlRequestSchema,
   listenerReferenceSchema,
   voiceSourceRequestSchema,
@@ -9,6 +10,7 @@ import {
 } from '@babel/contracts'
 import { ListenerError } from '@babel/database/listeners'
 import { MediaPeerError, type MediaPeers } from './media-peers.ts'
+import type { RoomAudioHub } from './room-audio-hub.ts'
 import type { VoiceSources } from './voice-sources.ts'
 import { SubtitleDeliveryError, type SubtitleService } from './subtitle-service.ts'
 
@@ -40,6 +42,7 @@ export function createControlServer(
   secret: string,
   sources: VoiceSources,
   subtitles: SubtitleService,
+  audioHub?: RoomAudioHub,
 ) {
   const expected = digest(`Bearer ${secret}`)
   const server = createServer(async (request, response) => {
@@ -48,6 +51,64 @@ export function createControlServer(
       return
     }
     try {
+      if (request.url === '/relay/audio' && request.method === 'POST') {
+        const parsed = audioRelayRequestSchema.safeParse(await input(request))
+        if (!parsed.success) {
+          json(response, 400, { code: 'INVALID_REQUEST' })
+          return
+        }
+        let early: string[] | null = []
+        const stop = audioHub?.subscribe(parsed.data.roomId, {
+          send(line) {
+            if (early) {
+              early.push(line)
+              return early.length <= 32
+            }
+            if (
+              response.destroyed ||
+              response.writableEnded ||
+              response.writableLength + Buffer.byteLength(line) > 256 * 1024
+            ) {
+              return false
+            }
+            response.write(line)
+            return true
+          },
+          close() {
+            response.end()
+          },
+        })
+        if (!stop) {
+          json(response, 404, { code: 'NOT_FOUND' })
+          return
+        }
+        if (response.destroyed) {
+          stop()
+          return
+        }
+        response.writeHead(200, {
+          'content-type': 'application/x-ndjson',
+          'cache-control': 'no-store',
+        })
+        response.flushHeaders()
+        for (const line of early) {
+          response.write(line)
+        }
+        early = null
+        const keepalive = setInterval(() => {
+          if (response.writableLength >= 256 * 1024) {
+            response.destroy()
+          } else if (!response.destroyed && !response.writableEnded) {
+            response.write('\n')
+          }
+        }, 5_000)
+        keepalive.unref()
+        response.once('close', () => {
+          clearInterval(keepalive)
+          stop()
+        })
+        return
+      }
       if (request.url === '/subtitles/ready' && request.method === 'GET') {
         const ready = await subtitles.ready()
         json(response, ready ? 200 : 503, { ready })

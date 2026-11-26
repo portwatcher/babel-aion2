@@ -227,7 +227,7 @@ export class MediaPeers {
           await this.close(prior)
         }
       }
-      const deadline = Date.now() + 2_000
+      const deadline = Date.now() + 3_000
       while (
         !(await earlierMediaConnectionsStopped(this.db, entry.id, entry.reference))
       ) {
@@ -428,6 +428,20 @@ export class MediaPeers {
       return
     }
     sink.receive(entry.uplink.id, entry.nickname, pcm)
+  }
+
+  /** Rooms that currently hold at least one live receive-only listener peer here. */
+  activeSendingRooms() {
+    const rooms = new Set<string>()
+    for (const [roomId, members] of this.rooms) {
+      for (const entry of members) {
+        if (entry.sending && !entry.closing && !entry.closed) {
+          rooms.add(roomId)
+          break
+        }
+      }
+    }
+    return rooms
   }
 
   /** Liveness of each peer is enforced by the shards' delivery membership. */

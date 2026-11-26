@@ -189,13 +189,14 @@ export class RoomSubtitles {
       stream.close()
     }
     this.speakers.delete(id)
+    const generation = ++this.generation
     for (const consumer of this.consumers.values()) {
       consumer.deliver({
         type: 'subtitle-state',
         roomId: this.roomId,
         sourceGeneration: this.sourceGeneration,
         speakerId: id,
-        streamGeneration: ++this.generation,
+        streamGeneration: generation,
         outputLanguage: consumer.outputLanguage,
         state: 'WAITING',
         failure: null,

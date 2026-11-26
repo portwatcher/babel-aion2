@@ -11,6 +11,8 @@ import { SpeechTurns, voiced } from './speech-turns.ts'
 
 /** Release an idle speaker's recognition WebSocket after 90 s without speech. */
 export const IDLE_SPEAKER_MS = 90_000
+/** Tolerate brief container CPU/GC stalls without tearing down live recognition. */
+export const CLOCK_STALL_MS = 500
 /** Absorb ordinary Discord UDP bursts without retiring a live speaker stream. */
 const LIVE_QUEUE_MS = 400
 /** Retain opening speech during initial WebSocket handshake so cold-start
@@ -40,7 +42,12 @@ export class SpeakerSubtitles {
   private readonly turns: SpeechTurns
   private readonly subscribers = new Map<
     string,
-    { path: RunningSubtitlePath; remove: () => void }
+    {
+      consumer: SubtitleConsumer
+      path: RunningSubtitlePath
+      remove: () => void
+      connecting: boolean
+    }
   >()
   private readonly timer: ReturnType<typeof setInterval>
   private readonly rotation: ReturnType<typeof setTimeout>
@@ -85,6 +92,14 @@ export class SpeakerSubtitles {
           this.lastVoiceAt = now
           this.nextFrameAt = now + 20
           this.ready = true
+          // Transition listeners out of CONNECTING once handshake completes so
+          // brief non-speech triggers never stick on "Connecting subtitles...".
+          for (const subscriber of this.subscribers.values()) {
+            if (subscriber.connecting) {
+              subscriber.connecting = false
+              this.state(subscriber.consumer, 'WAITING')
+            }
+          }
           // Flush opening speech captured during handshake so the speaker's
           // first phrase on cold start or idle wake is not discarded.
           let buffered = this.preconnect.take(now)
@@ -142,7 +157,8 @@ export class SpeakerSubtitles {
         continue
       }
       previous?.remove()
-      this.state(consumer, this.ready ? 'WAITING' : 'CONNECTING')
+      const connecting = !this.ready
+      this.state(consumer, connecting ? 'CONNECTING' : 'WAITING')
       const current = () =>
         !this.closed &&
         this.allowed() &&
@@ -157,7 +173,7 @@ export class SpeakerSubtitles {
           },
           (event) => this.deliver(consumer, path, event, current),
         )
-        this.subscribers.set(consumer.id, { path, remove })
+        this.subscribers.set(consumer.id, { consumer, path, remove, connecting })
       } catch (error) {
         this.subscribers.delete(consumer.id)
         this.state(
@@ -262,7 +278,7 @@ export class SpeakerSubtitles {
       this.finish('UNAVAILABLE', 'authorization')
       return
     }
-    if (now - this.nextFrameAt > 100) {
+    if (now - this.nextFrameAt > CLOCK_STALL_MS) {
       // A new stream gets a fresh generation; dropped time is never spliced into speech.
       this.finish('UNAVAILABLE', 'clock-stall')
       return

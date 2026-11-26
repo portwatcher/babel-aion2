@@ -5,17 +5,18 @@ an authenticated player WebSocket and a receive-only original-audio peer.
 
 ## What scales with listeners
 
-| Work                                         | Grows with            | Implementation                                                             |
-| -------------------------------------------- | --------------------- | -------------------------------------------------------------------------- |
-| Recognition and translation provider streams | speakers × languages  | Shared per room speaker and language group; listeners add none             |
-| Mixing and Opus encoding                     | rooms                 | One mix and one encoder per source group                                   |
-| SRTP encryption and socket writes            | listeners × packets/s | Worker threads ("media shards"); direct transport writes with a cached key |
-| Player socket verification                   | sockets               | One batched session query per web replica each second                      |
-| Player list, configuration and map revision  | rooms                 | Read and serialized once per room per sweep, then sent to its sockets      |
-| Media and subtitle authorization sweeps      | sockets               | One batched query per 500 ms sweep instead of one per listener             |
-| Subtitle delivery fences                     | events                | Checked against the latest 500 ms authorization snapshot, valid for 1.5 s  |
-| Tactical map reads                           | map changes           | Clients refetch when the pushed revision changes; 30-second repair poll    |
-| Voice source ownership                       | rooms                 | All advisory locks of a worker share one dedicated PostgreSQL session      |
+| Work                                         | Grows with            | Implementation                                                                                                                                       |
+| -------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Recognition and translation provider streams | speakers × languages  | Shared per room speaker and language group; listeners add none                                                                                       |
+| Mixing and Opus encoding                     | rooms                 | One mix and one encoder per source group                                                                                                             |
+| SRTP encryption and socket writes            | listeners × packets/s | Worker threads ("media shards"); direct transport writes with a cached key                                                                           |
+| Player socket verification                   | sockets               | One batched session query per web replica each second                                                                                                |
+| Player list, configuration and map revision  | rooms                 | Read and serialized once per room per sweep, then sent to its sockets                                                                                |
+| Media and subtitle authorization sweeps      | sockets               | One batched query per 500 ms sweep instead of one per listener                                                                                       |
+| Subtitle delivery fences                     | events                | Checked against the latest 500 ms authorization snapshot (stamp-cached paths), valid for 5 s                                                         |
+| Multi-replica listener fan-out               | voice-worker replicas | Receive-only peers spread across replicas by open peer count; encoded Opus packets relay over private `/relay/audio` from the exclusive source owner |
+| Tactical map reads                           | map changes           | Clients refetch when the pushed revision changes; 30-second repair poll                                                                              |
+| Voice source ownership                       | rooms                 | All advisory locks of a worker share one dedicated PostgreSQL session                                                                                |
 
 ### Media shards
 

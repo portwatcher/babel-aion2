@@ -4,6 +4,7 @@ import type { createDatabase } from '@babel/database'
 import type { CredentialCipher } from '@babel/database/credentials'
 import {
   claimVoiceSource,
+  readActiveVoiceSourceOwners,
   readVoiceSourceGroups,
   voiceSourceConfigured,
   VoiceSourceOwnershipError,
@@ -12,9 +13,14 @@ import {
 import { DiscordSource, describeError } from './discord-source.ts'
 import { GuildBroadcast } from './guild-broadcast.ts'
 import type { PacketDuration } from './room-audio.ts'
+import type { RoomAudioHub } from './room-audio-hub.ts'
 import type { MediaPeers } from './media-peers.ts'
 import { PlayerSource } from './player-source.ts'
 import type { SubtitleService } from './subtitle-service.ts'
+
+// Configuration snapshots refresh every 500 ms; keep a 5 s fail-closed window so
+// brief DB or scheduler stalls do not tear down live audio and subtitle streams.
+const SOURCE_VALIDITY_MS = 5_000
 
 interface Source {
   configuration: VoiceSourceConfiguration
@@ -51,10 +57,18 @@ export class VoiceSources {
     private readonly subtitles: SubtitleService,
     private readonly ownerId: string,
     private readonly packetMs: PacketDuration = 20,
+    private readonly audioHub?: RoomAudioHub,
   ) {
     this.timer = setInterval(() => this.check(), 500)
     this.timer.unref()
     this.check()
+  }
+
+  /** Whether this worker currently owns the exclusive source for `roomId`. */
+  ownsRoom(roomId: string) {
+    const sourceId = this.sourceIds.get(roomId) ?? roomId
+    const source = this.sources.get(sourceId)
+    return Boolean(source && !source.closing)
   }
 
   status(roomId: string): VoiceSourceStatus {
@@ -100,6 +114,26 @@ export class VoiceSources {
     if (this.stopped) {
       return
     }
+    const needsOwnershipCheck = groups.some(
+      ({ configuration }) =>
+        !configuration.stopped && !this.sources.has(configuration.id),
+    )
+    const foreignRooms = new Set<string>()
+    const foreignGuilds = new Set<string>()
+    if (needsOwnershipCheck) {
+      for (const owner of await readActiveVoiceSourceOwners(this.database.db)) {
+        if (owner.ownerId === this.ownerId) {
+          continue
+        }
+        foreignRooms.add(owner.roomId)
+        if (owner.discordGuildId) {
+          foreignGuilds.add(owner.discordGuildId)
+        }
+      }
+      if (this.stopped) {
+        return
+      }
+    }
     const roomIds = new Set(groups.map((group) => group.configuration.id))
     this.configurations.clear()
     this.sourceIds.clear()
@@ -135,13 +169,22 @@ export class VoiceSources {
           void this.close(source).catch(() => {})
         } else {
           // Publication fails closed when configuration reads stop completing.
-          source.validUntil = performance.now() + 1_500
+          source.validUntil = performance.now() + SOURCE_VALIDITY_MS
           source.rooms = rooms
           await source.broadcast?.reconcile(rooms)
         }
         continue
       }
       if (configuration.stopped) {
+        this.failures.delete(configuration.id)
+        continue
+      }
+      // Another live replica already holds this room or Discord guild source.
+      if (
+        foreignRooms.has(configuration.id) ||
+        (configuration.discordGuildId &&
+          foreignGuilds.has(configuration.discordGuildId))
+      ) {
         this.failures.delete(configuration.id)
         continue
       }
@@ -161,7 +204,7 @@ export class VoiceSources {
         starting: null,
         closing: false,
         closingTask: null,
-        validUntil: performance.now() + 1_500,
+        validUntil: performance.now() + SOURCE_VALIDITY_MS,
       }
       this.sources.set(configuration.id, next)
       this.failures.delete(configuration.id)
@@ -239,6 +282,7 @@ export class VoiceSources {
       this.subtitles,
       () => this.fail(source, inputFailure(configuration)),
       this.packetMs,
+      this.audioHub,
     )
     await source.broadcast.reconcile(
       source.rooms.map((room) =>

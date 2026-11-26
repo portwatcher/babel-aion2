@@ -4,6 +4,7 @@ import {
   type PlayerEvent,
   type SubtitleLatency,
 } from '@babel/contracts'
+import { resolveRoomControlUrl } from './media-control'
 
 /** A private streaming connection backs the player's existing revocable socket. */
 export function createSubtitleRelay(
@@ -63,7 +64,11 @@ export function createSubtitleRelay(
       if (!config.mediaControlUrl || !config.mediaControlSecret) {
         throw new Error('Unavailable')
       }
-      const destination = new URL('/subtitles', config.mediaControlUrl)
+      const baseUrl = await resolveRoomControlUrl(target.roomId)
+      if (!baseUrl) {
+        throw new Error('Unavailable')
+      }
+      const destination = new URL('/subtitles', baseUrl)
       if (!['http:', 'https:'].includes(destination.protocol)) {
         throw new Error('Unavailable')
       }

@@ -35,7 +35,89 @@ export interface LiveSubtitlePath {
   terminology: TerminologySnapshot | null
 }
 
-export async function readSubtitlePaths(db: Database, cipher: CredentialCipher) {
+type StampRow = {
+  code: string
+  pathVersion: number
+  recognitionId: string
+  recognitionVersion: number
+  translationId: string
+  translationVersion: number
+  includeTerms: boolean
+  terminologyVersion: number | null
+}
+
+async function readSubtitlePathStamps(db: Database): Promise<SubtitlePathStamp[]> {
+  const result = await db.execute<StampRow>(sql`
+    select l.code as "code",
+           l.path_version as "pathVersion",
+           a.id as "recognitionId",
+           a.version as "recognitionVersion",
+           b.id as "translationId",
+           b.version as "translationVersion",
+           l.include_terms as "includeTerms",
+           t.version as "terminologyVersion"
+      from output_language l
+      join provider_configuration a on a.id = l.recognition_configuration_id
+      join provider_configuration b on b.id = l.translation_configuration_id
+      left join term_catalog t on t.id = 'global'
+     where l.enabled and l.path_validated_at is not null
+  `)
+  return result.rows.map((row) => ({
+    code: row.code,
+    pathVersion: Number(row.pathVersion),
+    recognitionId: row.recognitionId,
+    recognitionVersion: Number(row.recognitionVersion),
+    translationId: row.translationId,
+    translationVersion: Number(row.translationVersion),
+    terminologyVersion: row.includeTerms
+      ? row.terminologyVersion === null
+        ? null
+        : Number(row.terminologyVersion)
+      : null,
+  }))
+}
+
+function stampsMatch(
+  stamps: SubtitlePathStamp[],
+  previous: ReadonlyMap<string, LiveSubtitlePath>,
+) {
+  if (stamps.length !== previous.size) {
+    return false
+  }
+  for (const stamp of stamps) {
+    const cached = previous.get(stamp.code)?.stamp
+    if (
+      !cached ||
+      cached.pathVersion !== stamp.pathVersion ||
+      cached.recognitionId !== stamp.recognitionId ||
+      cached.recognitionVersion !== stamp.recognitionVersion ||
+      cached.translationId !== stamp.translationId ||
+      cached.translationVersion !== stamp.translationVersion ||
+      cached.terminologyVersion !== stamp.terminologyVersion
+    ) {
+      return false
+    }
+  }
+  return true
+}
+
+export async function readSubtitlePaths(
+  db: Database,
+  cipher: CredentialCipher,
+  previous?: ReadonlyMap<string, LiveSubtitlePath>,
+) {
+  // Fast path: verify every enabled language's provider/path/terminology stamps in
+  // one read-only query, avoiding 500 ms game_term table scans, FOR SHARE locks,
+  // Zod row parsing and AES-GCM decryption when nothing changed.
+  if (previous) {
+    const stamps = await readSubtitlePathStamps(db)
+    if (!stamps.length) {
+      return []
+    }
+    if (stampsMatch(stamps, previous)) {
+      return [...previous.values()]
+    }
+  }
   const languages = await db
     .select()
     .from(outputLanguage)

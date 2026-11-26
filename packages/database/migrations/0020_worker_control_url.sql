@@ -1,0 +1,1 @@
+ALTER TABLE "runtime_owner" ADD COLUMN "control_url" text;

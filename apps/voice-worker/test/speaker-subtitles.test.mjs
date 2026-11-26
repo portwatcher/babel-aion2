@@ -2,7 +2,11 @@ import assert from 'node:assert/strict'
 import { performance } from 'node:perf_hooks'
 import { setTimeout as delay } from 'node:timers/promises'
 import { test } from 'node:test'
-import { IDLE_SPEAKER_MS, SpeakerSubtitles } from '../src/speaker-subtitles.ts'
+import {
+  CLOCK_STALL_MS,
+  IDLE_SPEAKER_MS,
+  SpeakerSubtitles,
+} from '../src/speaker-subtitles.ts'
 import { createProviderFixture } from '../../../scripts/fixtures/provider-server.mjs'
 import { routeProviderNetwork } from '../../../scripts/fixtures/provider-network.mjs'
 
@@ -103,8 +107,12 @@ for (const callbackMs of [20, 21]) {
       '500 ms trailing hangover preserves utterance boundary after filter tail',
     )
     assert.equal(recognition.closed, false)
-    // An actual stall still retires the stream instead of replaying old commands.
+    // A brief 200 ms CPU/GC stall drains cleanly without tearing down recognition.
     now += 200
+    t.mock.timers.tick(20)
+    assert.deepEqual(ended, [], 'brief 200 ms stall stays within clock tolerance')
+    // A genuine stall beyond CLOCK_STALL_MS still retires the stream cleanly.
+    now += CLOCK_STALL_MS + 100
     t.mock.timers.tick(20)
     assert.deepEqual(ended, [{ code: 'UNAVAILABLE', reason: 'clock-stall' }])
   })
@@ -125,6 +133,7 @@ test('opening speech during handshake is flushed once ready and 200 ms UDP burst
   t.mock.timers.enable({ apis: ['setInterval'] })
   const path = makePath(key)
   const ended = []
+  const states = []
   const speaker = new SpeakerSubtitles(
     '00000000-0000-4000-8000-000000000001',
     1,
@@ -138,9 +147,20 @@ test('opening speech during handshake is flushed once ready and 200 ms UDP burst
   )
   t.after(() => speaker.close())
   speaker.reconcile(
-    [{ id: 'listener', outputLanguage: 'ja', deliver() {} }],
+    [
+      {
+        id: 'listener',
+        outputLanguage: 'ja',
+        deliver(event) {
+          if (event.type === 'subtitle-state') {
+            states.push(event.state)
+          }
+        },
+      },
+    ],
     new Map([['ja', path]]),
   )
+  assert.deepEqual(states, ['CONNECTING'], 'listener sees CONNECTING during handshake')
   await held.started
   const speech = Buffer.alloc(3840)
   for (let offset = 0; offset < speech.length; offset += 2) {
@@ -155,6 +175,11 @@ test('opening speech during handshake is flushed once ready and 200 ms UDP burst
   assert.equal(recognition.frames.length, 0, 'nothing sent before session.updated')
   held.release()
   await until(() => recognition.frames.length === 25)
+  assert.deepEqual(
+    states,
+    ['CONNECTING', 'WAITING'],
+    'handshake completion leaves CONNECTING even before the first transcript arrives',
+  )
   assert.deepEqual(ended, [], 'preconnect flush succeeds without errors')
 
   // 10 frames (200 ms) arriving in a single UDP jitter burst must NOT retire the stream.

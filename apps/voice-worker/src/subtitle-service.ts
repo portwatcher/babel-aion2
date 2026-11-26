@@ -16,6 +16,7 @@ import {
   readSubtitlePaths,
   type SubtitlePathStamp,
 } from '@babel/database/subtitles'
+import { readRoomVoiceOwner } from '@babel/database/voice-sources'
 import { babelTracer, parentContext, traceparent } from '@babel/telemetry'
 import { RoomSubtitles } from './room-subtitles.ts'
 import type { RunningSubtitlePath, SubtitleConsumer } from './speaker-subtitles.ts'
@@ -42,8 +43,9 @@ interface Consumer extends SubtitleConsumer {
 export class SubtitleDeliveryError extends Error {}
 
 // Authorization and path snapshots are refreshed every 500 ms. A delivery is only
-// sent while its listener and path were confirmed within this window.
-const VALIDITY_MS = 1_500
+// sent while its listener and path were confirmed within this window; 5 s keeps
+// fail-closed fencing without tearing down live streams on brief DB/CPU stalls.
+const VALIDITY_MS = 5_000
 // Consecutive storage failures tolerated before subscribers are disconnected.
 // Delivery already stops once VALIDITY_MS lapses.
 const MAX_REFRESH_FAILURES = 3
@@ -68,6 +70,7 @@ export class SubtitleService {
   constructor(
     private readonly db: Database,
     private readonly cipher: CredentialCipher | null,
+    private readonly ownerId?: string,
   ) {
     this.timer = setInterval(() => this.check(), 500)
     this.timer.unref()
@@ -78,7 +81,7 @@ export class SubtitleService {
     if (!this.cipher || this.stopped) {
       return false
     }
-    await readSubtitlePaths(this.db, this.cipher)
+    await readSubtitlePaths(this.db, this.cipher, this.paths)
     return true
   }
 
@@ -392,7 +395,7 @@ export class SubtitleService {
     const startedAt = performance.now()
     const consumers = [...this.consumers.values()]
     const [saved, authorized, sources] = await Promise.all([
-      this.cipher ? readSubtitlePaths(this.db, this.cipher) : [],
+      this.cipher ? readSubtitlePaths(this.db, this.cipher, this.paths) : [],
       authorizedSubtitleListeners(
         this.db,
         consumers.map((consumer) => consumer.input),
@@ -420,11 +423,33 @@ export class SubtitleService {
     this.paths = paths
     this.roomSources = sources
     this.validUntil = startedAt + VALIDITY_MS
+    const misplacedRooms = new Set<string>()
     for (const consumer of consumers) {
       if (authorized.has(consumer.id)) {
         consumer.authorizedAt = Math.max(consumer.authorizedAt, startedAt)
+        if (this.ownerId && !this.rooms.has(consumer.listener.roomId)) {
+          misplacedRooms.add(consumer.listener.roomId)
+        }
       } else {
         this.close(consumer)
+      }
+    }
+    // If a subscriber landed here before another replica claimed the room's
+    // source, close it so the web relay immediately reconnects to the owner.
+    if (this.ownerId && misplacedRooms.size) {
+      const remoteOwned = new Set<string>()
+      for (const roomId of misplacedRooms) {
+        const owner = await readRoomVoiceOwner(this.db, roomId).catch(() => null)
+        if (owner && owner.ownerId !== this.ownerId && owner.controlUrl) {
+          remoteOwned.add(roomId)
+        }
+      }
+      if (!this.stopped && remoteOwned.size) {
+        for (const consumer of [...this.consumers.values()]) {
+          if (remoteOwned.has(consumer.listener.roomId)) {
+            this.close(consumer)
+          }
+        }
       }
     }
     this.reconcileRooms()

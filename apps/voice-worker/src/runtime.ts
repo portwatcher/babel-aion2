@@ -2,9 +2,14 @@ import { receiveRuntimeOwner } from '@babel/processes'
 import { startTelemetry, stopTelemetry } from '@babel/telemetry'
 import { createDatabase, databasePoolSize } from '@babel/database'
 import { createCredentialCipher } from '@babel/database/credentials'
-import { runtimeOwnerActive } from '@babel/database/runtime-owners'
+import {
+  runtimeOwnerActive,
+  setRuntimeOwnerControlUrl,
+} from '@babel/database/runtime-owners'
 import { MediaPeers } from './media-peers.ts'
 import { createControlServer } from './control-server.ts'
+import { RemoteRoomAudio } from './remote-room-audio.ts'
+import { RoomAudioHub } from './room-audio-hub.ts'
 import { VoiceSources } from './voice-sources.ts'
 import { SubtitleService } from './subtitle-service.ts'
 import { createMediaNetwork } from './media-network.ts'
@@ -17,6 +22,23 @@ function packetDuration(value: string | undefined): PacketDuration {
     throw new Error('Invalid Opus packet duration')
   }
   return duration
+}
+
+/** Optional private URL advertised in PostgreSQL for multi-replica worker routing. */
+function advertisedControlUrl(boundPort: number) {
+  const explicit = process.env.MEDIA_CONTROL_ADVERTISE_URL?.trim()
+  const podIp = process.env.BABEL_RUNTIME_POD_IP?.trim()
+  const raw =
+    explicit ||
+    (podIp ? `http://${podIp.includes(':') ? `[${podIp}]` : podIp}:${boundPort}` : '')
+  if (!raw) {
+    return null
+  }
+  const parsed = new URL(raw)
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('Invalid advertised control URL')
+  }
+  return parsed.origin
 }
 
 try {
@@ -66,7 +88,8 @@ async function start(ownerId: string) {
   } catch {
     /* Media admission remains available without a source credential key. */
   }
-  const subtitles = new SubtitleService(subtitleDatabase.db, cipher)
+  const audioHub = new RoomAudioHub()
+  const subtitles = new SubtitleService(subtitleDatabase.db, cipher, ownerId)
   const sources = new VoiceSources(
     sourceDatabase,
     peers,
@@ -74,8 +97,16 @@ async function start(ownerId: string) {
     subtitles,
     ownerId,
     packetDuration(process.env.MEDIA_OPUS_FRAME_MS),
+    audioHub,
   )
-  const server = createControlServer(peers, secret, sources, subtitles)
+  const remoteAudio = new RemoteRoomAudio(
+    database.db,
+    secret,
+    ownerId,
+    peers,
+    (roomId) => sources.ownsRoom(roomId),
+  )
+  const server = createControlServer(peers, secret, sources, subtitles, audioHub)
   let stopping = false
   async function stop() {
     if (stopping) {
@@ -90,6 +121,8 @@ async function start(ownerId: string) {
     server.close()
     server.closeAllConnections()
     try {
+      await remoteAudio.stop()
+      audioHub.close()
       await sources.stop()
       await subtitles.stop()
       await peers.stop()
@@ -122,14 +155,27 @@ async function start(ownerId: string) {
   })
   server.listen(port, host, () => {
     const address = server.address()
-    console.log(
-      JSON.stringify({
-        mediaControlListening: true,
-        port: typeof address === 'object' && address ? address.port : port,
-        voiceSourceControl: true,
-        runtimePid: process.pid,
-        ownerId,
-      }),
-    )
+    const boundPort = typeof address === 'object' && address ? address.port : port
+    void (async () => {
+      try {
+        const controlUrl = advertisedControlUrl(boundPort)
+        if (controlUrl) {
+          await setRuntimeOwnerControlUrl(database.db, ownerId, controlUrl)
+        }
+        console.log(
+          JSON.stringify({
+            mediaControlListening: true,
+            port: boundPort,
+            voiceSourceControl: true,
+            runtimePid: process.pid,
+            ownerId,
+          }),
+        )
+      } catch {
+        console.error('Babel media control registration failed.')
+        process.exitCode = 1
+        void stop()
+      }
+    })()
   })
 }

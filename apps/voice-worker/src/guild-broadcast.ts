@@ -1,5 +1,6 @@
 import type { VoiceSourceConfiguration } from '@babel/database/voice-sources'
 import { RoomAudio, type PacketDuration } from './room-audio.ts'
+import type { RoomAudioHub } from './room-audio-hub.ts'
 import type { MediaPeers } from './media-peers.ts'
 import type { SubtitleService } from './subtitle-service.ts'
 
@@ -21,12 +22,14 @@ export class GuildBroadcast {
     private readonly subtitles: Pick<SubtitleService, 'source'>,
     failed: () => void,
     packetMs: PacketDuration = 20,
+    private readonly audioHub?: RoomAudioHub,
   ) {
     this.audio = new RoomAudio(
       allowed,
       (packet, durationMs) => {
-        for (const roomId of this.destinations.keys()) {
+        for (const [roomId, destination] of this.destinations) {
           this.peers.publish(roomId, packet, durationMs)
+          this.audioHub?.publish(roomId, destination.generation, packet, durationMs)
         }
       },
       failed,
@@ -44,6 +47,7 @@ export class GuildBroadcast {
       }
       this.destinations.delete(roomId)
       destination.subtitles.close()
+      this.audioHub?.closeRoom(roomId, destination.generation)
       this.pendingClosures.add(roomId)
     }
     await this.closeRetired()
@@ -66,6 +70,7 @@ export class GuildBroadcast {
         ),
       }
       this.destinations.set(roomId, destination)
+      this.audioHub?.openRoom(roomId, configuration.sourceGeneration)
     }
   }
 
@@ -100,6 +105,7 @@ export class GuildBroadcast {
     this.audio.close()
     for (const [roomId, destination] of this.destinations) {
       destination.subtitles.close()
+      this.audioHub?.closeRoom(roomId, destination.generation)
       this.pendingClosures.add(roomId)
     }
     this.destinations.clear()
