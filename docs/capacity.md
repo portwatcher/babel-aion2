@@ -5,18 +5,19 @@ an authenticated player WebSocket and a receive-only original-audio peer.
 
 ## What scales with listeners
 
-| Work                                         | Grows with            | Implementation                                                                                                                                       |
-| -------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Recognition and translation provider streams | speakers × languages  | Shared per room speaker and language group; listeners add none                                                                                       |
-| Mixing and Opus encoding                     | rooms                 | One mix and one encoder per source group                                                                                                             |
-| SRTP encryption and socket writes            | listeners × packets/s | Worker threads ("media shards"); direct transport writes with a cached key                                                                           |
-| Player socket verification                   | sockets               | One batched session query per web replica each second                                                                                                |
-| Player list, configuration and map revision  | rooms                 | Read and serialized once per room per sweep, then sent to its sockets                                                                                |
-| Media and subtitle authorization sweeps      | sockets               | One batched query per 500 ms sweep instead of one per listener                                                                                       |
-| Subtitle delivery fences                     | events                | Checked against the latest 500 ms authorization snapshot (stamp-cached paths), valid for 5 s                                                         |
-| Multi-replica listener fan-out               | voice-worker replicas | Receive-only peers spread across replicas by open peer count; encoded Opus packets relay over private `/relay/audio` from the exclusive source owner |
-| Tactical map reads                           | map changes           | Clients refetch when the pushed revision changes; 30-second repair poll                                                                              |
-| Voice source ownership                       | rooms                 | All advisory locks of a worker share one dedicated PostgreSQL session                                                                                |
+| Work                                         | Grows with            | Implementation                                                                                                                                                                                                              |
+| -------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Recognition and translation provider streams | speakers × languages  | Shared per room speaker and language group; listeners add none                                                                                                                                                              |
+| Mixing and Opus encoding                     | rooms                 | One mix and one encoder per source group                                                                                                                                                                                    |
+| SRTP encryption and socket writes            | listeners × packets/s | Worker threads ("media shards"); direct transport writes with a cached key                                                                                                                                                  |
+| Player socket verification                   | sockets               | One batched session query and one batched heartbeat `last_seen_at` update per web replica each second; tolerates up to 2 transient storage failures before failing closed                                                   |
+| Player list, configuration and map revision  | rooms                 | Read and serialized once per room per sweep, then sent to its sockets                                                                                                                                                       |
+| Media and subtitle authorization sweeps      | sockets               | One batched query per 500 ms sweep instead of one per listener                                                                                                                                                              |
+| Subtitle delivery fences                     | events                | Checked against the latest 500 ms authorization snapshot (stamp-cached paths), valid for 5 s                                                                                                                                |
+| Multi-replica listener fan-out               | voice-worker replicas | Receive-only peers prefer dedicated `MEDIA_FANOUT_ONLY=true` burst replicas (balanced by open peers, falling back to base owners); encoded Opus packets relay over private `/relay/audio` from the exclusive source owner   |
+| Burst autoscaling (`GET /metrics/scale`)     | active listeners      | Authenticated endpoint returns `desiredBurstReplicas` (`0` below `SCALE_BURST_ACTIVATION_LISTENERS`, default 15; `ceil(listeners / SCALE_BURST_LISTENERS_PER_REPLICA)`, default 250) so KEDA scales burst replicas `0 -> N` |
+| Tactical map reads                           | map changes           | Clients refetch when the pushed revision changes; 30-second repair poll                                                                                                                                                     |
+| Voice source ownership                       | rooms                 | All advisory locks of a worker share one dedicated PostgreSQL session                                                                                                                                                       |
 
 ### Media shards
 
@@ -81,8 +82,12 @@ slower per core than this machine; budget at least 1.5× the worker and TURN CPU
 
 ## Production requirements
 
-- Voice worker: 60 ms packets, 2 media threads, CPU limit 2 and a request of at
-  least 1 CPU so the node cannot starve it; 1 GiB memory is sufficient.
+- Base voice worker: 60 ms packets, 2 media threads; owns exclusive room sources
+  and subtitle pipelines (7 DB connections: 3 pools of 2 + 1 supervisor).
+- Burst fan-out voice worker (`MEDIA_FANOUT_ONLY=true`): skips voice-source and
+  subtitle pools (3 DB connections: 1 media pool of 2 + 1 supervisor), CPU
+  request 1.5–2 cores / limit 2 on dedicated CPU burst nodes, 256 MiB–1 GiB
+  memory; scales from `0` via KEDA polling `GET /metrics/scale`.
 - TURN: with relay-only policy every listener holds two relay allocations (worker
   and browser), each using one relay port. 1,000 listeners need at least 2,000
   relay ports reachable on the TURN host, plus about one CPU core.

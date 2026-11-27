@@ -134,16 +134,25 @@ registers negotiations before creating peers, closes obsolete peers and persists
 the actual close acknowledgement. WebRTC peers run in worker threads; see
 [listener capacity](capacity.md). When `MEDIA_CONTROL_ADVERTISE_URL` or
 `BABEL_RUNTIME_POD_IP` is set, each worker replica records its private control
-URL on its `runtime_owner` row so multiple replicas can serve receive-only
-listeners concurrently. Exclusive source ownership (`voice_source_run` and
-PostgreSQL advisory locks) keeps one Discord receiver / host uplink, one Opus
-encoder, and one shared subtitle pipeline per room or guild; fan-out replicas
-subscribe to the source owner's authenticated `/relay/audio` stream only while
-they hold local listeners in that room. The web app routes receive-only listener
-offers to the least-loaded active replica, routes SDP answers/closes to the exact
-owning replica, routes host uplinks, source status, subtitles and subtitle
-history to the room's source owner, and revokes open media connections across all
-holding replicas before confirming replacement. A PostgreSQL ownership session and durable
+URL and `fanout_only` capability on its `runtime_owner` row so multiple replicas
+can serve receive-only listeners concurrently. Exclusive source ownership
+(`voice_source_run` and PostgreSQL advisory locks) keeps one Discord receiver /
+host uplink, one Opus encoder, and one shared subtitle pipeline per room or
+guild; fan-out replicas subscribe to the source owner's authenticated
+`/relay/audio` stream only while they hold local listeners in that room.
+Setting `MEDIA_FANOUT_ONLY=true` starts an autoscalable burst replica that skips
+voice-source claims and subtitle pools (holding only one media DB pool plus its
+supervisor connection) and never contends for room ownership. The web app routes
+receive-only listener offers to dedicated `fanout_only` replicas first (balanced
+by open peer count, falling back to full base replicas when no burst replica is
+running), routes SDP answers/closes to the exact owning replica, routes host
+uplinks, source status, subtitles and subtitle history strictly to non-fan-out
+room source owners, and revokes open media connections across all holding
+replicas before confirming replacement. Authenticated `GET /metrics/scale`
+exposes live listener and source counts for KEDA burst scaling. Player WebSocket
+sweeps batch `pong` renewals into one atomic SQL update per second per web
+replica and tolerate up to two transient storage glitches before failing closed
+on the third consecutive error. A PostgreSQL ownership session and durable
 source receipt exclude duplicate bot/guild controllers. The source controller
 connects Discord with DAVE, maintains separate member decoders and bounded PCM
 queues, and publishes mixed original audio independently of subtitle work. An

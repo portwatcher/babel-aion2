@@ -1,5 +1,5 @@
 import type { ListenerReference, ListenerSnapshot } from '@babel/contracts'
-import { and, eq, inArray, isNull } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import type { Database } from '../client.ts'
 import { playerConnection } from '../schema/player-connections.ts'
 import { listenerSession, nickname } from '../schema/rooms.ts'
@@ -92,53 +92,46 @@ export async function readPlayerConnections(
   return sessions
 }
 
+/**
+ * Batches heartbeat last_seen_at updates for verified, currently active
+ * connections owned by this web replica in one atomic SQL statement.
+ */
+export async function renewPlayerConnections(
+  db: Database,
+  connectionIds: string[],
+  ownerId: string,
+) {
+  const unique = [...new Set(connectionIds)]
+  if (!unique.length) {
+    return
+  }
+  const now = new Date()
+  await db.execute(sql`
+    update listener_session as ls
+    set last_seen_at = ${now}
+    from player_connection as pc
+    inner join nickname as n
+      on n.current_session_id = pc.session_id
+     and n.generation = pc.nickname_generation
+    where ls.id = pc.session_id
+      and ls.nickname_key = n.key
+      and ls.nickname_generation = pc.nickname_generation
+      and ls.revoked_at is null
+      and pc.owner_id = ${ownerId}::uuid
+      and pc.closed_at is null
+      and pc.id in (${sql.join(
+        unique.map((id) => sql`${id}::uuid`),
+        sql`, `,
+      )})
+  `)
+}
+
 export async function renewPlayerConnection(
   db: Database,
   connectionId: string,
   ownerId: string,
 ) {
-  return db.transaction(async (tx) => {
-    const [record] = await tx
-      .select({ listener: listenerSession })
-      .from(playerConnection)
-      .innerJoin(listenerSession, eq(listenerSession.id, playerConnection.sessionId))
-      .where(
-        and(
-          eq(playerConnection.id, connectionId),
-          eq(playerConnection.ownerId, ownerId),
-          isNull(playerConnection.closedAt),
-        ),
-      )
-    if (!record) {
-      return
-    }
-    await tx
-      .select()
-      .from(nickname)
-      .where(eq(nickname.key, record.listener.nicknameKey))
-      .for('update')
-    const [current] = await tx
-      .select()
-      .from(nickname)
-      .where(
-        and(
-          eq(nickname.key, record.listener.nicknameKey),
-          eq(nickname.currentSessionId, record.listener.id),
-          eq(nickname.generation, record.listener.nicknameGeneration),
-        ),
-      )
-    if (current) {
-      await tx
-        .update(listenerSession)
-        .set({ lastSeenAt: new Date() })
-        .where(
-          and(
-            eq(listenerSession.id, record.listener.id),
-            isNull(listenerSession.revokedAt),
-          ),
-        )
-    }
-  })
+  await renewPlayerConnections(db, [connectionId], ownerId)
 }
 
 export async function closePlayerConnection(

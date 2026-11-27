@@ -3,6 +3,7 @@ import { startTelemetry, stopTelemetry } from '@babel/telemetry'
 import { createDatabase, databasePoolSize } from '@babel/database'
 import { createCredentialCipher } from '@babel/database/credentials'
 import {
+  readVoiceScaleLoad,
   runtimeOwnerActive,
   setRuntimeOwnerControlUrl,
 } from '@babel/database/runtime-owners'
@@ -14,6 +15,11 @@ import { VoiceSources } from './voice-sources.ts'
 import { SubtitleService } from './subtitle-service.ts'
 import { createMediaNetwork } from './media-network.ts'
 import { PACKET_DURATIONS, type PacketDuration } from './room-audio.ts'
+import {
+  computeVoiceScaleMetrics,
+  parseBurstScalePolicy,
+  parseFanoutOnly,
+} from './scale-policy.ts'
 
 /** Original-audio packet duration; longer packets cut per-listener packet work. */
 function packetDuration(value: string | undefined): PacketDuration {
@@ -56,17 +62,20 @@ async function start(ownerId: string) {
   }
   const port = Number(process.env.MEDIA_CONTROL_PORT ?? '3100')
   const host = process.env.MEDIA_CONTROL_HOST ?? '127.0.0.1'
+  const fanoutOnly = parseFanoutOnly(process.env.MEDIA_FANOUT_ONLY)
+  const scalePolicy = parseBurstScalePolicy(process.env)
   const network = createMediaNetwork(process.env)
   startTelemetry('babel-voice')
   // Source ownership holds a dedicated session while queries continue. Preserve
   // at least one additional slot and keep provider work out of the media pool.
+  // Fan-out-only burst replicas skip voice sources and subtitles to stay at one pool.
   const storage = {
     queryTimeoutMs: 2_000,
     maxConnections: databasePoolSize(process.env.DATABASE_POOL_MAX, 2),
   }
   const database = createDatabase(databaseUrl, storage)
-  const sourceDatabase = createDatabase(databaseUrl, storage)
-  const subtitleDatabase = createDatabase(databaseUrl, storage)
+  const sourceDatabase = fanoutOnly ? null : createDatabase(databaseUrl, storage)
+  const subtitleDatabase = fanoutOnly ? null : createDatabase(databaseUrl, storage)
   if (!(await runtimeOwnerActive(database.db, ownerId)) || !process.connected) {
     process.exit(1)
   }
@@ -83,30 +92,41 @@ async function start(ownerId: string) {
     },
   })
   let cipher = null
-  try {
-    cipher = createCredentialCipher(process.env.PROVIDER_ENCRYPTION_KEY ?? '')
-  } catch {
-    /* Media admission remains available without a source credential key. */
+  if (!fanoutOnly) {
+    try {
+      cipher = createCredentialCipher(process.env.PROVIDER_ENCRYPTION_KEY ?? '')
+    } catch {
+      /* Media admission remains available without a source credential key. */
+    }
   }
-  const audioHub = new RoomAudioHub()
-  const subtitles = new SubtitleService(subtitleDatabase.db, cipher, ownerId)
-  const sources = new VoiceSources(
-    sourceDatabase,
-    peers,
-    cipher,
-    subtitles,
-    ownerId,
-    packetDuration(process.env.MEDIA_OPUS_FRAME_MS),
-    audioHub,
-  )
+  const audioHub = fanoutOnly ? undefined : new RoomAudioHub()
+  const subtitles = subtitleDatabase
+    ? new SubtitleService(subtitleDatabase.db, cipher, ownerId)
+    : null
+  const sources =
+    sourceDatabase && subtitles
+      ? new VoiceSources(
+          sourceDatabase,
+          peers,
+          cipher,
+          subtitles,
+          ownerId,
+          packetDuration(process.env.MEDIA_OPUS_FRAME_MS),
+          audioHub,
+        )
+      : null
   const remoteAudio = new RemoteRoomAudio(
     database.db,
     secret,
     ownerId,
     peers,
-    (roomId) => sources.ownsRoom(roomId),
+    (roomId) => sources?.ownsRoom(roomId) ?? false,
   )
-  const server = createControlServer(peers, secret, sources, subtitles, audioHub)
+  const server = createControlServer(peers, secret, sources, subtitles, audioHub, () =>
+    readVoiceScaleLoad(database.db).then((load) =>
+      computeVoiceScaleMetrics(load, scalePolicy),
+    ),
+  )
   let stopping = false
   async function stop() {
     if (stopping) {
@@ -122,15 +142,15 @@ async function start(ownerId: string) {
     server.closeAllConnections()
     try {
       await remoteAudio.stop()
-      audioHub.close()
-      await sources.stop()
-      await subtitles.stop()
+      audioHub?.close()
+      await sources?.stop()
+      await subtitles?.stop()
       await peers.stop()
-      await Promise.all([
-        database.close(),
-        sourceDatabase.close(),
-        subtitleDatabase.close(),
-      ])
+      await Promise.all(
+        [database, sourceDatabase, subtitleDatabase]
+          .filter((item): item is ReturnType<typeof createDatabase> => item !== null)
+          .map((item) => item.close()),
+      )
       await stopTelemetry()
     } catch {
       process.exitCode = 1
@@ -142,8 +162,8 @@ async function start(ownerId: string) {
   for (const signal of ['SIGINT', 'SIGTERM', 'disconnect']) {
     process.once(signal, () => void stop())
   }
-  for (const storage of [database, sourceDatabase, subtitleDatabase]) {
-    storage.pool.on('error', () => {
+  for (const item of [database, sourceDatabase, subtitleDatabase]) {
+    item?.pool.on('error', () => {
       process.exitCode = 1
       void stop()
     })
@@ -159,14 +179,20 @@ async function start(ownerId: string) {
     void (async () => {
       try {
         const controlUrl = advertisedControlUrl(boundPort)
+        if (fanoutOnly && !controlUrl) {
+          throw new Error('Fan-out worker requires an advertised control URL')
+        }
         if (controlUrl) {
-          await setRuntimeOwnerControlUrl(database.db, ownerId, controlUrl)
+          await setRuntimeOwnerControlUrl(database.db, ownerId, controlUrl, {
+            fanoutOnly,
+          })
         }
         console.log(
           JSON.stringify({
             mediaControlListening: true,
             port: boundPort,
-            voiceSourceControl: true,
+            voiceSourceControl: !fanoutOnly,
+            fanoutOnly,
             runtimePid: process.pid,
             ownerId,
           }),
