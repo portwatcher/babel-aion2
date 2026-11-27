@@ -1,0 +1,1 @@
+ALTER TABLE "runtime_owner" ADD COLUMN "fanout_only" boolean DEFAULT false NOT NULL;

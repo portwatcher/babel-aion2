@@ -1,5 +1,22 @@
 # Validation
 
+## Elastic fan-out voice workers, KEDA scale metrics and WebSocket resilience · 2026-11-27
+
+Added `MEDIA_FANOUT_ONLY=true` burst fan-out worker mode (skipping voice-source
+claims and subtitle pools to use 3 DB connections instead of 7), authenticated
+`GET /metrics/scale` for KEDA autoscaling, burst-first receive-only media
+routing via `runtime_owner.fanout_only` (migration `0021_worker_fanout_only`),
+batched per-second player WebSocket heartbeat renewals (`renewPlayerConnections`),
+and 3-failure transient storage tolerance in `player-channel.ts`.
+
+| Check                                           | Status  | Evidence                                                                                                                                                                                                                                                                                                                                                                                               |
+| ----------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Scale policy and burst-first routing unit tests | PASS    | `apps/voice-worker/test/scale-policy.test.ts` (3 tests) and `apps/web/test/media-control-routing.test.ts` (1 test) verify boolean/threshold parsing, listener-driven burst replica math, and burst-first least-loaded ordering with base-worker failover.                                                                                                                                              |
+| Database schema, scale load and heartbeat batch | PASS    | `npm run test:db` (22/22) including isolated `packages/database/test/voice-scale.test.ts` verifies migration `0021`, `fanout_only` discovery, disbanded-room exclusion in `readVoiceScaleLoad`, and fenced `renewPlayerConnections` batching (updating active current sessions while ignoring closed, foreign-owner and replaced connections).                                                         |
+| Distributed fan-out burst and failover suite    | PASS    | `npm run test:media:db` (4/4 + `media-smoke.mjs`) verifies a `MEDIA_FANOUT_ONLY=true` worker never claims `voice_source_run`, rejects `/subtitles/ready` (`503`) and `/source` (`404`), prioritizes relayed listener WebRTC peers over the base worker, enforces cross-replica UDP socket revocation, exposes authenticated `GET /metrics/scale`, and falls back to the base worker on burst shutdown. |
+| WebSocket, subtitle, pool and recovery suites   | PASS    | `npm run ci:local` (69 unit tests, line limits, formatting, strict types, all builds and built HTTP smoke), `test:ws:db`, `test:subtitles:db`, `test:pools:db`, `test:recovery:db`, `test:http:db`, and `test:community:db` all pass on Node 24.22.1 with disposable PostgreSQL.                                                                                                                       |
+| Live KEDA burst scale-up under raid concurrency | NOT RUN | Automated suites prove two-process burst fan-out, failover, and `/metrics/scale` output locally; production node cold-start timing and 500–1,000-player raid concurrency require live cluster load observation.                                                                                                                                                                                        |
+
 ## Five-minute in-memory translation history in room UI · 2026-11-26
 
 Active room listeners now see a rolling five-minute translation history for

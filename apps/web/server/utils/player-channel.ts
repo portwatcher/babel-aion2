@@ -10,7 +10,7 @@ import {
   openPlayerConnection,
   readPlayerConnection,
   readPlayerConnections,
-  renewPlayerConnection,
+  renewPlayerConnections,
   subtitleConnectionsStopped,
   ListenerError,
   type ListenerDelivery,
@@ -45,9 +45,15 @@ interface Connection {
 }
 
 const connections = new Map<string, Connection>()
+const pendingRenewals = new Set<string>()
+// Consecutive storage failures tolerated in the 1 s sweep before closing every
+// verified socket. Replacement stays fail-closed because new sessions cannot
+// activate until old sockets physically close and persist closed_at.
+const MAX_SWEEP_FAILURES = 3
 class PlayerProtocolError extends Error {}
 let timer: ReturnType<typeof setInterval> | undefined
 let running: Promise<void> | undefined
+let sweepFailures = 0
 
 /** One sweep's verified sessions and lazily shared room snapshots. */
 interface SweepContext {
@@ -75,6 +81,7 @@ function end(connection: Connection, code: number, reason: string) {
     return
   }
   connection.closing = true
+  pendingRenewals.delete(connection.peer.id)
   connection.subtitles?.stop()
   connection.probes.clear()
   clearTimeout(connection.timeout)
@@ -165,7 +172,28 @@ function createSweepContext(sessions: Map<string, ListenerSnapshot>): SweepConte
   return { sessions, room: createRoomViews() }
 }
 
+async function flushRenewals() {
+  if (!pendingRenewals.size) {
+    return
+  }
+  const batch = [...pendingRenewals]
+  pendingRenewals.clear()
+  try {
+    await renewPlayerConnections(useDatabase(), batch, playerRuntimeOwner())
+  } catch {
+    // Re-queue still-open connections for the next 1 s tick rather than kicking
+    // players on a single transient database write stall.
+    for (const id of batch) {
+      const connection = connections.get(id)
+      if (connection && !connection.closed && !connection.closing) {
+        pendingRenewals.add(id)
+      }
+    }
+  }
+}
+
 async function sweep() {
+  await flushRenewals()
   const all = [...connections.values()]
   const verified = new Set(
     all.filter(
@@ -174,17 +202,31 @@ async function sweep() {
   )
   // One query verifies every socket on this replica; room data is read once per room.
   let context: SweepContext | null = null
-  try {
-    context = createSweepContext(
-      await readPlayerConnections(
-        useDatabase(),
-        [...verified].flatMap((connection) =>
-          connection.session ? [connection.session] : [],
+  if (verified.size) {
+    try {
+      context = createSweepContext(
+        await readPlayerConnections(
+          useDatabase(),
+          [...verified].flatMap((connection) =>
+            connection.session ? [connection.session] : [],
+          ),
         ),
-      ),
-    )
-  } catch {
-    /* Each verified socket below fails closed. */
+      )
+      sweepFailures = 0
+    } catch {
+      sweepFailures += 1
+      if (sweepFailures < MAX_SWEEP_FAILURES) {
+        // Still retry close acknowledgements for sockets that already disconnected.
+        await Promise.allSettled(
+          all
+            .filter((connection) => connection.closed)
+            .map((connection) => persistClose(connection)),
+        )
+        return
+      }
+    }
+  } else {
+    sweepFailures = 0
   }
   await Promise.allSettled(
     all.map(async (connection) => {
@@ -224,6 +266,8 @@ export function startPlayerChannels() {
 export async function stopPlayerChannels() {
   clearInterval(timer)
   timer = undefined
+  pendingRenewals.clear()
+  sweepFailures = 0
   const closing = [...connections.values()]
   for (const connection of closing) {
     end(connection, 1012, 'Server restarting')
@@ -377,7 +421,7 @@ export const playerWebSocketHooks: Partial<Hooks> = {
         connection.nonce = null
         connection.pongAt = Date.now()
         connection.rttMs = connection.pongAt - connection.pingAt
-        await renewPlayerConnection(useDatabase(), peer.id, playerRuntimeOwner())
+        pendingRenewals.add(peer.id)
       }
     } catch (error) {
       const code =
@@ -400,6 +444,7 @@ export const playerWebSocketHooks: Partial<Hooks> = {
       return
     }
     connection.closed = true
+    pendingRenewals.delete(peer.id)
     connection.subtitles?.stop()
     clearTimeout(connection.timeout)
     try {

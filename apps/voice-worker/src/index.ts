@@ -1,6 +1,7 @@
 import { createMediaNetwork } from './media-network.ts'
 import { superviseRuntime } from '@babel/processes'
 import { databasePoolSize } from '@babel/database'
+import { parseBurstScalePolicy, parseFanoutOnly } from './scale-policy.ts'
 
 const databaseUrl = process.env.DATABASE_URL
 const secret = process.env.MEDIA_CONTROL_SECRET
@@ -16,6 +17,8 @@ if (!databaseUrl || !secret) {
 } else {
   try {
     databasePoolSize(process.env.DATABASE_POOL_MAX, 2)
+    parseFanoutOnly(process.env.MEDIA_FANOUT_ONLY)
+    parseBurstScalePolicy(process.env)
     createMediaNetwork(process.env)
     const extension = import.meta.url.endsWith('.ts') ? 'ts' : 'mjs'
     await superviseRuntime({

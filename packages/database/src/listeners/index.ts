@@ -29,6 +29,7 @@ export {
   readPlayerConnection,
   readPlayerConnections,
   renewPlayerConnection,
+  renewPlayerConnections,
   closePlayerConnection,
   subtitleConnectionsStopped,
 } from './connections.ts'

@@ -102,7 +102,9 @@ export async function resolveRoomControlUrl(roomId: string) {
       if (owner?.controlUrl) {
         return owner.controlUrl
       }
-      const workers = await listActiveVoiceWorkers(db)
+      const workers = (await listActiveVoiceWorkers(db)).filter(
+        (worker) => !worker.fanoutOnly,
+      )
       if (workers[0]) {
         return workers[0].controlUrl
       }
@@ -113,12 +115,19 @@ export async function resolveRoomControlUrl(roomId: string) {
   return settings.fallbackUrl
 }
 
-function rankWorkersByLoad(
+/**
+ * Prefers dedicated fan-out burst workers when present so source-owning base
+ * replicas stay light, while keeping base replicas as automatic failover targets.
+ */
+export function rankWorkersByLoad(
   workers: Awaited<ReturnType<typeof listActiveVoiceWorkers>>,
 ) {
   const randomized = workers.map((worker) => ({ worker, tie: Math.random() }))
   randomized.sort(
-    (a, b) => a.worker.activeConnections - b.worker.activeConnections || a.tie - b.tie,
+    (a, b) =>
+      Number(b.worker.fanoutOnly) - Number(a.worker.fanoutOnly) ||
+      a.worker.activeConnections - b.worker.activeConnections ||
+      a.tie - b.tie,
   )
   return randomized.map((item) => item.worker.controlUrl)
 }
@@ -143,7 +152,7 @@ export async function subtitlesReady() {
   if (!settings) {
     return false
   }
-  const workers = await activeWorkerPool()
+  const workers = (await activeWorkerPool()).filter((worker) => !worker.fanoutOnly)
   const urls = workers.length
     ? workers.map((worker) => worker.controlUrl)
     : [settings.fallbackUrl]

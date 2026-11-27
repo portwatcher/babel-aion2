@@ -13,6 +13,14 @@ export interface ActiveVoiceWorker {
   ownerId: string
   controlUrl: string
   activeConnections: number
+  fanoutOnly: boolean
+}
+
+export interface VoiceScaleLoad {
+  activeSessions: number
+  openMediaConnections: number
+  activeVoiceSources: number
+  activeFanoutWorkers: number
 }
 
 export async function registerRuntimeOwner(
@@ -34,10 +42,11 @@ export async function setRuntimeOwnerControlUrl(
   db: Pick<Database, 'update'>,
   id: string,
   controlUrl: string,
+  options: { fanoutOnly?: boolean } = {},
 ) {
   const updated = await db
     .update(runtimeOwner)
-    .set({ controlUrl })
+    .set({ controlUrl, fanoutOnly: options.fanoutOnly === true })
     .where(and(eq(runtimeOwner.id, id), isNull(runtimeOwner.exitedAt)))
     .returning({ id: runtimeOwner.id })
   if (!updated.length) {
@@ -53,6 +62,7 @@ export async function listActiveVoiceWorkers(
     .select({
       ownerId: runtimeOwner.id,
       controlUrl: runtimeOwner.controlUrl,
+      fanoutOnly: runtimeOwner.fanoutOnly,
       activeConnections: sql<number>`count(${mediaConnection.id})::int`,
     })
     .from(runtimeOwner)
@@ -72,7 +82,12 @@ export async function listActiveVoiceWorkers(
         isNull(runtimePod.retiredAt),
       ),
     )
-    .groupBy(runtimeOwner.id, runtimeOwner.controlUrl, runtimeOwner.startedAt)
+    .groupBy(
+      runtimeOwner.id,
+      runtimeOwner.controlUrl,
+      runtimeOwner.fanoutOnly,
+      runtimeOwner.startedAt,
+    )
     .orderBy(asc(runtimeOwner.startedAt), asc(runtimeOwner.id))
   return rows.flatMap((row) =>
     row.controlUrl
@@ -81,10 +96,62 @@ export async function listActiveVoiceWorkers(
             ownerId: row.ownerId,
             controlUrl: row.controlUrl,
             activeConnections: Number(row.activeConnections ?? 0),
+            fanoutOnly: Boolean(row.fanoutOnly),
           },
         ]
       : [],
   )
+}
+
+/** Lightweight single-query load snapshot for external autoscalers (KEDA). */
+export async function readVoiceScaleLoad(
+  db: Pick<Database, 'execute'>,
+): Promise<VoiceScaleLoad> {
+  const result = await db.execute<{
+    active_sessions: number
+    open_media_connections: number
+    active_voice_sources: number
+    active_fanout_workers: number
+  }>(sql`
+    select
+      (
+        select count(*)::int
+        from listener_session ls
+        inner join room r on r.id = ls.room_id
+        where ls.state in ('JOINING', 'ACTIVE')
+          and ls.revoked_at is null
+          and r.disbanded_at is null
+      ) as active_sessions,
+      (
+        select count(*)::int
+        from media_connection mc
+        inner join runtime_owner ro on ro.id = mc.owner_id
+        where mc.closed_at is null
+          and ro.exited_at is null
+      ) as open_media_connections,
+      (
+        select count(*)::int
+        from voice_source_run
+        where closed_at is null
+      ) as active_voice_sources,
+      (
+        select count(*)::int
+        from runtime_owner ro
+        left join runtime_pod rp on rp.uid = ro.pod_uid
+        where ro.exited_at is null
+          and ro.control_url is not null
+          and ro.fanout_only = true
+          and rp.retirement_requested_at is null
+          and rp.retired_at is null
+      ) as active_fanout_workers
+  `)
+  const row = result.rows[0]
+  return {
+    activeSessions: Number(row?.active_sessions ?? 0),
+    openMediaConnections: Number(row?.open_media_connections ?? 0),
+    activeVoiceSources: Number(row?.active_voice_sources ?? 0),
+    activeFanoutWorkers: Number(row?.active_fanout_workers ?? 0),
+  }
 }
 
 /** Exact worker URL that registered a media connection, if it is still live. */
