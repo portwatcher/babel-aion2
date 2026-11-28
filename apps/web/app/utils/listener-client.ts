@@ -5,7 +5,9 @@ import {
   listenerReferenceSchema,
   listenerSnapshotSchema,
   mediaOfferSchema,
+  subtitleHistorySchema,
   type MediaRequest,
+  type SubtitleHistory,
 } from '@babel/contracts'
 
 const savedSessionSchema = listenerReferenceSchema.extend({
@@ -124,6 +126,7 @@ async function playerRequest(
 ) {
   const response = await fetch(path, {
     method,
+    cache: 'no-store',
     headers: {
       authorization: `Bearer ${credential}`,
       ...(body ? { 'content-type': 'application/json' } : {}),
@@ -172,4 +175,20 @@ export async function requestListenerMedia(
     request.operation === 'offer' ? 25_000 : 10_000,
   )
   return request.operation === 'offer' ? mediaOfferSchema.parse(result) : null
+}
+
+export async function requestSubtitleHistory(
+  sessionId: string,
+  credential: string,
+  signal?: AbortSignal,
+): Promise<SubtitleHistory> {
+  const result = await playerRequest(
+    `/api/player/sessions/${sessionId}/subtitle-history`,
+    credential,
+    'GET',
+    undefined,
+    signal,
+    8_000,
+  )
+  return subtitleHistorySchema.parse(result)
 }

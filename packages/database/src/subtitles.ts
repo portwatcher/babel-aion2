@@ -1,6 +1,7 @@
-import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
 import {
   providerSettingsSchema,
+  type ListenerReference,
   type OpenAISettings,
   type SubtitleSubscription,
   type TerminologySnapshot,
@@ -16,7 +17,7 @@ import {
 } from './schema/rooms.ts'
 import { playerConnection } from './schema/player-connections.ts'
 import { createTermService } from './terms.ts'
-import { snapshot } from './listeners/model.ts'
+import { ListenerError, snapshot, verifyCredential } from './listeners/model.ts'
 
 export interface SubtitlePathStamp {
   code: string
@@ -34,7 +35,89 @@ export interface LiveSubtitlePath {
   terminology: TerminologySnapshot | null
 }
 
-export async function readSubtitlePaths(db: Database, cipher: CredentialCipher) {
+type StampRow = {
+  code: string
+  pathVersion: number
+  recognitionId: string
+  recognitionVersion: number
+  translationId: string
+  translationVersion: number
+  includeTerms: boolean
+  terminologyVersion: number | null
+}
+
+async function readSubtitlePathStamps(db: Database): Promise<SubtitlePathStamp[]> {
+  const result = await db.execute<StampRow>(sql`
+    select l.code as "code",
+           l.path_version as "pathVersion",
+           a.id as "recognitionId",
+           a.version as "recognitionVersion",
+           b.id as "translationId",
+           b.version as "translationVersion",
+           l.include_terms as "includeTerms",
+           t.version as "terminologyVersion"
+      from output_language l
+      join provider_configuration a on a.id = l.recognition_configuration_id
+      join provider_configuration b on b.id = l.translation_configuration_id
+      left join term_catalog t on t.id = 'global'
+     where l.enabled and l.path_validated_at is not null
+  `)
+  return result.rows.map((row) => ({
+    code: row.code,
+    pathVersion: Number(row.pathVersion),
+    recognitionId: row.recognitionId,
+    recognitionVersion: Number(row.recognitionVersion),
+    translationId: row.translationId,
+    translationVersion: Number(row.translationVersion),
+    terminologyVersion: row.includeTerms
+      ? row.terminologyVersion === null
+        ? null
+        : Number(row.terminologyVersion)
+      : null,
+  }))
+}
+
+function stampsMatch(
+  stamps: SubtitlePathStamp[],
+  previous: ReadonlyMap<string, LiveSubtitlePath>,
+) {
+  if (stamps.length !== previous.size) {
+    return false
+  }
+  for (const stamp of stamps) {
+    const cached = previous.get(stamp.code)?.stamp
+    if (
+      !cached ||
+      cached.pathVersion !== stamp.pathVersion ||
+      cached.recognitionId !== stamp.recognitionId ||
+      cached.recognitionVersion !== stamp.recognitionVersion ||
+      cached.translationId !== stamp.translationId ||
+      cached.translationVersion !== stamp.translationVersion ||
+      cached.terminologyVersion !== stamp.terminologyVersion
+    ) {
+      return false
+    }
+  }
+  return true
+}
+
+export async function readSubtitlePaths(
+  db: Database,
+  cipher: CredentialCipher,
+  previous?: ReadonlyMap<string, LiveSubtitlePath>,
+) {
+  // Fast path: verify every enabled language's provider/path/terminology stamps in
+  // one read-only query, avoiding 500 ms game_term table scans, FOR SHARE locks,
+  // Zod row parsing and AES-GCM decryption when nothing changed.
+  if (previous) {
+    const stamps = await readSubtitlePathStamps(db)
+    if (!stamps.length) {
+      return []
+    }
+    if (stampsMatch(stamps, previous)) {
+      return [...previous.values()]
+    }
+  }
   const languages = await db
     .select()
     .from(outputLanguage)
@@ -230,4 +313,55 @@ export async function subtitleDeliveryCurrent(
     select exists (${listenerQuery(db, input)}) as listener,
            exists (${pathQuery(roomId, generation, stamp)}) as path`)
   return result.rows[0] ?? { listener: false, path: false }
+}
+
+/**
+ * Authorize an active listener session to read its room's ephemeral subtitle
+ * history, returning only currently enabled validated output languages.
+ */
+export async function authorizeSubtitleHistory(
+  db: Pick<Database, 'select'>,
+  reference: ListenerReference,
+  credential: string,
+) {
+  const [record] = await db
+    .select()
+    .from(listenerSession)
+    .where(eq(listenerSession.id, reference.sessionId))
+  const session = verifyCredential(record, credential)
+  const [current] = await db
+    .select({
+      currentSessionId: nickname.currentSessionId,
+      generation: nickname.generation,
+      disbandedAt: room.disbandedAt,
+    })
+    .from(nickname)
+    .innerJoin(room, eq(room.id, session.roomId))
+    .where(eq(nickname.key, session.nicknameKey))
+  if (
+    session.nicknameGeneration !== reference.nicknameGeneration ||
+    session.state !== 'ACTIVE' ||
+    session.revokedAt ||
+    current?.currentSessionId !== session.id ||
+    current.generation !== reference.nicknameGeneration ||
+    current.disbandedAt
+  ) {
+    throw new ListenerError('SESSION_ENDED')
+  }
+  const languages = await db
+    .select({ code: outputLanguage.code })
+    .from(outputLanguage)
+    .where(
+      and(eq(outputLanguage.enabled, true), isNotNull(outputLanguage.pathValidatedAt)),
+    )
+    .orderBy(asc(outputLanguage.order), asc(outputLanguage.code))
+  const enabledLanguages = languages.map((language) => language.code)
+  return {
+    roomId: session.roomId,
+    outputLanguage:
+      session.outputLanguage && enabledLanguages.includes(session.outputLanguage)
+        ? session.outputLanguage
+        : null,
+    enabledLanguages,
+  }
 }

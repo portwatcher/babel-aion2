@@ -167,13 +167,17 @@ try {
     'Rejected language requests cannot spend provider work',
   )
 
-  network.setMode(translationKey, 'sentences')
-  const validated = await value(await sample(language))
-  network.setMode(translationKey, 'speech')
+  network.setMode(recognitionKey, 'sentences')
+  const validated = await value(
+    await sample(language, first, {
+      audioBase64: syntheticWave(48_000, 1_800).toString('base64'),
+    }),
+  )
+  network.setMode(recognitionKey, 'speech')
   assert.equal(
     validated.sample.segments.length,
     2,
-    'continuous caption windows need no invented source/target utterance alignment',
+    'each recognized utterance produces an aligned translated segment',
   )
   language = validated.language
   assert.equal(validated.sample.code, 'PASS')
@@ -185,7 +189,7 @@ try {
     language.validation.terminologyVersion,
     validated.sample.terminology.version,
   )
-  assert.equal(language.validation.stableUtterances, 1)
+  assert.equal(language.validation.stableUtterances, 2)
   const proof = language.validation
   const unavailable = await value(
     await call('/zh-Hant/state', 'POST', {

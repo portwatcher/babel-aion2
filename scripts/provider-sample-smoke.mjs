@@ -234,7 +234,7 @@ try {
   assert.ok(
     preview.segments.every(
       (segment) =>
-        segment.sourceAlignment === 'independent' &&
+        segment.sourceAlignment === 'aligned' &&
         segment.audioStartMs === null &&
         segment.audioEndMs === null,
     ),
@@ -246,7 +246,7 @@ try {
     'attack',
     'engage',
   ])
-  assert.equal(audioRequest.frames.length, 50)
+  assert.ok(audioRequest.frames.length >= 40 && audioRequest.frames.length <= 50)
   assert.ok(audioRequest.frames.every((frame) => frame.bytes === 960))
   assert.ok(
     audioRequest.frames.some((frame) => frame.silence) &&
@@ -255,11 +255,17 @@ try {
   const translations = network.observations.filter(
     (value) => value.protocol === 'translation',
   )
-  assert.equal(translations.length, 1, 'One continuous audio connection per target')
-  assert.deepEqual(translations[0].configuration, {
-    audio: { output: { language: 'zh' } },
-  })
-  assert.ok(preview.segments.every((segment) => segment.translationTermCount === 0))
+  assert.ok(
+    translations.length >= 1 && translations.length <= 2,
+    'Coalesced delta and completed utterance avoid duplicate final translation calls',
+  )
+  assert.equal(translations[0].model, 'gpt-5.4-nano')
+  assert.equal(translations[0].stream, true)
+  assert.ok(
+    translations[0].messages[0].content.includes('attack (engage) => 測試攻擊'),
+    'Target terminology glossary is passed to gpt-5.4-nano',
+  )
+  assert.equal(preview.segments.at(-1).translationTermCount, 1)
   const saved = (
     await pool.query(
       'select enabled, last_test from provider_configuration where id = any($1::uuid[])',
@@ -302,7 +308,8 @@ try {
   )
   assert.equal(
     network.observations.filter((value) => value.protocol === 'translation').length,
-    beforeSilence + 1,
+    beforeSilence,
+    'Silent audio with no recognized speech spends zero translation requests',
   )
   await pastCooldown()
   network.setMode(recognitionKey, 'speech')

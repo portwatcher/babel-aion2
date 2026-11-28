@@ -7,14 +7,23 @@ import {
 } from '@babel/contracts'
 import type { InterfaceMessageKey } from '~/locales'
 import { playerErrorKey } from '~/utils/player-feedback'
+import { enterCreatedRoom } from '~/utils/created-room-entry'
 
 const { t } = useInterfaceLocale()
 const route = useRoute()
 const { data: directory } = await useFetch('/api/player/rooms')
 const audioSource = ref<RoomAudioSource>('PLAYER')
 const audioSources = computed(() => [
-  { label: t('audioSourcePlayer'), value: 'PLAYER' },
-  { label: t('audioSourceDiscord'), value: 'DISCORD' },
+  {
+    label: t('audioSourcePlayer'),
+    description: t('playerCaptureNote'),
+    value: 'PLAYER' as const,
+  },
+  {
+    label: t('audioSourceDiscord'),
+    description: t('installationPermissions'),
+    value: 'DISCORD' as const,
+  },
 ])
 const sourceAvailable = computed(
   () => directory.value?.creationSources.includes(audioSource.value) ?? false,
@@ -28,10 +37,14 @@ const installation = shallowRef<{
   name: string
   server: string
   allowedIds: string[]
+  hostId: string
   roomNumber: number | null
   channels: { id: string; name: string }[]
 } | null>(null)
 const busy = ref(false)
+// Keep a successful creation while admission retries, rather than creating
+// another empty room after a temporary character lookup or connection failure.
+const createdRoom = shallowRef<{ roomNumber: number; hostId: string } | null>(null)
 const errorKey = ref<InterfaceMessageKey | ''>(
   route.query.installationError ? 'installationFailed' : '',
 )
@@ -49,9 +62,16 @@ function roomSettings() {
   }
 }
 function submit() {
+  if (createdRoom.value) {
+    return retryCreatedRoom()
+  }
   return audioSource.value === 'PLAYER' ? createHosted() : install()
 }
 async function createHosted() {
+  if (createdRoom.value) {
+    await retryCreatedRoom()
+    return
+  }
   const parsed = playerRoomCreationSchema.safeParse(roomSettings())
   if (!parsed.success) {
     errorKey.value = !server.value ? 'serverMissing' : 'roomSettingsInvalid'
@@ -64,7 +84,26 @@ async function createHosted() {
       method: 'POST',
       body: parsed.data,
     })
-    await navigateTo(`/rooms/${result.roomNumber}`)
+    await finishCreation(result.roomNumber, parsed.data.hostId)
+  } catch (failure) {
+    errorKey.value = playerErrorKey(failure)
+  } finally {
+    busy.value = false
+  }
+}
+async function finishCreation(roomNumber: number, characterId: string) {
+  createdRoom.value = { roomNumber, hostId: characterId }
+  await enterCreatedRoom(roomNumber, characterId)
+  await navigateTo(`/rooms/${roomNumber}`)
+}
+async function retryCreatedRoom() {
+  if (!createdRoom.value) {
+    return
+  }
+  busy.value = true
+  errorKey.value = ''
+  try {
+    await finishCreation(createdRoom.value.roomNumber, createdRoom.value.hostId)
   } catch (failure) {
     errorKey.value = playerErrorKey(failure)
   } finally {
@@ -96,11 +135,11 @@ async function readInstallation() {
   errorKey.value = ''
   try {
     const result = await $fetch('/api/player/rooms/installation')
+    installation.value = result
     if (result.roomNumber) {
-      await navigateTo(`/rooms/${result.roomNumber}`)
+      await finishCreation(result.roomNumber, result.hostId)
       return
     }
-    installation.value = result
   } catch (failure) {
     errorKey.value = playerErrorKey(failure)
   } finally {
@@ -108,7 +147,11 @@ async function readInstallation() {
   }
 }
 async function create() {
-  if (!voiceChannelId.value) {
+  if (createdRoom.value) {
+    await retryCreatedRoom()
+    return
+  }
+  if (!voiceChannelId.value || !installation.value) {
     errorKey.value = 'channelMissing'
     return
   }
@@ -119,7 +162,7 @@ async function create() {
       method: 'POST',
       body: { voiceChannelId: voiceChannelId.value },
     })
-    await navigateTo(`/rooms/${result.roomNumber}`)
+    await finishCreation(result.roomNumber, installation.value.hostId)
   } catch (failure) {
     errorKey.value = playerErrorKey(failure)
   } finally {
@@ -142,146 +185,162 @@ onMounted(() => {
       <h1>{{ t('createBroadcastRoom') }}</h1>
       <p class="muted">{{ t('createRoomHelp') }}</p>
     </div>
-    <div class="room-layout create-layout">
-      <section class="entry-panel">
-        <form v-if="!installation" class="entry-form" @submit.prevent="submit">
-          <div class="field">
-            <span id="audio-source-label" class="field-label">{{
-              t('audioSource')
-            }}</span>
-            <SelectButton
-              v-model="audioSource"
-              :options="audioSources"
-              option-label="label"
-              option-value="value"
-              :allow-empty="false"
-              :disabled="busy"
-              aria-labelledby="audio-source-label"
-            />
+    <section class="entry-panel create-panel">
+      <form v-if="!installation" class="entry-form" @submit.prevent="submit">
+        <fieldset
+          class="field source-fieldset"
+          :disabled="busy || Boolean(createdRoom)"
+        >
+          <legend class="field-label">{{ t('audioSource') }}</legend>
+          <div class="source-cards">
+            <label
+              v-for="option in audioSources"
+              :key="option.value"
+              :class="[
+                'source-card',
+                { 'source-card-selected': audioSource === option.value },
+              ]"
+            >
+              <input
+                v-model="audioSource"
+                type="radio"
+                name="audio-source"
+                :value="option.value"
+                class="source-card-input"
+                :aria-labelledby="`audio-source-title-${option.value}`"
+                :aria-describedby="`audio-source-desc-${option.value}`"
+              />
+              <span class="source-card-body">
+                <span
+                  :id="`audio-source-title-${option.value}`"
+                  class="source-card-title"
+                  >{{ option.label }}</span
+                >
+                <span
+                  :id="`audio-source-desc-${option.value}`"
+                  class="source-card-description muted"
+                  >{{ option.description }}</span
+                >
+              </span>
+            </label>
           </div>
-          <div class="field">
-            <label for="room-name">{{ t('roomName') }}</label>
-            <InputText
-              id="room-name"
-              v-model="name"
-              required
-              maxlength="64"
-              :disabled="busy"
-            />
-          </div>
-          <div class="field">
-            <label for="room-server">{{ t('serverRequired') }}</label>
-            <Select
-              input-id="room-server"
-              v-model="server"
-              :options="[...ASIA_SERVERS]"
-              :disabled="busy"
-              :placeholder="t('chooseServer')"
-            />
-          </div>
-          <div class="field">
-            <label for="host-id">{{ t('hostCharacter') }}</label>
-            <InputText
-              id="host-id"
-              v-model="hostId"
-              required
-              maxlength="32"
-              autocomplete="off"
-              :disabled="busy"
-              aria-describedby="host-id-help"
-            />
-            <small id="host-id-help" class="muted">{{
-              t(
-                audioSource === 'PLAYER'
-                  ? 'hostCharacterHelp'
-                  : 'hostCharacterDiscordHelp',
-              )
-            }}</small>
-          </div>
-          <div class="field">
-            <label for="allowed-ids">{{ t('allowedCharacters') }}</label>
-            <Textarea
-              id="allowed-ids"
-              v-model="allowed"
-              :disabled="busy"
-              rows="4"
-              aria-describedby="allowed-ids-help"
-            />
-            <small id="allowed-ids-help" class="muted">{{
-              t('allowedCharactersHelp')
-            }}</small>
-          </div>
-          <p v-if="!sourceAvailable" class="muted" role="status">
-            {{ t('creationUnavailable') }}
+        </fieldset>
+        <div class="field">
+          <label for="room-name">{{ t('roomName') }}</label>
+          <InputText
+            id="room-name"
+            v-model="name"
+            required
+            maxlength="64"
+            :disabled="busy || Boolean(createdRoom)"
+          />
+        </div>
+        <div class="field">
+          <label for="room-server">{{ t('serverRequired') }}</label>
+          <Select
+            input-id="room-server"
+            v-model="server"
+            :options="[...ASIA_SERVERS]"
+            :disabled="busy || Boolean(createdRoom)"
+            :placeholder="t('chooseServer')"
+          />
+        </div>
+        <div class="field">
+          <label for="host-id">{{ t('hostCharacter') }}</label>
+          <InputText
+            id="host-id"
+            v-model="hostId"
+            required
+            maxlength="32"
+            autocomplete="off"
+            :disabled="busy || Boolean(createdRoom)"
+            aria-describedby="host-id-help"
+          />
+          <small id="host-id-help" class="muted">{{
+            t(
+              audioSource === 'PLAYER'
+                ? 'hostCharacterHelp'
+                : 'hostCharacterDiscordHelp',
+            )
+          }}</small>
+        </div>
+        <div class="field">
+          <label for="allowed-ids">{{ t('allowedCharacters') }}</label>
+          <Textarea
+            id="allowed-ids"
+            v-model="allowed"
+            :disabled="busy || Boolean(createdRoom)"
+            rows="4"
+            aria-describedby="allowed-ids-help"
+          />
+          <small id="allowed-ids-help" class="muted">{{
+            t('allowedCharactersHelp')
+          }}</small>
+        </div>
+        <p class="muted form-note">{{ t('broadcastConsent') }}</p>
+        <p v-if="!sourceAvailable" class="muted" role="status">
+          {{ t('creationUnavailable') }}
+        </p>
+        <Button
+          type="submit"
+          :label="audioSource === 'PLAYER' ? t('createAndJoin') : t('installBot')"
+          :loading="busy"
+          :disabled="!sourceAvailable"
+        />
+      </form>
+      <form v-else class="entry-form" @submit.prevent="create">
+        <div class="installation-summary">
+          <h2>{{ installation.name }}</h2>
+          <p class="muted">
+            {{ installation.server }} ·
+            {{
+              installation.allowedIds.length
+                ? t('restrictedCount', { count: installation.allowedIds.length })
+                : t('allCharacters')
+            }}
           </p>
+        </div>
+        <div class="field">
+          <label for="voice-channel">{{ t('voiceChannel') }}</label>
+          <Select
+            input-id="voice-channel"
+            v-model="voiceChannelId"
+            :options="installation.channels"
+            option-label="name"
+            option-value="id"
+            :placeholder="t('chooseVoiceChannel')"
+            :disabled="busy || Boolean(createdRoom)"
+          />
+          <small v-if="!installation.channels.length" class="muted">{{
+            t('noVoiceChannels')
+          }}</small>
+        </div>
+        <p class="muted form-note">{{ t('broadcastConsent') }}</p>
+        <div class="form-actions">
           <Button
             type="submit"
-            :label="audioSource === 'PLAYER' ? t('createAndJoin') : t('installBot')"
+            :label="t('createAndJoin')"
             :loading="busy"
-            :disabled="!sourceAvailable"
+            :disabled="!voiceChannelId && !createdRoom"
           />
-        </form>
-        <form v-else class="entry-form" @submit.prevent="create">
-          <div class="installation-summary">
-            <h2>{{ installation.name }}</h2>
-            <p class="muted">
-              {{ installation.server }} ·
-              {{
-                installation.allowedIds.length
-                  ? t('restrictedCount', { count: installation.allowedIds.length })
-                  : t('allCharacters')
-              }}
-            </p>
-          </div>
-          <div class="field">
-            <label for="voice-channel">{{ t('voiceChannel') }}</label>
-            <Select
-              input-id="voice-channel"
-              v-model="voiceChannelId"
-              :options="installation.channels"
-              option-label="name"
-              option-value="id"
-              :placeholder="t('chooseVoiceChannel')"
-              :disabled="busy"
-            />
-            <small v-if="!installation.channels.length" class="muted">{{
-              t('noVoiceChannels')
-            }}</small>
-          </div>
-          <div class="form-actions">
-            <Button
-              type="submit"
-              :label="t('createAndJoin')"
-              :loading="busy"
-              :disabled="!voiceChannelId"
-            />
-            <Button
-              :label="t('refreshChannels')"
-              severity="secondary"
-              :disabled="busy"
-              @click="readInstallation"
-            />
-          </div>
-        </form>
-        <div v-if="error" class="session-feedback form-feedback" role="alert">
-          <p class="form-error">{{ error }}</p>
           <Button
-            v-if="route.query.installed && !installation"
-            :label="t('retryInstallation')"
+            :label="t('refreshChannels')"
             severity="secondary"
-            :loading="busy"
+            :disabled="busy"
             @click="readInstallation"
           />
         </div>
-      </section>
-      <aside class="room-detail creation-notes" aria-labelledby="creation-notes-title">
-        <h2 id="creation-notes-title">{{ t('creationInstructions') }}</h2>
-        <ul>
-          <li v-if="audioSource === 'PLAYER'">{{ t('playerCaptureNote') }}</li>
-          <li v-else>{{ t('installationPermissions') }}</li>
-          <li>{{ t('broadcastConsent') }}</li>
-        </ul>
-      </aside>
-    </div>
+      </form>
+      <div v-if="error" class="session-feedback form-feedback" role="alert">
+        <p class="form-error">{{ error }}</p>
+        <Button
+          v-if="route.query.installed && !installation"
+          :label="t('retryInstallation')"
+          severity="secondary"
+          :loading="busy"
+          @click="readInstallation"
+        />
+      </div>
+    </section>
   </main>
 </template>

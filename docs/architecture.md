@@ -20,6 +20,11 @@ room API parameters resolve a canonical positive number to the internal UUID.
 Sessions, source ownership, encryption contexts and management keep their UUIDs.
 Directory links and completed installations use only the public number.
 
+The creation page completes ordinary verified host admission before navigating
+to that number. It uses the host ID already entered, including the stored ID
+returned after Discord OAuth, and saves the listener in the existing per-tab
+store. Admission retries retain the created room and idempotent pending request.
+
 `/rooms/:roomNumber` and its nested `/verify` page share a parent listener controller.
 The browser restores its saved room credential before selecting the destination:
 valid sessions open the room, missing/ended sessions open verification, and
@@ -73,11 +78,21 @@ transport rejects frames above 2 KiB before buffering them, and JSON request
 bodies are capped (64 KiB unless a route sets its own limit). Refresh
 and reconnect restore the original generation; replaced sessions never re-enter
 automatically. No sample players, language choices or subtitles are generated.
-A player action can open a feature-detected Document PiP window. Vue Teleport
-shares the existing listener's reactive status and text size with that document;
-there is no extra network client, session or media element. Session replacement,
-leave, page navigation and listener-component disposal close the window. Current
-member subtitles arrive through the same authorized socket and shared view state.
+A player action can open a feature-detected Document PiP window. Because the
+Document PiP specification allows only one active PiP window at a time, that
+single window combines live subtitles and the room's tactical map with
+independent PrimeVue `ToggleSwitch` visibility controls. Vue Teleport shares the
+existing listener's reactive subtitle state, text size and single `useRoomMap`
+controller with that document while mirroring page and runtime-injected styles;
+there is no extra network client, map poller, session or media element. Inside
+the PiP document, Leaflet uses synchronous SVG rendering, disabled hidden-tab
+animations, pointer-event panning and container keyboard controls so map updates
+and interaction stay responsive while the main page is hidden. On the room page
+itself, the tactical map stays pinned beside the listener panel on desktop (and
+above the bounded, scrollable listener list on narrow viewports). Session
+replacement, leave, page navigation and listener-component disposal close the
+window. Current member subtitles arrive through the same authorized socket and
+shared view state.
 Without the optional private media worker, new sessions remain JOINING and entry
 returns 202. A configured worker can authorize the current listener after older
 socket and media closures are confirmed. The browser opens one receive-only peer
@@ -111,12 +126,12 @@ and restores encrypted history as a new version. Candidate connection changes
 must pass a probe before replacing saved settings. Database leases prevent
 duplicate tests across replicas and version checks reject late results.
 The audio-sample form holds the selected OpenAI configuration lease while a
-bounded authorized PCM WAV feeds original-caption recognition and direct-audio
-translation concurrently. Finite samples return their comparison after draining;
-player captions publish each fragment. The catalog's enabled source terms become
-recognition hints. Target expressions remain evaluation data because the realtime
-translator does not support custom prompts/glossaries. Independent source and
-translation streams are labeled accordingly; timestamps are not fabricated.
+bounded authorized PCM WAV feeds VAD-gated original-caption recognition and
+per-utterance streaming text translation. Finite samples return their comparison
+after draining; player captions publish each incremental fragment. Enabled catalog
+terms supply both recognition hints and target-language translation glossaries.
+Utterance-aligned translations preserve the source utterance identity; timestamps
+are not fabricated.
 The output-language editor stores provider references, terminology policy, order
 and a room default. Sample validation binds to the path and provider/catalog
 revisions; stale results cannot validate a replacement path. Last successful
@@ -127,7 +142,27 @@ private worker readiness. See [output languages](output-languages.md).
 0.25.1 receive-only admission. It rechecks persisted listener authorization,
 registers negotiations before creating peers, closes obsolete peers and persists
 the actual close acknowledgement. WebRTC peers run in worker threads; see
-[listener capacity](capacity.md). A PostgreSQL ownership session and durable
+[listener capacity](capacity.md). When `MEDIA_CONTROL_ADVERTISE_URL` or
+`BABEL_RUNTIME_POD_IP` is set, each worker replica records its private control
+URL and `fanout_only` capability on its `runtime_owner` row so multiple replicas
+can serve receive-only listeners concurrently. Exclusive source ownership
+(`voice_source_run` and PostgreSQL advisory locks) keeps one Discord receiver /
+host uplink, one Opus encoder, and one shared subtitle pipeline per room or
+guild; fan-out replicas subscribe to the source owner's authenticated
+`/relay/audio` stream only while they hold local listeners in that room.
+Setting `MEDIA_FANOUT_ONLY=true` starts an autoscalable burst replica that skips
+voice-source claims and subtitle pools (holding only one media DB pool plus its
+supervisor connection) and never contends for room ownership. The web app routes
+receive-only listener offers to dedicated `fanout_only` replicas first (balanced
+by open peer count, falling back to full base replicas when no burst replica is
+running), routes SDP answers/closes to the exact owning replica, routes host
+uplinks, source status, subtitles and subtitle history strictly to non-fan-out
+room source owners, and revokes open media connections across all holding
+replicas before confirming replacement. Authenticated `GET /metrics/scale`
+exposes live listener and source counts for KEDA burst scaling. Player WebSocket
+sweeps batch `pong` renewals into one atomic SQL update per second per web
+replica and tolerate up to two transient storage glitches before failing closed
+on the third consecutive error. A PostgreSQL ownership session and durable
 source receipt exclude duplicate bot/guild controllers. The source controller
 connects Discord with DAVE, maintains separate member decoders and bounded PCM
 queues, and publishes mixed original audio independently of subtitle work. An
@@ -139,6 +174,12 @@ writes a `source-failed` JSON line with the room and reason. Source
 retirement closes old browser peers before acknowledging shutdown. Separate
 member timelines feed shared provider jobs only while language demand exists.
 Version-checked private HTTP streams feed actual registered player sockets.
+`SubtitleService` also maintains a bounded, ephemeral five-minute in-memory
+translation cache per room and output language (populated strictly from
+authorized deliveries for subscribed languages, never persisted). Active
+listeners fetch it through `GET /api/player/sessions/:id/subtitle-history` via
+the worker's private `POST /subtitles/history` route so all web replicas share
+one room cache while Document PiP and live sockets remain live-only.
 See [original audio](original-audio.md) and
 [media admission](media-admission.md).
 Explicit [STUN/TURN configuration](media-network.md) issues separate temporary
@@ -206,14 +247,20 @@ stable administrator ID from the signed issuer and subject, saves the identity,
 and creates an HTTP-only session cookie. Player listener sessions use their own
 tables and are not Better Auth user accounts.
 
-`@babel/providers` implements `gpt-live-transcribe` with minimal delay and one
-`gpt-realtime-translate` continuous audio session per active target language.
-Audio fans out in parallel, without serial transcript-to-translation requests.
-Every target delta publishes immediately. Recognition and targets share one
-server-only encrypted key, fixed official destinations, bounded socket/audio
-queues and safe errors. Current listener/source/configuration checks run in one
-500 ms authorization snapshot before delivery and fence obsolete work. Main page and PiP
-consume the same incremental state. See [streaming processing](streaming-subtitles.md).
+`@babel/providers` implements one shared `gpt-live-transcribe` session per active
+speaker with local VAD silence gating (160 ms pre-roll, 500 ms hangover, 90 s idle
+speaker release) and `gpt-5.4-nano` streaming SSE text translation per subscribed
+target language. Coalesced recognition deltas stream incremental translated text,
+and identical completed transcripts finalize without duplicate translation calls.
+Any output whose language family matches the locally identified source uses the
+shared transcript directly without calling translation. Unknown or different
+source languages translate to the selected target with target-language game
+terminology glossaries; Chinese script choices also apply local OpenCC conversion.
+Recognition and translation share one server-only encrypted key, fixed official
+destinations, bounded socket/audio queues and safe errors. Current
+listener/source/configuration checks run in one 500 ms authorization snapshot
+before delivery and fence obsolete work. Main page and PiP consume the same
+incremental state. See [streaming processing](streaming-subtitles.md).
 See [provider configuration](providers-and-languages.md) for probe and sample limits.
 
 ## Next implementation gates

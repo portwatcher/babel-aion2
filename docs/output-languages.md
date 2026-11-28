@@ -5,6 +5,12 @@ validate a saved path with an authorized audio sample, then enable it when the
 private subtitle worker is ready. New installations have an empty public language
 list. No credentials or languages are seeded.
 
+The production catalog also includes validated English (`en`). It shares the
+saved OpenAI key and terminology with the existing Chinese, Japanese and Korean
+paths. Every selected language reuses transcription when it matches the detected
+source language; other or uncertain source languages retain translation. Regional
+variants share the language family, and Chinese scripts are normalized locally. Provisioning uses the normal validation and activation gates.
+
 ## Administrator workflow
 
 1. Save one **OpenAI API Key** in **OpenAI 字幕服务**. The same encrypted

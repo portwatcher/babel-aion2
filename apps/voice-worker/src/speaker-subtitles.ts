@@ -7,7 +7,17 @@ import {
   type SubtitleStreamEvent,
 } from '@babel/providers'
 import { PCM_FRAME_BYTES, PcmTimeline } from './pcm-timeline.ts'
-import { SpeechTurns } from './speech-turns.ts'
+import { SpeechTurns, voiced } from './speech-turns.ts'
+
+/** Release an idle speaker's recognition WebSocket after 90 s without speech. */
+export const IDLE_SPEAKER_MS = 90_000
+/** Tolerate brief container CPU/GC stalls without tearing down live recognition. */
+export const CLOCK_STALL_MS = 500
+/** Absorb ordinary Discord UDP bursts without retiring a live speaker stream. */
+const LIVE_QUEUE_MS = 400
+/** Retain opening speech during initial WebSocket handshake so cold-start
+ * and idle-wake phrases are never dropped before recognition becomes ready. */
+const CONNECT_BUFFER_MS = 1_500
 
 export interface RunningSubtitlePath extends LiveSubtitlePath {
   key: string
@@ -27,18 +37,27 @@ export interface SubtitleConsumer {
 /** One speaker and recognition configuration; all matching languages share its PCM. */
 export class SpeakerSubtitles {
   private readonly stream: ReturnType<typeof openSharedSubtitleStream>
-  private readonly timeline = new PcmTimeline()
+  private readonly timeline = new PcmTimeline(LIVE_QUEUE_MS)
+  private readonly preconnect = new PcmTimeline(CONNECT_BUFFER_MS)
   private readonly turns: SpeechTurns
   private readonly subscribers = new Map<
     string,
-    { path: RunningSubtitlePath; remove: () => void }
+    {
+      consumer: SubtitleConsumer
+      path: RunningSubtitlePath
+      remove: () => void
+      connecting: boolean
+    }
   >()
   private readonly timer: ReturnType<typeof setInterval>
   private readonly rotation: ReturnType<typeof setTimeout>
   private ready = false
   private closed = false
   private samples = 0
-  private lastTick = performance.now()
+  private receivedSamples = 0
+  private readonly startedAt = performance.now()
+  private lastVoiceAt = performance.now()
+  private nextFrameAt = performance.now() + 20
 
   constructor(
     private readonly roomId: string,
@@ -49,7 +68,10 @@ export class SpeakerSubtitles {
     readonly group: string,
     path: RunningSubtitlePath,
     private readonly allowed: () => boolean,
-    private readonly ended: (code: Exclude<ProviderTestCode, 'PASS'> | null) => void,
+    private readonly ended: (
+      code: Exclude<ProviderTestCode, 'PASS'> | null,
+      reason: string,
+    ) => void,
   ) {
     this.turns = new SpeechTurns(roomId)
     this.stream = openSharedSubtitleStream({
@@ -60,21 +82,45 @@ export class SpeakerSubtitles {
     this.timer = setInterval(() => this.tick(), 20)
     this.timer.unref()
     // Rotate before the provider session limit; the adapter also honors expires_at.
-    this.rotation = setTimeout(() => this.finish(null), 50 * 60_000)
+    this.rotation = setTimeout(() => this.finish(null, 'rotation'), 50 * 60_000)
     this.rotation.unref()
     void this.stream.ready
       .then(() => {
         if (!this.closed) {
           this.timeline.clear()
-          this.lastTick = performance.now()
+          const now = performance.now()
+          this.lastVoiceAt = now
+          this.nextFrameAt = now + 20
           this.ready = true
+          // Transition listeners out of CONNECTING once handshake completes so
+          // brief non-speech triggers never stick on "Connecting subtitles...".
+          for (const subscriber of this.subscribers.values()) {
+            if (subscriber.connecting) {
+              subscriber.connecting = false
+              this.state(subscriber.consumer, 'WAITING')
+            }
+          }
+          // Flush opening speech captured during handshake so the speaker's
+          // first phrase on cold start or idle wake is not discarded.
+          let buffered = this.preconnect.take(now)
+          while (buffered && !this.closed) {
+            this.writePcm(buffered)
+            buffered = this.preconnect.take(now)
+          }
+          this.preconnect.clear()
         }
       })
       .catch((error: unknown) =>
-        this.finish(error instanceof ProviderFailure ? error.code : 'UNAVAILABLE'),
+        this.finish(
+          error instanceof ProviderFailure ? error.code : 'UNAVAILABLE',
+          'provider-session',
+        ),
       )
     void this.stream.finished.catch((error: unknown) => {
-      this.finish(error instanceof ProviderFailure ? error.code : 'UNAVAILABLE')
+      this.finish(
+        error instanceof ProviderFailure ? error.code : 'UNAVAILABLE',
+        'provider-session',
+      )
     })
   }
 
@@ -111,7 +157,8 @@ export class SpeakerSubtitles {
         continue
       }
       previous?.remove()
-      this.state(consumer, this.ready ? 'WAITING' : 'CONNECTING')
+      const connecting = !this.ready
+      this.state(consumer, connecting ? 'CONNECTING' : 'WAITING')
       const current = () =>
         !this.closed &&
         this.allowed() &&
@@ -126,7 +173,7 @@ export class SpeakerSubtitles {
           },
           (event) => this.deliver(consumer, path, event, current),
         )
-        this.subscribers.set(consumer.id, { path, remove })
+        this.subscribers.set(consumer.id, { consumer, path, remove, connecting })
       } catch (error) {
         this.subscribers.delete(consumer.id)
         this.state(
@@ -206,10 +253,19 @@ export class SpeakerSubtitles {
     if (this.closed || pcm.length % 4) {
       return
     }
+    const now = performance.now()
+    if (voiced(pcm)) {
+      this.lastVoiceAt = now
+    }
     this.turns.hear(pcm)
-    const overflow = this.timeline.receive(pcm, performance.now())
-    if (overflow && this.ready) {
-      this.finish('UNAVAILABLE')
+    this.receivedSamples += pcm.length / 4
+    if (!this.ready) {
+      this.preconnect.receive(pcm, now)
+      return
+    }
+    const overflow = this.timeline.receive(pcm, now)
+    if (overflow) {
+      this.finish('UNAVAILABLE', 'audio-backlog')
     }
   }
 
@@ -218,13 +274,34 @@ export class SpeakerSubtitles {
       return
     }
     const now = performance.now()
-    if (!this.allowed() || now - this.lastTick > 100) {
-      // A new stream gets a fresh generation; dropped time is never spliced into speech.
-      this.finish('UNAVAILABLE')
+    if (!this.allowed()) {
+      this.finish('UNAVAILABLE', 'authorization')
       return
     }
-    this.lastTick = now
+    if (now - this.nextFrameAt > CLOCK_STALL_MS) {
+      // A new stream gets a fresh generation; dropped time is never spliced into speech.
+      this.finish('UNAVAILABLE', 'clock-stall')
+      return
+    }
+    if (now - this.lastVoiceAt >= IDLE_SPEAKER_MS) {
+      this.finish(null, 'idle')
+      return
+    }
+    // Hardware continues at 48 kHz even when interval callbacks run late.
+    // Drain every due frame so ordinary timer drift cannot overflow the queue
+    // and repeatedly reset recognition for this speaker.
+    while (now >= this.nextFrameAt && !this.closed) {
+      this.nextFrameAt += 20
+      this.writeFrame(now)
+    }
+  }
+
+  private writeFrame(now: number) {
     const frame = this.timeline.take(now) ?? Buffer.alloc(PCM_FRAME_BYTES)
+    this.writePcm(frame)
+  }
+
+  private writePcm(frame: Buffer) {
     const mono = Buffer.alloc(960 * 2)
     for (let i = 0; i < 960; i += 1) {
       mono.writeInt16LE(
@@ -236,22 +313,42 @@ export class SpeakerSubtitles {
       this.stream.write(mono, this.samples)
       this.samples += 960
     } catch (error) {
-      this.finish(error instanceof ProviderFailure ? error.code : 'UNAVAILABLE')
+      this.finish(
+        error instanceof ProviderFailure ? error.code : 'UNAVAILABLE',
+        'provider-write',
+      )
     }
   }
 
-  private finish(code: Exclude<ProviderTestCode, 'PASS'> | null) {
+  private finish(code: Exclude<ProviderTestCode, 'PASS'> | null, reason: string) {
     if (this.closed) {
       return
     }
+    console.warn(
+      JSON.stringify({
+        component: 'speaker-subtitles',
+        event: 'stream-ended',
+        roomId: this.roomId,
+        sourceGeneration: this.sourceGeneration,
+        streamGeneration: this.streamGeneration,
+        reason,
+        code,
+        ready: this.ready,
+        elapsedMs: Math.round(performance.now() - this.startedAt),
+        receivedAudioMs: Math.round(this.receivedSamples / 48),
+        sentAudioMs: Math.round(this.stream.sentAudioMs()),
+      }),
+    )
     this.close()
-    this.ended(code)
+    this.ended(code, reason)
   }
+
   close() {
     this.closed = true
     clearInterval(this.timer)
     clearTimeout(this.rotation)
     this.timeline.clear()
+    this.preconnect.clear()
     this.turns.close()
     for (const subscriber of this.subscribers.values()) {
       subscriber.remove()

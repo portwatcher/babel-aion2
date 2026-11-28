@@ -1,0 +1,204 @@
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+import { setTimeout } from 'node:timers/promises'
+import { openSharedSubtitleStream } from '../src/index.ts'
+import { createProviderFixture } from '../../../scripts/fixtures/provider-server.mjs'
+import { routeProviderNetwork } from '../../../scripts/fixtures/provider-network.mjs'
+
+const settings = { type: 'openai', timeoutMs: 3000 }
+const subtitles = (events) => events.filter((event) => event.type === 'subtitle')
+async function until(predicate) {
+  const deadline = Date.now() + 2000
+  while (!predicate() && Date.now() < deadline) {
+    await setTimeout(5)
+  }
+  assert.ok(predicate(), 'expected subtitle delivery')
+}
+async function fixture(t, outputLanguage = 'en') {
+  const network = await createProviderFixture()
+  const restore = routeProviderNetwork(network.origin)
+  const sourceKey = network.credential()
+  const targetKey = network.credential()
+  const stream = openSharedSubtitleStream({
+    recognition: { settings, credential: sourceKey },
+    sampleRate: 48000,
+    terminology: null,
+  })
+  t.after(async () => {
+    stream.close()
+    restore()
+    await network.close()
+  })
+  const path = { settings, credential: targetKey, outputLanguage, version: 1 }
+  const events = []
+  stream.subscribe(path, (event) => events.push(event))
+  await stream.prepare()
+  const source = network.observations.find((value) => value.protocol === 'recognition')
+  return {
+    events,
+    stream,
+    path,
+    network,
+    sourceKey,
+    targetKey,
+    source(item, text, final = false) {
+      network.emit(
+        sourceKey,
+        {
+          type: `conversation.item.input_audio_transcription.${final ? 'completed' : 'delta'}`,
+          item_id: item,
+          [final ? 'transcript' : 'delta']: text,
+        },
+        source,
+      )
+    },
+    failTarget() {
+      network.setMode(targetKey, 'quota')
+    },
+    translationCalls() {
+      return network.observations.filter((value) => value.protocol === 'translation')
+        .length
+    },
+    latest() {
+      return subtitles(events).at(-1)?.value
+    },
+  }
+}
+
+test('English output uses incremental original captions, corrections and finality with zero translation requests', async (t) => {
+  const f = await fixture(t, 'en-US')
+  f.source('first', 'Wait 3 seconds.')
+  await until(() => f.latest()?.text === 'Wait 3 seconds.')
+  assert.equal(f.latest().translatedText, 'Wait 3 seconds.')
+  assert.equal(f.latest().language, 'en')
+  assert.equal(f.latest().translationIsFinal, false)
+  assert.equal(f.latest().sourceAlignment, 'aligned')
+  const first = f.latest()
+  const late = []
+  f.stream.subscribe(f.path, (event) => late.push(event))
+  f.source('first', ' Then move left.')
+  await until(() => f.latest()?.translatedText.endsWith('Then move left.'))
+  assert.equal(f.latest().utteranceId, first.utteranceId)
+  assert.equal(f.latest().sequence, first.sequence)
+  assert.equal(subtitles(late).at(-1).value.translatedText, ' Then move left.')
+  f.source('first', 'Wait 2 seconds. Then move left.', true)
+  await until(() => f.latest()?.translationIsFinal)
+  assert.equal(f.latest().translatedText, 'Wait 2 seconds. Then move left.')
+  f.source('second', 'Do not attack.')
+  await until(() => f.latest()?.text === 'Do not attack.')
+  assert.equal(f.latest().translatedText, 'Do not attack.')
+  assert.notEqual(f.latest().utteranceId, first.utteranceId)
+  assert.ok(f.latest().sequence > first.sequence)
+  f.source('second', '', true)
+  await until(() => f.latest()?.text === '')
+  assert.equal(f.latest().translatedText, '', 'retracted source clears direct output')
+  assert.equal(
+    f.translationCalls(),
+    0,
+    'matching source and output language spends zero translation calls',
+  )
+})
+
+test('non-English and uncertain source text stream gpt-5.4-nano English translation and can follow direct English', async (t) => {
+  const f = await fixture(t)
+  f.source('english', 'Wait 3 seconds.')
+  await until(() => f.latest()?.text === 'Wait 3 seconds.')
+  assert.equal(f.translationCalls(), 0)
+  for (const [item, text] of [
+    ['chinese', '不要攻击，向左撤退。'],
+    ['japanese', '攻撃しないで、左に撤退してください。'],
+    ['korean', '공격하지 말고 왼쪽으로 후퇴하세요.'],
+    ['french', 'Ne pas attaquer, reculez vers la gauche.'],
+    ['spanish', 'No ataques, retírate hacia la izquierda.'],
+    ['uncertain', '123'],
+  ]) {
+    f.source(item, text, true)
+    await until(() => f.latest()?.translatedText === `fixture:en:${text}`)
+    assert.notEqual(f.latest().translatedText, text)
+    assert.equal(f.latest().sourceAlignment, 'aligned')
+    assert.equal(f.latest().translationIsFinal, true)
+  }
+})
+
+test('a failed translation credential cannot prevent direct English captions', async (t) => {
+  const f = await fixture(t)
+  f.failTarget()
+  f.source('chinese', '不要攻击，向左撤退。', true)
+  await until(() => f.events.some((event) => event.type === 'failure'))
+  const count = f.events.length
+  f.source('english', 'Wait 2 seconds.', true)
+  await until(() => f.latest()?.translationIsFinal)
+  assert.equal(f.latest().translatedText, 'Wait 2 seconds.')
+  assert.equal(f.latest().failure, null)
+  assert.equal(
+    f.events.slice(count).some((event) => event.type === 'failure'),
+    false,
+  )
+})
+
+for (const [output, language, text, expected] of [
+  ['es-MX', 'es', 'No ataques, retírate hacia la izquierda.'],
+  ['pt-BR', 'pt', 'Não ataque, recue para a esquerda.'],
+  ['fr-CA', 'fr', 'Ne pas attaquer, reculez vers la gauche.'],
+  ['ja-JP', 'ja', '攻撃しないで、左に撤退してください。'],
+  ['ru', 'ru', 'Не атакуйте, отступайте налево.'],
+  [
+    'zh-Hans',
+    'zh',
+    '不要進攻，等待三秒，然後向左撤退。',
+    '不要进攻，等待三秒，然后向左撤退。',
+  ],
+  [
+    'zh-Hant',
+    'zh',
+    '不要进攻，等待三秒，然后向左撤退。',
+    '不要進攻，等待三秒，然後向左撤退。',
+  ],
+  ['de-DE', 'de', 'Nicht angreifen, ziehen Sie sich nach links zurück.'],
+  ['ko-KR', 'ko', '공격하지 말고 왼쪽으로 후퇴하세요.'],
+  ['hi-IN', 'hi', 'हमला मत करो, तीन सेकंड रुको और फिर बाईं ओर पीछे हटो।'],
+  ['id-ID', 'id', 'Jangan menyerang, tunggu tiga detik lalu mundur ke kiri.'],
+  ['vi-VN', 'vi', 'Đừng tấn công, đợi ba giây rồi rút lui sang trái.'],
+  ['it-IT', 'it', 'Non attaccare, aspetta tre secondi e poi ritirati a sinistra.'],
+]) {
+  test(`${output} uses the matching source transcript, switches languages and survives target failure`, async (t) => {
+    const f = await fixture(t, output)
+    f.source('same', text)
+    await until(() => f.latest()?.text === text)
+    assert.equal(f.latest().translatedText, expected ?? text)
+    assert.equal(f.latest().language, language)
+    assert.equal(f.latest().sourceAlignment, 'aligned')
+    assert.equal(f.translationCalls(), 0)
+    const same = f.latest()
+
+    f.source('different', 'Wait 3 seconds.', true)
+    await until(
+      () => f.latest()?.translatedText === `fixture:${language}:Wait 3 seconds.`,
+    )
+    assert.equal(f.latest().sourceAlignment, 'aligned')
+    assert.ok(f.latest().sequence > same.sequence)
+
+    f.failTarget()
+    f.source('different-failed', 'Hold position.', true)
+    await until(() => f.events.some((event) => event.type === 'failure'))
+    const count = f.events.length
+    f.source('same-again', text, true)
+    await until(() => f.latest()?.translationIsFinal && f.latest()?.text === text)
+    assert.equal(f.latest().translatedText, expected ?? text)
+    assert.equal(f.latest().failure, null)
+    assert.equal(
+      f.events.slice(count).some((event) => event.type === 'failure'),
+      false,
+    )
+  })
+}
+
+test('Malay text is not relabeled as Indonesian', async (t) => {
+  const f = await fixture(t, 'id')
+  const text =
+    'Semua manusia dilahirkan bebas dan sama rata dari segi kemuliaan dan hak-hak.'
+  f.source('malay', text, true)
+  await until(() => f.latest()?.translatedText === `fixture:id:${text}`)
+  assert.equal(f.latest().language, 'ms')
+  assert.equal(f.translationCalls(), 1)
+})

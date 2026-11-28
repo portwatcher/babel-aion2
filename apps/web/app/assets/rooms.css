@@ -80,17 +80,127 @@ a.p-button {
   display: grid;
   gap: 4px;
 }
-.creation-notes ul {
+.entry-panel.create-panel {
+  max-width: 32rem;
+}
+.source-fieldset {
+  border: 0;
   margin: 0;
-  padding-inline-start: 1.25rem;
+  padding: 0;
+  min-width: 0;
+}
+.source-fieldset > legend {
+  padding: 0;
+  margin-bottom: 8px;
+}
+.source-cards {
   display: grid;
-  gap: 8px;
-  color: var(--babel-muted);
+  gap: 12px;
+}
+.source-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--babel-background);
+  border: 1px solid var(--babel-border);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.source-card-selected {
+  background:
+    linear-gradient(180deg, rgb(214 173 85 / 0.1), rgb(214 173 85 / 0.04)),
+    var(--babel-background);
+  border-color: var(--babel-gold);
+}
+@media (hover: hover) {
+  .source-card:not(:has(:disabled)):hover {
+    border-color: var(--babel-gold-line);
+  }
+  .source-card-selected:not(:has(:disabled)):hover {
+    border-color: var(--babel-gold);
+  }
+}
+.source-card:has(.source-card-input:focus-visible) {
+  outline: 2px solid var(--babel-aether);
+  outline-offset: 2px;
+}
+.source-card-input {
+  flex-shrink: 0;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0.0625rem 0 0;
+  accent-color: var(--babel-gold);
+  cursor: inherit;
+}
+.source-card-input:focus-visible {
+  outline: none;
+}
+@media (forced-colors: active) {
+  .source-card-selected {
+    border-color: Highlight;
+  }
+  .source-card-input:focus-visible {
+    outline: auto;
+  }
+}
+.source-fieldset:disabled .source-card {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.source-card-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.source-card-title {
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--babel-text);
+  overflow-wrap: anywhere;
+}
+.source-card-selected .source-card-title {
+  color: var(--babel-gold-bright);
+}
+.source-card-description,
+.form-note {
+  font-size: 0.875rem;
   line-height: 1.5;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+.room-workspace {
+  display: grid;
+  grid-template-columns: minmax(22rem, 1fr) minmax(0, 1.35fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    'listener map'
+    'players map';
+  gap: clamp(20px, 3vw, 32px);
+  align-items: start;
+}
+.room-listener {
+  grid-area: listener;
+}
+.room-players {
+  grid-area: players;
+}
+.room-map {
+  grid-area: map;
+  position: sticky;
+  top: 16px;
 }
 .tactical-section {
-  margin-top: clamp(32px, 6vw, 56px);
   gap: 16px;
+  min-width: 0;
+  container-type: inline-size;
+}
+.map-heading-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-width: 0;
 }
 .map-modes {
   display: flex;
@@ -98,8 +208,8 @@ a.p-button {
 }
 .tactical-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 15rem;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
   align-items: start;
 }
 .map-frame {
@@ -108,8 +218,8 @@ a.p-button {
 }
 .map-canvas {
   width: 100%;
-  height: min(70svh, 680px);
-  min-height: 380px;
+  height: clamp(320px, 52svh, 580px);
+  min-height: 320px;
   border: 1px solid var(--babel-gold-line);
   border-radius: 2px;
   background: var(--babel-void);
@@ -161,11 +271,20 @@ a.p-button {
   inset-inline-start: 12px;
   z-index: 500;
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   max-width: calc(100% - 24px);
 }
 .map-zoom .p-button {
   min-height: 44px;
+}
+.map-corner-controls {
+  position: absolute;
+  bottom: 12px;
+  inset-inline-end: 12px;
+  z-index: 500;
+  display: flex;
+  gap: 4px;
 }
 .map-legend {
   min-width: 0;
@@ -186,7 +305,7 @@ a.p-button {
   list-style: none;
   padding: 0;
   margin: 0;
-  max-height: 540px;
+  max-height: 11rem;
   overflow-y: auto;
 }
 .map-stroke-list li {
@@ -253,12 +372,25 @@ a.p-button {
   padding: 6px 12px;
   min-height: 44px;
 }
-@media (max-width: 900px) {
+@container (min-width: 52rem) {
   .tactical-layout {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 14rem;
   }
   .map-stroke-list {
-    max-height: 240px;
+    max-height: 540px;
+  }
+}
+@media (max-width: 63.99rem) {
+  .room-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    grid-template-areas:
+      'listener'
+      'map'
+      'players';
+  }
+  .room-map {
+    position: static;
   }
 }
 @media (max-width: 40rem) {
@@ -273,6 +405,89 @@ a.p-button {
     min-height: 320px;
   }
 }
+.map-is-foreign .map-canvas {
+  cursor: grab;
+  touch-action: none;
+}
+.map-is-panning .map-canvas {
+  cursor: grabbing;
+}
 .map-is-erasing .map-canvas {
   cursor: cell;
+}
+.subtitle-history {
+  display: grid;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--babel-border);
+  min-width: 0;
+}
+.subtitle-history-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.subtitle-history-meta {
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+.subtitle-history-empty,
+.subtitle-history-feedback {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+.subtitle-history-scroll {
+  max-height: 20rem;
+  overflow-y: auto;
+  padding: 4px 16px;
+  border: 1px solid var(--babel-border);
+  border-radius: 2px;
+  background: var(--babel-void);
+}
+.subtitle-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.subtitle-history-item {
+  display: grid;
+  gap: 4px;
+  padding-block: 10px;
+  border-bottom: 1px solid var(--babel-border);
+  min-width: 0;
+}
+.subtitle-history-item:last-child {
+  border-bottom: 0;
+}
+.subtitle-history-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 0.875rem;
+}
+.subtitle-history-speaker {
+  color: var(--babel-gold-bright);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.subtitle-history-time {
+  font-variant-numeric: tabular-nums;
+}
+.subtitle-history-live {
+  color: var(--babel-gold);
+}
+.subtitle-history-translated {
+  font-size: 1rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  max-width: none;
+}
+.subtitle-history-original {
+  color: var(--babel-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  max-width: none;
 }

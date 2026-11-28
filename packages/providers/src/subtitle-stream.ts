@@ -9,34 +9,36 @@ import {
 } from '@babel/contracts'
 import { ProviderFailure } from './errors.ts'
 import { openRecognition } from './openai-recognition.ts'
-import { openTranslation, translationLanguage } from './openai-translation.ts'
+import { translationLanguage } from './openai-translation.ts'
 import { createPcm24k } from './resample.ts'
 import { subtitleText } from './subtitle-text.ts'
-import { recognitionTerminology } from './terminology.ts'
+import { recognitionTerminology, translationTerminology } from './terminology.ts'
+import { createTranslationLane } from './translation-lane.ts'
+import { sourceLanguage } from './source-language.ts'
 import type { TranslationPath, SubtitleUpdate } from './subtitle-work.ts'
 
 export type SubtitleStreamEvent =
   | { type: 'subtitle'; value: SubtitleUpdate }
   | { type: 'reset'; outputLanguage: string; configurationVersion: number }
   | { type: 'failure'; code: Exclude<ProviderTestCode, 'PASS'> }
+
 interface Subscriber {
   after: number
   sourceAfter: number
-  window: string
-  translationOffset: number
+  sourceWindow: string | undefined
+  sourceOffset: number
   receive: (event: SubtitleStreamEvent) => void
 }
+
 interface Output {
   path: TranslationPath
-  stream: ReturnType<typeof openTranslation>
   subscribers: Set<Subscriber>
   value: SubtitleUpdate
-  ready: boolean
-  failed: boolean
-  pending: string[]
-  attempt: number
-  retryAt: number | null
+  displayWindow: string
+  displaySequence: number
+  lane: ReturnType<typeof createTranslationLane>
 }
+
 function checked(path: TranslationPath) {
   translationLanguage(path.outputLanguage)
   if (
@@ -50,14 +52,15 @@ function checked(path: TranslationPath) {
   return path
 }
 
-/** One original-text stream and one direct-audio translation per target language.
- * No translation waits for recognition, a complete utterance, or another target. */
+/** One shared VAD-gated recognition stream and lightweight streaming text
+ * translation per subscribed target language. */
 export function openSharedSubtitleStream(input: {
   recognition: { settings: OpenAISettings; credential: string }
   sampleRate: 16_000 | 48_000
   terminology: TerminologySnapshot | null
   signal?: AbortSignal
 }) {
+  const recognitionContext = recognitionTerminology(input.terminology?.terms ?? [])
   const outputs = new Map<string, Output>()
   const completed = Promise.withResolvers<{
     processedAudioMs: number
@@ -75,141 +78,169 @@ export function openSharedSubtitleStream(input: {
   let recognitionReady = false
   let sourcePending: Array<ReturnType<typeof convert>> = []
   const created = Date.now()
+
   function releaseUnused(output: Output) {
     if (output.subscribers.size || outputs.get(output.path.outputLanguage) !== output) {
       return
     }
-    // Fence late deltas and handshake completion before closing the socket.
     outputs.delete(output.path.outputLanguage)
-    output.pending = []
-    output.retryAt = null
-    output.stream.close()
+    output.lane.close()
   }
+
+  function usesTranscript(output: Output) {
+    return source?.language === translationLanguage(output.path.outputLanguage)
+  }
+
   function deliver(output: Output, event: SubtitleStreamEvent) {
     if (closed || outputs.get(output.path.outputLanguage) !== output) {
       return
     }
+    const direct = usesTranscript(output)
     for (const subscriber of output.subscribers) {
-      if (events > subscriber.after) {
-        try {
-          if (event.type === 'subtitle') {
-            const value = event.value
-            subscriber.receive({
-              type: 'subtitle',
-              value: {
-                ...value,
-                text: sourceEvents > subscriber.sourceAfter ? value.text : '',
-                translatedText:
-                  value.utteranceId === subscriber.window &&
-                  subscriber.translationOffset > 0
-                    ? subtitleText(
-                        output.path.outputLanguage,
-                        output.value.translatedText.slice(subscriber.translationOffset),
-                      )
-                    : value.translatedText,
-              },
-            })
-          } else {
-            subscriber.receive(event)
+      if (events <= subscriber.after) {
+        continue
+      }
+      try {
+        if (event.type === 'subtitle') {
+          const value = event.value
+          if (
+            !direct &&
+            value.utteranceId === subscriber.sourceWindow &&
+            subscriber.sourceOffset > 0
+          ) {
+            // Never leak pre-subscription speech through a re-translated utterance.
+            continue
           }
-        } catch {
-          output.subscribers.delete(subscriber)
-          releaseUnused(output)
+          const sourceText =
+            sourceEvents > subscriber.sourceAfter
+              ? value.utteranceId === subscriber.sourceWindow
+                ? value.text.slice(subscriber.sourceOffset)
+                : value.text
+              : ''
+          subscriber.receive({
+            type: 'subtitle',
+            value: {
+              ...value,
+              text: sourceText,
+              translatedText: direct
+                ? sourceText === value.text
+                  ? value.translatedText
+                  : subtitleText(output.path.outputLanguage, sourceText)
+                : value.translatedText,
+            },
+          })
+        } else {
+          subscriber.receive(event)
         }
+      } catch {
+        output.subscribers.delete(subscriber)
+        releaseUnused(output)
       }
     }
   }
+
   function publish(output: Output) {
     events += 1
+    const direct = usesTranscript(output) ? source : undefined
+    const utteranceId = direct?.utteranceId ?? output.value.utteranceId
+    if (output.displayWindow !== utteranceId) {
+      output.displayWindow = utteranceId
+      output.displaySequence += 1
+    }
     deliver(output, {
       type: 'subtitle',
       value: {
         ...output.value,
-        translatedText: subtitleText(
-          output.path.outputLanguage,
-          output.value.translatedText,
-        ),
+        utteranceId,
+        sequence: output.displaySequence,
+        sourceAlignment: 'aligned',
+        ...(direct
+          ? {
+              translatedText: subtitleText(output.path.outputLanguage, direct.text),
+              translationRevision: direct.revision,
+              translationIsFinal: direct.isFinal,
+              translationTermCount: 0,
+              failure: null,
+            }
+          : {
+              translatedText: subtitleText(
+                output.path.outputLanguage,
+                output.value.translatedText,
+              ),
+            }),
       },
     })
   }
-  function laneFailure(output: Output, error: unknown) {
-    if (closed || output.failed || outputs.get(output.path.outputLanguage) !== output) {
-      return
-    }
-    output.failed = true
-    output.stream.close()
-    output.value.failure = error instanceof ProviderFailure ? error.code : 'UNAVAILABLE'
-    output.pending = []
-    if (
-      !ending &&
-      ['TIMEOUT', 'UNAVAILABLE', 'RATE_LIMITED'].includes(output.value.failure)
-    ) {
-      output.retryAt = Date.now() + Math.min(5000, 250 * 2 ** output.attempt)
-    }
-    events += 1
-    deliver(output, { type: 'failure', code: output.value.failure })
-  }
+
   function makeOutput(
     path: TranslationPath,
     subscribers = new Set<Subscriber>(),
   ): Output {
+    const glossary = translationTerminology(
+      input.terminology?.terms ?? [],
+      path.outputLanguage,
+    )
     let output: Output
-    const stream = openTranslation({
-      ...path,
+    const lane = createTranslationLane({
+      path,
+      glossary,
       signal: input.signal,
-      delta(text) {
-        if (
-          closed ||
-          output.failed ||
-          !text ||
-          outputs.get(output.path.outputLanguage) !== output
-        ) {
-          return
+      isActive: () =>
+        !closed &&
+        Boolean(output.subscribers.size) &&
+        outputs.get(path.outputLanguage) === output,
+      isDirect: () => usesTranscript(output),
+      isEnding: () => ending,
+      currentUtteranceId: () => output.value.utteranceId,
+      onProgress(progress) {
+        if (progress.text) {
+          output.value.translatedText = progress.text
         }
-        // These APIs do not provide cross-session utterance alignment. Keep a
-        // bounded display window, label source text independently, and never
-        // manufacture matching source timestamps or finality for translated text.
-        const fragment =
-          text.length > 2048 ? text.slice(-2048).replace(/^[\uDC00-\uDFFF]/u, '') : text
-        if (fragment !== text) {
+        if (progress.discontinuity) {
           output.value.discontinuity = true
         }
-        if (
-          output.value.translatedText.length + fragment.length > 2048 ||
-          (Boolean(fragment.trim()) &&
-            /[.!?。！？]\s*$/u.test(output.value.translatedText))
-        ) {
-          output.value = {
-            ...output.value,
-            utteranceId: randomUUID(),
-            sequence: output.value.sequence + 1,
-            translatedText: '',
-            translationRevision: 0,
-          }
-        }
-        output.value.translatedText += fragment
+        output.value.translationIsFinal = progress.isFinal
+        output.value.translationTermCount = progress.termCount
+        output.value.failure = null
         output.value.translationRevision += 1
         publish(output)
+      },
+      onFailure(code) {
+        output.value.failure = code
+        output.value.translatedText = ''
+        output.value.translationIsFinal = false
+        output.value.translationRevision += 1
+        publish(output)
+        events += 1
+        deliver(output, { type: 'failure', code })
+      },
+      onReset() {
+        output.value.failure = null
+        output.value.discontinuity = true
+        output.value.sequence += 1
+        events += 1
+        deliver(output, {
+          type: 'reset',
+          outputLanguage: path.outputLanguage,
+          configurationVersion: path.version,
+        })
       },
     })
     output = {
       path,
       subscribers,
-      ready: false,
-      failed: false,
-      stream,
-      pending: [],
-      attempt: 0,
-      retryAt: null,
+      displayWindow: '',
+      displaySequence: 0,
+      lane,
       value: {
-        utteranceId: randomUUID(),
-        revision: 1,
+        utteranceId: source?.utteranceId ?? randomUUID(),
+        revision: source?.revision ?? 1,
         text: source?.text ?? '',
-        language: 'und',
+        language: source?.language ?? 'und',
         isFinal: source?.isFinal ?? false,
         audioStartMs: null,
         audioEndMs: null,
-        sourceAlignment: 'independent',
+        sourceAlignment: 'aligned',
         translatedText: '',
         translationRevision: 0,
         translationIsFinal: false,
@@ -221,28 +252,9 @@ export function openSharedSubtitleStream(input: {
         discontinuity: false,
       },
     }
-    void output.stream.ready
-      .then(() => {
-        if (outputs.get(path.outputLanguage) !== output || output.failed || closed) {
-          return
-        }
-        output.ready = true
-        for (const audio of output.pending) {
-          output.stream.append(audio)
-        }
-        output.pending = []
-      })
-      .catch((error: unknown) => laneFailure(output, error))
-    void output.stream.finished
-      .then(() => {
-        if (ending && !closed) {
-          output.value.translationIsFinal = true
-          publish(output)
-        }
-      })
-      .catch((error: unknown) => laneFailure(output, error))
     return output
   }
+
   function cleanup() {
     closed = true
     clearInterval(sweep)
@@ -250,10 +262,11 @@ export function openSharedSubtitleStream(input: {
     recognition.close()
     sourcePending = []
     for (const output of outputs.values()) {
-      output.stream.close()
+      output.lane.close()
     }
     outputs.clear()
   }
+
   function fail(error: ProviderFailure) {
     if (closed) {
       return
@@ -266,27 +279,76 @@ export function openSharedSubtitleStream(input: {
     cleanup()
     completed.reject(error)
   }
+
   function abort() {
     fail(new ProviderFailure('TIMEOUT'))
   }
+
   const recognition = openRecognition({
     ...input.recognition,
     signal: input.signal,
-    context: recognitionTerminology(input.terminology?.terms ?? []),
+    context: recognitionContext,
     onTranscript(value) {
       if (closed) {
         return
       }
-      source = value
+      const language =
+        !value.text && source?.utteranceId === value.utteranceId
+          ? source.language
+          : sourceLanguage(value.text)
+      const previous = source
+      source = { ...value, language }
       sourceEvents += 1
       for (const output of outputs.values()) {
+        const target = translationLanguage(output.path.outputLanguage)
+        const utteranceChanged = output.value.utteranceId !== value.utteranceId
+        if (
+          utteranceChanged ||
+          (previous?.language === target && language !== target)
+        ) {
+          output.lane.resetUtterance(false)
+          output.value.utteranceId = value.utteranceId
+          output.value.translatedText = ''
+          output.value.translationRevision = 0
+          output.value.translationIsFinal = false
+          output.value.translationTermCount = 0
+        }
         output.value.text = value.text
+        output.value.language = language
         output.value.isFinal = value.isFinal
-        output.value.revision += 1
+        output.value.revision = value.revision
+        if (usesTranscript(output)) {
+          output.lane.resetUtterance(false)
+          publish(output)
+          continue
+        }
+        if (!value.text.trim()) {
+          output.lane.resetUtterance(true)
+          output.value.translatedText = ''
+          output.value.translationRevision += 1
+          output.value.translationIsFinal = value.isFinal
+          output.value.translationTermCount = 0
+          publish(output)
+          continue
+        }
         publish(output)
+        const promotedFinal = output.lane.schedule(
+          {
+            utteranceId: value.utteranceId,
+            text: value.text,
+            isFinal: value.isFinal,
+          },
+          output.value.translationIsFinal,
+        )
+        if (promotedFinal) {
+          output.value.translationIsFinal = true
+          output.value.translationRevision += 1
+          publish(output)
+        }
       }
     },
   })
+
   void recognition.ready
     .then(() => {
       if (closed) {
@@ -303,30 +365,16 @@ export function openSharedSubtitleStream(input: {
         error instanceof ProviderFailure ? error : new ProviderFailure('UNAVAILABLE'),
       ),
     )
+
   void recognition.finished.catch((error: unknown) =>
     fail(error instanceof ProviderFailure ? error : new ProviderFailure('UNAVAILABLE')),
   )
+
   const sweep = setInterval(() => {
     const now = Date.now()
-    for (const [code, output] of outputs) {
-      if (
-        !ending &&
-        output.subscribers.size &&
-        output.retryAt !== null &&
-        output.retryAt <= now
-      ) {
-        const replacement = makeOutput(output.path, output.subscribers)
-        replacement.attempt = output.attempt + 1
-        replacement.value.sequence = output.value.sequence + 1
-        replacement.value.discontinuity = true
-        outputs.set(code, replacement)
-        events += 1
-        deliver(replacement, {
-          type: 'reset',
-          outputLanguage: code,
-          configurationVersion: output.path.version,
-        })
-        continue
+    for (const output of outputs.values()) {
+      if (!ending && output.subscribers.size) {
+        output.lane.pollRetry(now)
       }
     }
     if (!outputs.size && !ending && now - created >= 2000) {
@@ -334,30 +382,27 @@ export function openSharedSubtitleStream(input: {
     }
   }, 250)
   sweep.unref()
+
   input.signal?.addEventListener('abort', abort, { once: true })
   if (input.signal?.aborted) {
     abort()
   }
-  // Whichever session is ready first can consume current audio. Recognition
-  // and targets never wait for one another; connecting lanes retain <=100 ms.
-  const ready = Promise.resolve().then(() =>
-    Promise.any([
-      recognition.ready,
-      ...[...outputs.values()].map((output) => output.stream.ready),
-    ]),
-  )
-  void ready.catch(() => {})
+
   function replaceOutput(path: TranslationPath) {
     const value = checked(path)
     const previous = outputs.get(value.outputLanguage)
     if (closed || ending || !previous || value.version <= previous.path.version) {
       throw new ProviderFailure('INVALID_CONFIGURATION')
     }
-    previous.stream.close()
+    previous.lane.close()
     for (const subscriber of previous.subscribers) {
       subscriber.after = events
+      subscriber.sourceAfter = sourceEvents
+      subscriber.sourceWindow = source?.utteranceId
+      subscriber.sourceOffset = source?.text.length ?? 0
     }
     const output = makeOutput(value, previous.subscribers)
+    output.displaySequence = previous.displaySequence
     outputs.set(value.outputLanguage, output)
     events += 1
     deliver(output, {
@@ -366,16 +411,16 @@ export function openSharedSubtitleStream(input: {
       configurationVersion: value.version,
     })
   }
+
   return {
-    ready,
+    ready: recognition.ready,
     async prepare() {
-      // Finite uploaded samples wait for their selected target before playback.
-      await Promise.all([
-        recognition.ready,
-        ...[...outputs.values()].map((output) => output.stream.ready),
-      ])
+      await recognition.ready
     },
     finished: completed.promise,
+    sentAudioMs() {
+      return recognition.sentAudioMs()
+    },
     subscribe(path: TranslationPath, receive: Subscriber['receive']) {
       if (closed || ending) {
         throw new ProviderFailure('UNAVAILABLE')
@@ -393,11 +438,11 @@ export function openSharedSubtitleStream(input: {
         output = makeOutput(value)
         outputs.set(value.outputLanguage, output)
       }
-      const subscriber = {
+      const subscriber: Subscriber = {
         after: events,
         sourceAfter: sourceEvents,
-        window: output.value.utteranceId,
-        translationOffset: output.value.translatedText.length,
+        sourceWindow: source?.utteranceId,
+        sourceOffset: source?.text.length ?? 0,
         receive,
       }
       output.subscribers.add(subscriber)
@@ -435,45 +480,33 @@ export function openSharedSubtitleStream(input: {
         }
         sourcePending.push(frame)
       }
-      for (const output of outputs.values()) {
-        if (!output.failed && output.subscribers.size) {
-          try {
-            if (output.ready) {
-              output.stream.append(frame.audio)
-            } else {
-              if (output.pending.length >= 5) {
-                output.pending.shift()
-                output.value.discontinuity = true
-              }
-              output.pending.push(frame.audio)
-            }
-          } catch (error) {
-            laneFailure(output, error)
-          }
-        }
-      }
     },
     end() {
       if (!ending && !closed) {
         ending = true
-        void Promise.all([
-          recognition.end(),
-          ...[...outputs.values()].map((output) => output.stream.end()),
-        ])
-          .then(() => {
+        for (const output of outputs.values()) {
+          output.lane.flushForEnd()
+        }
+        void (async () => {
+          try {
+            await recognition.end()
+            await Promise.all(
+              [...outputs.values()].map((output) => output.lane.waitIdle()),
+            )
             if (!closed) {
               const duration = (samples / input.sampleRate) * 1000
+              const sent = recognition.sentAudioMs()
               cleanup()
-              completed.resolve({ processedAudioMs: duration, sentAudioMs: duration })
+              completed.resolve({ processedAudioMs: duration, sentAudioMs: sent })
             }
-          })
-          .catch((error: unknown) =>
+          } catch (error) {
             fail(
               error instanceof ProviderFailure
                 ? error
                 : new ProviderFailure('UNAVAILABLE'),
-            ),
-          )
+            )
+          }
+        })()
       }
       return completed.promise
     },

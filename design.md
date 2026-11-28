@@ -192,6 +192,12 @@ at any time: computer audio (so the host can talk without being broadcast) or
 any audio input device. Other listeners only receive. Discord capture keeps the
 existing installation flow.
 
+After either creation flow, join the creator using the host character ID already
+supplied. Complete ordinary verified admission and save its per-tab listener
+session before opening the room; do not ask the creator to enter the ID again.
+Retry temporary entry failures against the created room without creating another
+room or replacing a successful pending entry request.
+
 ### Host room closing · 2026-10-19
 
 Every community room names a host character ID at creation, for both player and
@@ -398,13 +404,28 @@ Use BCP 47 language codes.
 Keep the website code separate from the provider's language parameter.
 Map between these codes in the provider adapter.
 
-Set up Simplified Chinese (`zh-Hans`), Japanese (`ja`) and Korean (`ko`) using
+Set up English (`en`), Simplified Chinese (`zh-Hans`), Japanese (`ja`) and Korean (`ko`) using
 the saved OpenAI key. Validate their actual paths before enabling them. Complete
 this production setup without asking the administrator to repeat language setup.
-Do not hard-code the player menu to these three languages.
+Do not hard-code the player menu to these initial languages.
 
 Show only the administrator's enabled languages in the player menu.
 Do the same language check on the server.
+
+### Matching source and output languages · 2026-10-26
+
+Include English (`en`) in the validated output-language catalog. For every output
+language, when the locally identified source language matches the selected output
+language family, use the shared live transcription text directly. Preserve
+incremental revisions, final corrections and retractions, without waiting for or
+replacing it with translation output. BCP 47 regional variants share the language
+family; Chinese Simplified/Traditional choices retain local script normalization.
+Different or uncertain source languages stream lightweight text translation from
+the shared transcription to the selected output language, without opening extra
+audio sessions or spending translation requests on matching-language speech. Language
+identification is a local text estimate, not provider-reported audio language;
+short or mixed-language commands can remain uncertain. Preserve subscription
+fences and do not replay captions from before a listener subscribed.
 
 ### Initial selection
 
@@ -473,23 +494,25 @@ Show a fault for the selected language.
 Use only OpenAI for speech recognition and translation.
 The administrator enters one OpenAI API Key, with no endpoint, region, model,
 provider type or second credential to configure.
-Use `gpt-live-transcribe` with minimal transcription delay for original captions.
-Use `gpt-realtime-translate` for direct speech translation to each target language.
+Use `gpt-live-transcribe` with minimal transcription delay and local VAD silence
+gating (160 ms pre-roll, 500 ms trailing hangover, 90 s idle speaker release) for
+shared original captions.
+Use `gpt-5.4-nano` (`reasoning_effort: none`) streaming text completions
+(`/v1/chat/completions`) to translate recognized utterances into each subscribed
+target language.
 Keep model names and official destinations in server code.
 
 Let the administrator replace the encrypted key and run a connection test that
-configures both actual model sessions. Show invalid key, unavailable model,
+verifies both actual model endpoints. Show invalid key, unavailable model,
 permission, rate limit and exhausted quota as safe, specific errors.
 Keep versioned encrypted history and tested restoration at the server boundary.
 One saved configuration can serve both recognition and translation references.
 
 Translation currently supports 13 target language families: es, pt, fr, ja, ru,
-zh, de, ko, hi, id, vi, it and en. Keep Chinese scripts distinct using local
-script normalization, and validate each chosen output path before enabling it.
-The translation API does not support custom prompts or glossaries. Use catalog
-terms only as supported recognition hints; evaluate target terminology manually.
-Already-target-language speech can produce no translation. Keep original captions
-and original audio available without silently relabeling them as translated text.
+zh, de, ko, hi, id, vi, it and en. Keep Chinese scripts distinct using target
+locale prompts and local script normalization, and validate each chosen output
+path before enabling it. Enabled catalog terms supply both recognition hints and
+target-language translation glossaries within bounded context budgets.
 
 ### Secret storage
 
@@ -540,7 +563,7 @@ In this state:
 - Do not show fabricated subtitles.
 - Do not show nonexistent language choices.
 
-Production setup includes the three requested languages. The administrator
+Production setup includes the four requested languages. The administrator
 provides only the OpenAI API Key and game terminology; do not require manual
 language creation, path configuration or activation in administration.
 
@@ -686,6 +709,20 @@ Use a documented mapping between source audio and subtitle segments.
 
 Do not send earlier battle history to a new player by default.
 
+### Five-minute translation history · 2026-11-26
+
+This amendment refines battle history for active room listeners. The room UI
+displays a rolling five-minute translation history for the listener's selected
+output language, backed by an ephemeral in-memory server cache keyed by room
+and output language (no subtitle history is persisted to disk or PostgreSQL).
+Supported history languages depend strictly on translated records present in
+the server cache: do not translate languages without active subscribers, and
+show no history records when a player switches to a language that nobody has
+listened to within the last five minutes. Live subtitle WebSocket delivery and
+Document PiP preserve strict subscription fences and never replay
+pre-subscription commands; history reads require an active, unrevoked listener
+session for the room and return only currently enabled output languages.
+
 ## 14. Background audio and PiP
 
 Make the original audio continue when the player returns to the game.
@@ -724,6 +761,23 @@ The website cannot promise mouse click-through or coverage above every exclusive
 
 Do a test with AION2 in the actual supported display mode.
 Record the browser and game display mode.
+
+### Room tactical map layout and unified PiP · 2026-11-28
+
+This amendment extends Section 14 and the multi-room tactical map layout. Keep
+the room tactical map visible alongside live subtitles without letting the
+online listener list push it down the page: on desktop viewports place the map
+in a sticky column beside the listener panel and bound the listener list's
+scroll height; on narrow viewports place the map above the listener list.
+
+Because the Document Picture-in-Picture API permits only one active PiP window
+at a time, combine live subtitles and the room tactical map into that single
+always-on-top Document PiP window rather than opening a second window or
+simulating PiP with video. Provide independent visibility switches inside the
+PiP window for subtitles and the tactical map, reusing the active room session
+and shared map state without adding extra sockets, polling loops, or media
+elements. Map rendering and interaction in PiP must remain responsive without
+relying on animation frames from a hidden main page.
 
 ## 15. Discord bot and media service
 
@@ -1036,7 +1090,7 @@ Give evidence for each PASS result.
 Delivery is complete when the required functions operate on the production domain and the core checks pass.
 The administrator can then configure providers and languages without another software change.
 
-Complete the requested Chinese, Japanese and Korean language setup before
+Complete the requested English, Chinese, Japanese and Korean language setup before
 handover when the authorized key is available. An empty language list is allowed
 when no valid credential exists.
 This state does not prove that live subtitle quality has passed.
@@ -1045,7 +1099,7 @@ Report the actual state of each subtitle provider and language.
 Do not report unperformed core audio, access, or session tests as complete.
 
 Give a final report for the website.
-State the actual enabled status of Chinese, Japanese and Korean.
+State the actual enabled status of English, Chinese, Japanese and Korean.
 State which live checks passed.
 State any remaining external inputs or measured limits.
 

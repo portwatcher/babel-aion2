@@ -46,21 +46,28 @@ the private catalog.
 ## Applying terms to an audio sample
 
 **使用已启用的游戏术语提示** is checked by default in the sample form. Uncheck it
-to compare the same sample without terminology. Enabled terms go only to the
-OpenAI original-caption recognizer as supported `prompt`, `keywords` and language
-hints. The recognition context is independent of the output language.
-Connection-only probes do not send this catalog.
+to compare the same sample without terminology. For single-language catalogs,
+enabled terms supply bounded `prompt` and `keywords` hints to the OpenAI
+original-caption recognizer; for multilingual catalogs spanning multiple scripts,
+recognition keeps a neutral scene prompt without mixed-script `keywords` so
+onset syllables are not hijacked across scripts, while matching output-language
+expressions (including source-term fallbacks with cross-language aliases) form a
+required terminology glossary in the `gpt-5.4-nano` translation system prompt
+(`translationTermCount`). Connection-only probes do not send this catalog.
 
-`gpt-realtime-translate` consumes the same audio directly and does not support
-custom prompts, glossaries or pronunciation guides. Target expressions remain
-saved for manual evaluation; no unsupported translation context is sent. A
-recognition hint cannot enforce how the separate translator renders a game term.
-See [OpenAI's translation guide](https://developers.openai.com/cookbook/examples/voice_solutions/realtime_translation_guide).
+The recognizer's descriptive `prompt` is limited to 1,024 UTF-16 code units,
+without splitting a Unicode surrogate pair. Longer catalog descriptions are
+shortened in that field; every enabled source term and alternative remains in
+the separate `keywords` list, and language hints remain intact. Stored entries
+and their context are unchanged. This applies to live subtitles and samples.
+The provider rejects overlong prompts during session setup; its
+[context guidance](https://developers.openai.com/api/docs/guides/realtime-transcription#add-transcription-context)
+distinguishes descriptive prompts from literal keyword hints.
 
-Generated context has a conservative 6,000-byte UTF-8 budget per provider request.
+Generated context still has a conservative 6,000-byte UTF-8 budget per request.
 More than 2,000 enabled entries also rejects the sample before provider work.
 These are processing safeguards, not storage or measured capacity claims. Excess
-context returns `CONTEXT_TOO_LARGE`; entries are never silently truncated. Disable
+context returns `CONTEXT_TOO_LARGE`; keyword entries are never truncated. Disable
 unneeded entries or compare without terms. Individual field limits alone do not
 guarantee that the combined context fits.
 

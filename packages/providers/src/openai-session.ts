@@ -11,11 +11,12 @@ export interface OpenAIEvent {
   [key: string]: unknown
 }
 
-/** Fixed official destinations; the key appears only in server handshake headers. */
+const RECOGNITION_ENDPOINT = 'wss://api.openai.com/v1/realtime?intent=transcription'
+
+/** Fixed official destination; the key appears only in server handshake headers. */
 export function openOpenAISession(input: {
   settings: OpenAISettings
   credential: string
-  translation: boolean
   configuration: Record<string, unknown>
   signal?: AbortSignal
   event: (event: OpenAIEvent) => void
@@ -32,13 +33,9 @@ export function openOpenAISession(input: {
   void finished.promise.catch(() => {})
   let closed = false
   let configured = false
-  let ending = false
   let expires: ReturnType<typeof setTimeout> | undefined
   let pong = true
-  const endpoint = input.translation
-    ? 'wss://api.openai.com/v1/realtime/translations?model=gpt-realtime-translate'
-    : 'wss://api.openai.com/v1/realtime?intent=transcription'
-  const socket = new WebSocket(endpoint, {
+  const socket = new WebSocket(RECOGNITION_ENDPOINT, {
     headers: { Authorization: 'Bearer ' + input.credential },
     handshakeTimeout: input.settings.timeoutMs,
     perMessageDeflate: false,
@@ -97,9 +94,10 @@ export function openOpenAISession(input: {
     ) {
       throw new ProviderFailure('UNAVAILABLE')
     }
-    // 100 ms of 24 kHz PCM16 is 4,800 bytes before base64. Never accumulate
-    // seconds of obsolete battle commands behind a congested provider socket.
-    if (socket.bufferedAmount > 6_800) {
+    // Allow pre-roll, initial connect-buffer flushes, TLS record framing, and
+    // timer catch-up bursts (~2 s of 24 kHz PCM16 base64 JSON) while still
+    // failing fast if the provider socket genuinely stalls behind stale audio.
+    if (socket.bufferedAmount > 131_072) {
       fail(new ProviderFailure('UNAVAILABLE'))
       throw new ProviderFailure('UNAVAILABLE')
     }
@@ -185,11 +183,7 @@ export function openOpenAISession(input: {
         ready.resolve()
       }
       if (event.type === 'session.closed') {
-        if (!ending || !input.translation) {
-          throw new ProviderFailure('INVALID_RESPONSE')
-        }
-        settle()
-        return
+        throw new ProviderFailure('INVALID_RESPONSE')
       }
       input.event(event)
     } catch (error) {
@@ -220,17 +214,6 @@ export function openOpenAISession(input: {
         () => fail(new ProviderFailure('TIMEOUT')),
         input.settings.timeoutMs,
       )
-      return finished.promise
-    },
-    end() {
-      if (!ending && !closed) {
-        ending = true
-        send({ type: 'session.close' })
-        deadline = setTimeout(
-          () => fail(new ProviderFailure('TIMEOUT')),
-          input.settings.timeoutMs,
-        )
-      }
       return finished.promise
     },
     close() {

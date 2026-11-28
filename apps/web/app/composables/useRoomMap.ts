@@ -21,6 +21,7 @@ export function useRoomMap(
 ) {
   const { t } = useInterfaceLocale()
   const strokes = shallowRef<MapStroke[]>([])
+  const pending = shallowRef<MapStrokeInput | null>(null)
   const current = ref(false)
   const error = ref<InterfaceMessageKey | ''>('')
   const busy = ref(false)
@@ -122,6 +123,15 @@ export function useRoomMap(
       busy.value = false
     }
   }
+  async function commit(stroke: MapStrokeInput) {
+    pending.value = stroke
+    if (await save(stroke)) {
+      pending.value = null
+    }
+  }
+  function discardPending() {
+    pending.value = null
+  }
   async function remove(id: string) {
     busy.value = true
     version += 1
@@ -145,6 +155,7 @@ export function useRoomMap(
     () => {
       version += 1
       strokes.value = []
+      pending.value = null
       current.value = false
       denied.value = false
       void refresh()
@@ -176,12 +187,17 @@ export function useRoomMap(
   })
   return {
     strokes,
+    pending,
     current,
     busy,
     error: computed(() => (error.value ? t(error.value) : '')),
     enabled,
     refresh,
     save,
+    commit,
+    discardPending,
     remove,
   }
 }
+
+export type RoomMapController = ReturnType<typeof useRoomMap>

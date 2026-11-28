@@ -119,19 +119,50 @@ export async function portsBusy(endpoints) {
           socket.once('error', (error) => {
             socket.close()
             if (error.code === 'EADDRINUSE') {
-              resolve(true)
+              resolve('busy')
+            } else if (error.code === 'EADDRNOTAVAIL') {
+              // Ephemeral Docker bridge interfaces from concurrent jobs on a
+              // shared runner can disappear after ICE host-candidate gathering.
+              resolve('gone')
             } else {
-              reject(new Error('Cannot inspect local candidate socket'))
+              reject(
+                new Error(
+                  `Cannot inspect local candidate socket (${error.code ?? 'UNKNOWN'})`,
+                ),
+              )
             }
           })
-          socket.bind(port, address, () => socket.close(() => resolve(false)))
+          socket.bind(port, address, () => socket.close(() => resolve('free')))
+        }),
+    ),
+  )
+  const present = states.filter((state) => state !== 'gone')
+  return present.length > 0 && present.every((state) => state === 'busy')
+}
+
+export async function portsReleased(endpoints) {
+  const states = await Promise.all(
+    endpoints.map(
+      ({ address, port }) =>
+        new Promise((resolve, reject) => {
+          const socket = dgram.createSocket('udp4')
+          socket.once('error', (error) => {
+            socket.close()
+            if (error.code === 'EADDRINUSE') {
+              resolve(false)
+            } else if (error.code === 'EADDRNOTAVAIL') {
+              resolve(true)
+            } else {
+              reject(
+                new Error(
+                  `Cannot inspect local candidate socket (${error.code ?? 'UNKNOWN'})`,
+                ),
+              )
+            }
+          })
+          socket.bind(port, address, () => socket.close(() => resolve(true)))
         }),
     ),
   )
   return states.every(Boolean)
-}
-
-export async function portsReleased(endpoints) {
-  const states = await Promise.all(endpoints.map((endpoint) => portsBusy([endpoint])))
-  return states.every((busy) => !busy)
 }

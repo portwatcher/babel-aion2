@@ -4,7 +4,7 @@ import { testProviderConnection } from '../src/index.ts'
 import { createProviderFixture } from '../../../scripts/fixtures/provider-server.mjs'
 import { routeProviderNetwork } from '../../../scripts/fixtures/provider-network.mjs'
 
-test('OpenAI probes authenticate over real WebSockets and verify both configured model sessions', async (t) => {
+test('OpenAI probes authenticate recognition WebSocket and gpt-5.4-nano translation HTTP endpoint', async (t) => {
   const fixture = await createProviderFixture()
   const restore = routeProviderNetwork(fixture.origin)
   t.after(async () => {
@@ -14,14 +14,18 @@ test('OpenAI probes authenticate over real WebSockets and verify both configured
   const settings = { type: 'openai', timeoutMs: 1000 }
   const key = fixture.credential()
   assert.equal((await testProviderConnection(settings, key)).code, 'PASS')
-  const [recognition, translation] = fixture.observations
+  const recognition = fixture.observations.find(
+    (value) => value.protocol === 'recognition',
+  )
+  const translation = fixture.observations.find(
+    (value) => value.protocol === 'translation',
+  )
+  assert.ok(recognition)
+  assert.ok(translation)
   assert.equal(recognition.auth, 'Bearer ' + key)
   assert.equal(translation.auth, 'Bearer ' + key)
   assert.equal(recognition.url, '/v1/realtime?intent=transcription')
-  assert.equal(
-    translation.url,
-    '/v1/realtime/translations?model=gpt-realtime-translate',
-  )
+  assert.equal(translation.url, '/v1/chat/completions')
   assert.deepEqual(recognition.configuration, {
     type: 'transcription',
     audio: {
@@ -32,7 +36,10 @@ test('OpenAI probes authenticate over real WebSockets and verify both configured
       },
     },
   })
-  assert.deepEqual(translation.configuration, { audio: { output: { language: 'ja' } } })
+  assert.equal(translation.model, 'gpt-5.4-nano')
+  assert.equal(translation.stream, false)
+  assert.equal(translation.configuration.reasoning_effort, 'none')
+  assert.equal(translation.configuration.max_completion_tokens, 16)
   for (const [mode, code] of [
     ['invalid', 'INVALID_CREDENTIAL'],
     ['model', 'MODEL_UNAVAILABLE'],

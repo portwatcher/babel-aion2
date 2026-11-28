@@ -3,30 +3,28 @@
 The administrator enters one **OpenAI API Key**. Model names and destinations
 are fixed in server code. No region, endpoint, second key or model selection is
 required. Administration contains only the website-wide key and game terms.
-Production setup provisions and validates Simplified Chinese (`zh-Hans`),
+Production setup provisions and validates English (`en`), Simplified Chinese (`zh-Hans`),
 Japanese (`ja`) and Korean (`ko`) with that key; no manual language setup is
 required in administration. Missing credentials never produce fabricated paths.
 
-| Purpose                   | Model                                   | Connection                                               |
-| ------------------------- | --------------------------------------- | -------------------------------------------------------- |
-| Shared original captions  | `gpt-live-transcribe`, `delay: minimal` | `/v1/realtime?intent=transcription`                      |
-| Direct speech translation | `gpt-realtime-translate`                | `/v1/realtime/translations?model=gpt-realtime-translate` |
+| Purpose                    | Model                                                     | Connection                                              |
+| -------------------------- | --------------------------------------------------------- | ------------------------------------------------------- |
+| Shared original captions   | `gpt-live-transcribe`, `delay: minimal`                   | `wss://api.openai.com/v1/realtime?intent=transcription` |
+| Streaming text translation | `gpt-5.4-nano` (`stream: true`, `reasoning_effort: none`) | `https://api.openai.com/v1/chat/completions`            |
 
-Both connections use `wss://api.openai.com` and server-only Authorization headers.
-Translation consumes incoming audio directly and runs concurrently with original
-caption recognition. It never waits for a completed source transcript. One target
-session is shared by listeners using that target language for that speaker.
+Both endpoints use `api.openai.com` and server-only Authorization headers.
+One VAD-gated recognition stream runs per active speaker; streaming SSE text
+translation runs per subscribed target language from incremental and finalized
+transcripts, sharing one request per target language across listeners.
 
 The supported target language families are `es`, `pt`, `fr`, `ja`, `ru`, `zh`,
 `de`, `ko`, `hi`, `id`, `vi`, `it` and `en`. BCP 47 region variants map to the
-corresponding provider language. `zh-Hans` and `zh-Hant` use the same Chinese
-translation target, followed by local OpenCC script normalization. This converts
-writing system; it does not guarantee a regional translation vocabulary.
-Unsupported targets fail validation and cannot be enabled.
+corresponding provider language. `zh-Hans` and `zh-Hant` specify Simplified or
+Traditional Chinese in the translation prompt, followed by local OpenCC script
+normalization. Unsupported targets fail validation and cannot be enabled.
 
-Sources: [OpenAI realtime transcription](https://developers.openai.com/api/docs/guides/realtime-transcription),
-[realtime translation](https://developers.openai.com/api/docs/guides/realtime-translation),
-and [translation implementation guide](https://developers.openai.com/cookbook/examples/voice_solutions/realtime_translation_guide).
+Sources: [OpenAI realtime transcription](https://developers.openai.com/api/docs/guides/realtime-transcription)
+and [chat completions streaming](https://platform.openai.com/docs/api-reference/chat/create).
 
 ## Credential protection and revisions
 
@@ -44,7 +42,9 @@ stale results. A blank key on edit retains the saved key. One configuration may
 serve both recognition and translation references; its lease is acquired once.
 Conflicting reference versions reject before provider work.
 
-A connection probe opens and configures both actual model sessions in parallel.
+A connection probe configures the recognition WebSocket session and executes a
+minimal `gpt-5.4-nano` (`reasoning_effort: none`, `max_completion_tokens: 16`)
+completion probe in parallel.
 It verifies key/model access, without claiming that audio or language quality was
 validated. Errors are reduced to safe credential, model, quota, rate, permission,
 configuration, response, timeout or availability categories. Untrusted endpoint
@@ -60,26 +60,30 @@ storage.
 
 An authorized administrator can upload 0.2–10 seconds of mono PCM16 WAV at 16 or
 48 kHz, at most 1 MB. The JSON limit is 1,400,000 bytes, including chunked requests.
-Audio is paced in 20 ms frames and converted once to 24 kHz PCM16. Silence stays
-in the timeline. The finite sample waits for its target connection, then uses the
-same streaming engine as the worker. The sample comparison is displayed when the
+Audio is paced in 20 ms frames, converted once to 24 kHz PCM16, and gated by local
+VAD (160 ms pre-roll, 500 ms trailing hangover) so pure silence is not streamed.
+The finite sample waits for the recognition handshake, then uses the same
+streaming engine as the worker. The sample comparison is displayed when the
 finite operation completes; live player captions are delivered incrementally.
 
-Samples have a 30-second deadline. They retain up to 32 bounded display windows,
-not a fabricated alignment of source and translated utterances. The original
-caption stream is marked independent, source language is `und`, and timestamps
-are null because this model does not supply dependable per-utterance alignment
-between these separate sessions. Translation is final only after `session.close`
-is drained through `session.closed`. Validation requires nonempty completed
-source and translated output, checked against the saved path and catalog versions.
+Samples have a 30-second deadline. They retain up to 32 utterance-aligned
+segments (`sourceAlignment: 'aligned'`), source language is locally estimated
+(or `und` when uncertain), and audio timestamps remain null. Validation requires
+every non-empty recognized utterance to reach final source and translated output,
+checked against the saved path and catalog versions.
 
-Recognition terms become `prompt`, `keywords` and language hints. Generated
-recognition context has a 6,000-byte budget; terms are never silently truncated.
-The translation model does **not** support custom prompts, glossaries or
-pronunciation guides. Saved target-language terminology remains catalog data for
-manual evaluation; it is not sent through an unsupported translation parameter.
+Recognition terms supply `prompt` and `keywords` hints for single-language
+catalogs, or a neutral scene `prompt` without mixed-script `keywords` for
+multilingual catalogs (without restricting `transcription.languages`, so
+`gpt-live-transcribe` auto-detects spoken languages freely); matching
+target-language expressions (plus source-term fallbacks with cross-language
+aliases) become a required terminology glossary for `gpt-5.4-nano` translation
+(`translationTermCount`). Both contexts enforce a 6,000-byte UTF-8 budget; terms
+are never silently truncated.
 
-The translation model can omit speech already in the target language. Source
-captions and original audio remain available. The application does not infer a
-source language or relabel untranslated text as a translation. Test mixed-language
-commands, names and terminology explicitly before enabling production languages.
+For every output language, a matching local source-language estimate selects the
+shared transcript directly, including its revisions and finality, with zero
+translation API requests. Regional variants match their language family; Chinese
+script choices use local normalization. Different or uncertain source languages
+stream `gpt-5.4-nano` translations. Test mixed-language commands, names and
+terminology explicitly before enabling production languages.

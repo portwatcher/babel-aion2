@@ -1,13 +1,17 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import {
+  audioRelayRequestSchema,
   mediaControlRequestSchema,
   listenerReferenceSchema,
   voiceSourceRequestSchema,
+  subtitleHistoryRequestSchema,
   subtitleSubscriptionSchema,
+  type VoiceScaleMetrics,
 } from '@babel/contracts'
 import { ListenerError } from '@babel/database/listeners'
 import { MediaPeerError, type MediaPeers } from './media-peers.ts'
+import type { RoomAudioHub } from './room-audio-hub.ts'
 import type { VoiceSources } from './voice-sources.ts'
 import { SubtitleDeliveryError, type SubtitleService } from './subtitle-service.ts'
 
@@ -37,8 +41,10 @@ function json(response: ServerResponse, status: number, value: unknown) {
 export function createControlServer(
   peers: MediaPeers,
   secret: string,
-  sources: VoiceSources,
-  subtitles: SubtitleService,
+  sources: VoiceSources | null,
+  subtitles: SubtitleService | null,
+  audioHub?: RoomAudioHub,
+  scaleMetrics?: () => Promise<VoiceScaleMetrics>,
 ) {
   const expected = digest(`Bearer ${secret}`)
   const server = createServer(async (request, response) => {
@@ -47,12 +53,99 @@ export function createControlServer(
       return
     }
     try {
+      if (request.url === '/metrics/scale' && request.method === 'GET') {
+        if (!scaleMetrics) {
+          json(response, 404, { code: 'NOT_FOUND' })
+          return
+        }
+        json(response, 200, await scaleMetrics())
+        return
+      }
+      if (request.url === '/relay/audio' && request.method === 'POST') {
+        const parsed = audioRelayRequestSchema.safeParse(await input(request))
+        if (!parsed.success) {
+          json(response, 400, { code: 'INVALID_REQUEST' })
+          return
+        }
+        let early: string[] | null = []
+        const stop = audioHub?.subscribe(parsed.data.roomId, {
+          send(line) {
+            if (early) {
+              early.push(line)
+              return early.length <= 32
+            }
+            if (
+              response.destroyed ||
+              response.writableEnded ||
+              response.writableLength + Buffer.byteLength(line) > 256 * 1024
+            ) {
+              return false
+            }
+            response.write(line)
+            return true
+          },
+          close() {
+            response.end()
+          },
+        })
+        if (!stop) {
+          json(response, 404, { code: 'NOT_FOUND' })
+          return
+        }
+        if (response.destroyed) {
+          stop()
+          return
+        }
+        response.writeHead(200, {
+          'content-type': 'application/x-ndjson',
+          'cache-control': 'no-store',
+        })
+        response.flushHeaders()
+        for (const line of early) {
+          response.write(line)
+        }
+        early = null
+        const keepalive = setInterval(() => {
+          if (response.writableLength >= 256 * 1024) {
+            response.destroy()
+          } else if (!response.destroyed && !response.writableEnded) {
+            response.write('\n')
+          }
+        }, 5_000)
+        keepalive.unref()
+        response.once('close', () => {
+          clearInterval(keepalive)
+          stop()
+        })
+        return
+      }
       if (request.url === '/subtitles/ready' && request.method === 'GET') {
-        const ready = await subtitles.ready()
+        const ready = subtitles ? await subtitles.ready() : false
         json(response, ready ? 200 : 503, { ready })
         return
       }
+      if (request.url === '/subtitles/history' && request.method === 'POST') {
+        if (!subtitles) {
+          json(response, 503, { code: 'UNAVAILABLE' })
+          return
+        }
+        const parsed = subtitleHistoryRequestSchema.safeParse(await input(request))
+        if (!parsed.success) {
+          json(response, 400, { code: 'INVALID_REQUEST' })
+          return
+        }
+        json(
+          response,
+          200,
+          await subtitles.readHistory(parsed.data.reference, parsed.data.credential),
+        )
+        return
+      }
       if (request.url === '/subtitles' && request.method === 'POST') {
+        if (!subtitles) {
+          json(response, 503, { code: 'UNAVAILABLE' })
+          return
+        }
         const parsed = subtitleSubscriptionSchema.safeParse(await input(request))
         if (!parsed.success) {
           json(response, 400, { code: 'INVALID_REQUEST' })
@@ -114,6 +207,10 @@ export function createControlServer(
         return
       }
       if (request.url === '/source' && request.method === 'POST') {
+        if (!sources) {
+          json(response, 404, { code: 'NOT_FOUND' })
+          return
+        }
         const parsed = voiceSourceRequestSchema.safeParse(await input(request))
         if (!parsed.success) {
           json(response, 400, { code: 'INVALID_REQUEST' })

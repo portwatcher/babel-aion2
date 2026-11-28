@@ -19,8 +19,11 @@ ID is checked against AION2 Index on the room's server, exactly as entry checks 
 character, and the index's exact character ID is stored as `room.host_character_id`.
 A non-empty allowlist always includes the host. The room is created running with
 `audio_source = 'PLAYER'`, a `community_room` row without guild or creator, and a
-`room.create` audit event. The page then opens the room; the host joins through
-ordinary character verification.
+`room.create` audit event. The creation page submits the supplied host ID through
+ordinary verified admission, saves the resulting per-tab listener credential,
+then opens the room directly. The host does not type the ID again. An admission
+retry retains the created room and the pending entry request, avoiding another
+room or nickname generation after a lost response.
 
 Migration `0018_player_audio_source` adds the `room_audio_source` enum (existing
 rooms default to `DISCORD`), `room.host_character_id`, and makes
@@ -60,6 +63,14 @@ The capture belongs to the page, not to one peer: media reconnects reuse it
 without asking again. A chosen device is remembered in local storage and starts
 automatically on the next visit; computer audio always needs a click. Mute
 disables the track. Leaving the room stops the capture.
+
+The host reports broadcasting only after both capture and the media connection
+are ready. A selected live capture alone does not establish audio delivery.
+Browser candidate gathering waits up to ten seconds. If a discovery server is
+still pending at that deadline, negotiation uses the candidates already in the
+local description under the configured ICE policy. No candidates or cancellation
+still stops that attempt. Controlled negotiation-stage diagnostics omit SDP,
+credentials and raw transport errors.
 
 The worker decodes the host's Opus RTP to 48 kHz stereo PCM and feeds the same
 `GuildBroadcast` used for Discord: one Opus mix for room playback and an

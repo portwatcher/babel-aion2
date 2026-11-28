@@ -38,6 +38,14 @@ source readiness remains worker status, independently from the saved request.
 
 ## Room and character entry
 
+After either host-capture creation or Discord installation, the creator joins
+with the host ID already supplied. The installation response returns that ID
+only to the matching installation browser. The client uses ordinary room
+admission and the same output-language selection as verification, then saves
+the room-scoped listener credential before navigation. Refresh restores this
+session. Temporary entry failures retry the same room and request rather than
+creating a second room or asking the host to type the ID again.
+
 Room numbers start at 1: share `/rooms/1`, `/rooms/2`, and so on. Existing
 community rooms receive numbers in creation order. Numbers stay fixed and are
 not reused after deletion. UUID room links are not supported.
@@ -146,11 +154,18 @@ shows attribution to InteractiveMap.app and AION2/NCSOFT. Availability depends o
 the public tile host. The implementation does not bundle an offline tile archive
 or copy the source site's application, account features or community markers.
 
-Map coordinates cover `[0, 4096]` in each dimension. Leaflet's shared transform
-keeps bottom-image pixels, drawn points, labels and eraser hit tests aligned through
-zoom, pan and viewport resize. Controls include wheel/pinch zoom, double click,
-keyboard arrows and plus/minus, explicit zoom buttons, and reset (`0`). The initial
-view and reset use the source map's center at zoom 4.
+Map coordinates cover `[0, 4096]` in each dimension. On desktop room pages the
+tactical map sits in a sticky column beside live subtitles while the listener
+list stays in a bounded scroll container underneath the listener panel; on
+narrow viewports the map appears directly below the listener panel and above the
+listener list. Players on browsers with Document Picture-in-Picture can also
+show the tactical map alongside live subtitles inside the unified PiP window,
+toggling either panel with switches while sharing the room's single `useRoomMap`
+synchronization state. Leaflet's shared transform keeps bottom-image pixels,
+drawn points, labels and eraser hit tests aligned through zoom, pan and viewport
+resize. Controls include wheel/pinch zoom, double click, keyboard arrows and
+plus/minus, explicit zoom buttons, and reset (`0`). The initial view and reset
+use the source map's center at zoom 4.
 
 Members can draw with five colors. Every committed stroke has a numbered label
 and the authenticated author's game ID, plus a corresponding line sample in the

@@ -2,7 +2,7 @@
 
 Live voice relay and subtitles for AION2 (Steam Global / Asia) battle groups.
 A host's voice reaches players as original audio, with real-time captions and
-Chinese, Japanese and Korean translation.
+English, Chinese, Japanese and Korean subtitles.
 
 Built with Nuxt 4, Better Auth and PostgreSQL. Deployed at
 [babel.juryquinn.com](https://babel.juryquinn.com/). The product specification
@@ -13,18 +13,32 @@ is in [design.md](design.md), mirrored in [GOAL.md](GOAL.md).
 - **Rooms.** Public directory at `/`, numbered rooms at `/rooms/:roomNumber`.
   Players enter with a character ID verified against AION2 Index; no account
   needed. Creators pick an Asia server and may restrict entry to up to 200
-  character IDs.
+  character IDs. Creation joins the host with the ID already supplied; no second
+  character-entry form is required.
 - **Audio sources.** Either _host capture_ (the host broadcasts computer audio
   or any input from the browser) or a _Discord_ voice channel via the bot.
   See [player audio source](docs/player-audio-source.md) and
   [original audio](docs/original-audio.md).
+  Host broadcasting status requires an established media connection; a pending
+  discovery server does not discard an already collected connection candidate.
 - **Room lifecycle.** Empty rooms disband after five minutes. The host can close
   a room at any time. See [community rooms](docs/multi-room-and-map.md).
-- **Subtitles.** OpenAI realtime transcription and translation, pushed to the
-  page and a Picture-in-Picture window. Original text stays visible beneath the
-  translation in both views, updating independently. Translation runs only for
-  languages with subscribers. See [streaming subtitles](docs/streaming-subtitles.md).
-- **Tactical map.** Shared drawing on the Lower Reshanta map, persisted per room.
+- **Subtitles.** Shared OpenAI live transcription (`gpt-live-transcribe`) with
+  local VAD silence gating and idle speaker release, plus `gpt-5.4-nano`
+  streaming text translation per subscribed language, pushed to the page and a
+  Picture-in-Picture window. Original text stays visible beneath the translation
+  in both views. Translation runs only for languages with subscribers and skips
+  utterances whose source language already matches the selected subtitle language;
+  Chinese script choices retain local Simplified/Traditional conversion.
+  Enabled game terms guide both live recognition and target-language translation
+  within bounded prompt budgets. The room page also shows a rolling five-minute
+  in-memory translation history for the selected language whenever listeners
+  were subscribed to it. See
+  [streaming subtitles](docs/streaming-subtitles.md).
+- **Tactical map.** Shared drawing on the Lower Reshanta map, persisted per room,
+  pinned beside live subtitles on desktop (and above the listener list on narrow
+  screens) and available inside the unified Picture-in-Picture pop-out alongside
+  subtitles with independent visibility switches.
 - **Interface languages.** English, Simplified Chinese, Japanese and Korean.
   See [interface localization](docs/interface-localization.md).
 - **Source code.** The header's GitHub icon links to this repository.

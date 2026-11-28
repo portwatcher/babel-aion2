@@ -4,9 +4,12 @@ import { syncBuiltinESMExports } from 'node:module'
 
 // Test-process routing only. Exercise the real ws handshake, framing, headers
 // and loopback sockets without introducing a production endpoint override.
-export function routeProviderNetwork(origin) {
+export function routeProviderNetwork(origin, tlsOptions = {}) {
   const local = new URL(origin)
-  if (local.hostname !== '127.0.0.1' || local.protocol !== 'http:') {
+  if (
+    local.hostname !== '127.0.0.1' ||
+    (local.protocol !== 'http:' && local.protocol !== 'https:')
+  ) {
     throw new Error('Provider fixture must listen on loopback')
   }
   const request = https.request
@@ -16,6 +19,24 @@ export function routeProviderNetwork(origin) {
       typeof options === 'object' &&
       (options.hostname ?? options.host) === 'api.openai.com'
     ) {
+      if (local.protocol === 'https:') {
+        return request.call(
+          this,
+          {
+            ...options,
+            protocol: 'https:',
+            hostname: local.hostname,
+            host: local.hostname,
+            port: local.port,
+            servername: 'api.openai.com',
+            ca: tlsOptions.ca,
+            agent: undefined,
+            createConnection: undefined,
+            defaultPort: Number(local.port),
+          },
+          callback,
+        )
+      }
       return http.request(
         {
           ...options,

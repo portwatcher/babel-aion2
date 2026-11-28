@@ -54,6 +54,13 @@
   prune metadata, and verify directories, registrations, and task branches are gone.
 - Do not create another task or worktree just for cleanup. Preserve and report
   actual unmerged work, unknown valuable files, and another active task.
+- Stop the Docker Compose services a task started as soon as the task no longer
+  needs them, and always before session completion: run `docker compose down`
+  from the task's checkout for its project (`babel-source-pipeline`). Do not
+  leave a Postgres container running on the shared computer between sessions.
+  The named `postgres-data` volume may stay; a later `docker compose up`
+  reuses it. At session start, remove any leftover container of this project
+  that no running task owns.
 - At session start, completion, and after removal, check all accessible Codex
   tasks across projects for `Current working directory missing` or a confirmed
   nonexistent cwd on the owning host. Archive every match with

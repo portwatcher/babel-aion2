@@ -89,6 +89,7 @@ async function create(name, server, allowedIds, code, shared = false) {
   )
   assert.equal(installation.server, server)
   assert.deepEqual(installation.allowedIds, allowedIds)
+  assert.equal(installation.hostId, 'Pilot', 'OAuth return retains the host for entry')
   assert.deepEqual(
     installation.channels,
     shared

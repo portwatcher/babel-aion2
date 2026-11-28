@@ -141,6 +141,20 @@
       "when": 1792417226292,
       "tag": "0019_room_host_close",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795694669606,
+      "tag": "0020_worker_control_url",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795767600683,
+      "tag": "0021_worker_fanout_only",
+      "breakpoints": true
     }
   ]
 }
