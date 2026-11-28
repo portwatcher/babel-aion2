@@ -106,6 +106,9 @@ small {
   margin-inline: auto;
   padding-inline: clamp(16px, 4vw, 32px);
 }
+.site-shell:has(.room-workspace) {
+  width: min(1440px, 100%);
+}
 .site-header {
   position: relative;
   display: flex;
@@ -163,10 +166,16 @@ small {
 .main-content {
   padding-block: clamp(24px, 5vw, 48px) 64px;
 }
+.main-content:has(.room-workspace) {
+  padding-block: clamp(16px, 3vw, 24px) 48px;
+}
 .page-heading {
   display: grid;
   gap: 8px;
   margin-bottom: clamp(24px, 4vw, 32px);
+}
+.main-content:has(.room-workspace) .page-heading {
+  margin-bottom: clamp(16px, 2.5vw, 24px);
 }
 .back-link {
   justify-self: start;
@@ -315,10 +324,6 @@ small {
   margin-inline-end: 0.5em;
   font-size: 0.875rem;
 }
-.subtitle-pip-page {
-  min-width: 0;
-  padding: 16px;
-}
 .listener-subtitles-compact {
   min-height: 0;
   padding: 0;
@@ -341,7 +346,9 @@ small {
 .player-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 4px 0 0;
+  max-height: 22rem;
+  overflow-y: auto;
 }
 .player-list li {
   display: flex;

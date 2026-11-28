@@ -4,6 +4,7 @@ import { audioStatus } from '~/utils/audio-status'
 import type { useHostCapture } from '~/composables/useHostCapture'
 import type { SubtitleHistoryState } from '~/composables/useSubtitleHistory'
 import type { SubtitlePresentation } from '~/utils/subtitle-view'
+
 const { t } = useInterfaceLocale()
 const props = defineProps<{
   session: ListenerSnapshot
@@ -17,6 +18,11 @@ const props = defineProps<{
   changingLanguage: boolean
   subtitles: SubtitlePresentation
   subtitleHistory: SubtitleHistoryState
+  textSize: number
+  pipSupported: boolean
+  pipOpen: boolean
+  pipOpening: boolean
+  pipError: string
 }>()
 const emit = defineEmits<{
   leave: []
@@ -25,16 +31,14 @@ const emit = defineEmits<{
   playAudio: []
   toggleMute: []
   retryHistory: []
+  togglePip: []
+  'update:textSize': [size: number]
 }>()
-const pip = useSubtitlePictureInPicture(
-  () => `${props.session.sessionId}:${props.session.nicknameGeneration}`,
-)
-const { supported, opening, target, error: pipError } = pip
+
 const isHost = computed(
   () => props.configuration.room.hostId === props.session.nickname,
 )
 const confirmingClose = ref(false)
-const textSize = ref(1.25)
 const textSizes = computed(() => [
   { label: t('textStandard'), value: 1.25 },
   { label: t('textLarge'), value: 1.5 },
@@ -128,22 +132,23 @@ const languageName = computed(
       <div class="field">
         <label for="subtitle-text-size">{{ t('subtitleTextSize') }}</label>
         <Select
-          v-model="textSize"
+          :model-value="textSize"
           input-id="subtitle-text-size"
           :options="textSizes"
           option-label="label"
           option-value="value"
+          @update:model-value="emit('update:textSize', $event)"
         />
       </div>
     </div>
     <p v-if="pipError" class="form-error" role="alert">{{ pipError }}</p>
     <div class="listener-actions">
       <Button
-        v-if="supported"
-        :label="target ? t('closePip') : t('openPip')"
+        v-if="pipSupported"
+        :label="pipOpen ? t('closePip') : t('openPip')"
         severity="secondary"
-        :loading="opening"
-        @click="target ? pip.close() : pip.open()"
+        :loading="pipOpening"
+        @click="emit('togglePip')"
       />
       <template v-if="isHost && confirmingClose">
         <Button
@@ -185,16 +190,5 @@ const languageName = computed(
       :history="subtitleHistory"
       @retry="emit('retryHistory')"
     />
-    <Teleport v-if="target" :to="target">
-      <ListenerSubtitleStatus
-        :session="session"
-        :connection-state="connectionState"
-        :language-name="languageName"
-        :changing-language="changingLanguage"
-        :text-size="textSize"
-        :subtitles="subtitles"
-        compact
-      />
-    </Teleport>
   </section>
 </template>

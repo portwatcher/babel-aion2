@@ -78,11 +78,21 @@ transport rejects frames above 2 KiB before buffering them, and JSON request
 bodies are capped (64 KiB unless a route sets its own limit). Refresh
 and reconnect restore the original generation; replaced sessions never re-enter
 automatically. No sample players, language choices or subtitles are generated.
-A player action can open a feature-detected Document PiP window. Vue Teleport
-shares the existing listener's reactive status and text size with that document;
-there is no extra network client, session or media element. Session replacement,
-leave, page navigation and listener-component disposal close the window. Current
-member subtitles arrive through the same authorized socket and shared view state.
+A player action can open a feature-detected Document PiP window. Because the
+Document PiP specification allows only one active PiP window at a time, that
+single window combines live subtitles and the room's tactical map with
+independent PrimeVue `ToggleSwitch` visibility controls. Vue Teleport shares the
+existing listener's reactive subtitle state, text size and single `useRoomMap`
+controller with that document while mirroring page and runtime-injected styles;
+there is no extra network client, map poller, session or media element. Inside
+the PiP document, Leaflet uses synchronous SVG rendering, disabled hidden-tab
+animations, pointer-event panning and container keyboard controls so map updates
+and interaction stay responsive while the main page is hidden. On the room page
+itself, the tactical map stays pinned beside the listener panel on desktop (and
+above the bounded, scrollable listener list on narrow viewports). Session
+replacement, leave, page navigation and listener-component disposal close the
+window. Current member subtitles arrive through the same authorized socket and
+shared view state.
 Without the optional private media worker, new sessions remain JOINING and entry
 returns 202. A configured worker can authorize the current listener after older
 socket and media closures are confirmed. The browser opens one receive-only peer

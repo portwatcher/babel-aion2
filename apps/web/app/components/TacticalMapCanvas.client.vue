@@ -7,6 +7,7 @@ import {
 } from '@babel/contracts'
 import type * as Leaflet from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { DEFAULT_MAP_VIEW, type MapViewState } from '~/utils/pip-layout'
 
 const { t } = useInterfaceLocale()
 const props = defineProps<{
@@ -17,19 +18,31 @@ const props = defineProps<{
   selected: string | null
   erasing: boolean
   sessionId: string | null
+  initialView?: MapViewState
+  compact?: boolean
 }>()
-const emit = defineEmits<{ draw: [stroke: MapStrokeInput]; erase: [id: string] }>()
+const emit = defineEmits<{
+  draw: [stroke: MapStrokeInput]
+  erase: [id: string]
+  viewChange: [view: MapViewState]
+}>()
 const element = ref<HTMLDivElement>()
 const loadError = ref(false)
-const zoom = ref(0)
+const zoom = ref(props.initialView?.zoom ?? DEFAULT_MAP_VIEW.zoom)
+const foreignDocument = ref(false)
+const panning = ref(false)
 let L: typeof Leaflet | undefined
 let map: Leaflet.Map | undefined
 let tiles: Leaflet.TileLayer | undefined
 let observer: ResizeObserver | undefined
+let ownerWin: Window | undefined
+let invalidateTimer: ReturnType<typeof setTimeout> | undefined
 let disposed = false
 let preview: Leaflet.Polyline | undefined
 let pendingLayer: Leaflet.Polyline | undefined
 let pointer: number | null = null
+let panPointer: number | null = null
+let panLast: [number, number] | null = null
 let draft: MapPoint[] = []
 const pointers = new Set<number>()
 const eraserHits = new Set<string>()
@@ -38,14 +51,31 @@ const bounds: Leaflet.LatLngBoundsExpression = [
   [-MAP_EXTENT, 0],
   [0, MAP_EXTENT],
 ]
+
 function latLngs(points: MapPoint[]): Leaflet.LatLngTuple[] {
   return points.map(([x, y]) => [-y, x])
 }
+function stopPan() {
+  panPointer = null
+  panLast = null
+  panning.value = false
+}
 function cancel() {
+  stopPan()
   pointer = null
   draft = []
   preview?.remove()
   preview = undefined
+}
+function emitCurrentView() {
+  if (!map) {
+    return
+  }
+  const center = map.getCenter()
+  emit('viewChange', {
+    center: [center.lat, center.lng],
+    zoom: map.getZoom(),
+  })
 }
 function point(event: PointerEvent): MapPoint | null {
   const location = map?.mouseEventToLatLng(event)
@@ -73,6 +103,13 @@ function down(event: PointerEvent) {
     element.value?.setPointerCapture(event.pointerId)
     return
   }
+  if (!props.drawing && foreignDocument.value && event.button === 0 && map) {
+    panPointer = event.pointerId
+    panLast = [event.clientX, event.clientY]
+    panning.value = true
+    element.value?.setPointerCapture(event.pointerId)
+    return
+  }
   if (!props.drawing || event.button !== 0 || !L || !map) {
     return
   }
@@ -94,6 +131,15 @@ function move(event: PointerEvent) {
     eraseAt(event)
     return
   }
+  if (panPointer === event.pointerId && panLast && map) {
+    const dx = panLast[0] - event.clientX
+    const dy = panLast[1] - event.clientY
+    if (dx !== 0 || dy !== 0) {
+      map.panBy([dx, dy], { animate: false })
+      panLast = [event.clientX, event.clientY]
+    }
+    return
+  }
   if (pointer !== event.pointerId || !props.drawing || !map) {
     return
   }
@@ -113,6 +159,10 @@ function up(event: PointerEvent) {
   pointers.delete(event.pointerId)
   if (!pointers.size) {
     eraserHits.clear()
+  }
+  if (panPointer === event.pointerId) {
+    stopPan()
+    return
   }
   if (pointer !== event.pointerId) {
     return
@@ -175,6 +225,7 @@ function render() {
   if (!map || !L) {
     return
   }
+  const ownerDoc = element.value?.ownerDocument ?? document
   const wanted = new Set(props.strokes.map((stroke) => stroke.id))
   for (const [id, layer] of lines) {
     if (!wanted.has(id)) {
@@ -183,7 +234,7 @@ function render() {
     }
   }
   props.strokes.forEach((stroke, index) => {
-    const label = document.createElement('span')
+    const label = ownerDoc.createElement('span')
     label.textContent = `${stroke.nickname} · #${index + 1}`
     const existing = lines.get(stroke.id)
     if (existing) {
@@ -219,10 +270,15 @@ function retryTiles() {
   tiles?.redraw()
 }
 function reset() {
-  map?.setView([-2048, 2048], 4, { animate: false })
+  map?.setView(DEFAULT_MAP_VIEW.center, DEFAULT_MAP_VIEW.zoom, { animate: false })
 }
 function changeZoom(delta: number) {
-  map?.setZoom(Math.max(0, Math.min(7, map.getZoom() + delta)))
+  if (!map) {
+    return
+  }
+  map.setZoom(Math.max(0, Math.min(7, map.getZoom() + delta)), {
+    animate: !foreignDocument.value,
+  })
 }
 function key(event: KeyboardEvent) {
   if (event.key === 'Escape') {
@@ -231,17 +287,46 @@ function key(event: KeyboardEvent) {
   if (event.key === '0') {
     reset()
     event.preventDefault()
+    return
   }
+  if (!foreignDocument.value || !map) {
+    return
+  }
+  const step = 80
+  if (event.key === 'ArrowUp') {
+    map.panBy([0, -step], { animate: false })
+    event.preventDefault()
+  } else if (event.key === 'ArrowDown') {
+    map.panBy([0, step], { animate: false })
+    event.preventDefault()
+  } else if (event.key === 'ArrowLeft') {
+    map.panBy([-step, 0], { animate: false })
+    event.preventDefault()
+  } else if (event.key === 'ArrowRight') {
+    map.panBy([step, 0], { animate: false })
+    event.preventDefault()
+  } else if (event.key === '+' || event.key === '=') {
+    changeZoom(1)
+    event.preventDefault()
+  } else if (event.key === '-' || event.key === '_') {
+    changeZoom(-1)
+    event.preventDefault()
+  }
+}
+function handleResize() {
+  map?.invalidateSize({ animate: false })
 }
 watch(() => [props.strokes, props.pending], render)
 watch(
   () => props.drawing || props.erasing,
-  (drawing) => {
+  (active) => {
     cancel()
-    if (drawing) {
-      map?.dragging.disable()
-    } else {
-      map?.dragging.enable()
+    if (!foreignDocument.value) {
+      if (active) {
+        map?.dragging.disable()
+      } else {
+        map?.dragging.enable()
+      }
     }
   },
 )
@@ -264,9 +349,15 @@ onMounted(async () => {
   if (disposed || !element.value) {
     return
   }
+  const ownerDoc = element.value.ownerDocument
+  ownerWin = ownerDoc.defaultView ?? window
+  const isForeign = ownerDoc !== document
+  foreignDocument.value = isForeign
   const crs = L.extend({}, L.CRS.Simple, {
     transformation: new L.Transformation(1 / 16, 0, -1 / 16, 0),
   })
+  // Inside Document PiP, Leaflet's built-in drag/keyboard/canvas-rAF paths bind to
+  // the hidden main window; use synchronous SVG and direct pointer/keyboard handlers.
   map = L.map(element.value, {
     crs,
     minZoom: 0,
@@ -276,8 +367,14 @@ onMounted(async () => {
     maxBoundsViscosity: 1,
     zoomControl: false,
     attributionControl: false,
-    preferCanvas: true,
-    keyboard: true,
+    preferCanvas: !isForeign,
+    fadeAnimation: !isForeign,
+    zoomAnimation: !isForeign,
+    markerZoomAnimation: !isForeign,
+    dragging: !isForeign,
+    boxZoom: !isForeign,
+    touchZoom: !isForeign,
+    keyboard: !isForeign,
   })
   tiles = L.tileLayer('/api/player/map-tiles/{z}_{x}_{y}.jpg', {
     bounds,
@@ -292,18 +389,27 @@ onMounted(async () => {
   })
   map.on('zoomend', () => {
     zoom.value = map?.getZoom() ?? 0
+    emitCurrentView()
   })
-  reset()
+  map.on('moveend', emitCurrentView)
+  const initial = props.initialView ?? DEFAULT_MAP_VIEW
+  map.setView(initial.center, initial.zoom, { animate: false })
+  zoom.value = map.getZoom()
   render()
-  if (props.drawing) {
+  if (!isForeign && (props.drawing || props.erasing)) {
     map.dragging.disable()
   }
-  observer = new ResizeObserver(() => map?.invalidateSize({ animate: false }))
-  observer.observe(element.value)
+  const activeObserver = new ResizeObserver(handleResize)
+  activeObserver.observe(element.value)
+  observer = activeObserver
+  ownerWin.addEventListener('resize', handleResize)
+  invalidateTimer = setTimeout(handleResize, 0)
 })
 onBeforeUnmount(() => {
   disposed = true
+  clearTimeout(invalidateTimer)
   observer?.disconnect()
+  ownerWin?.removeEventListener('resize', handleResize)
   map?.remove()
   lines.clear()
 })
@@ -312,12 +418,19 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="map-frame"
-    :class="{ 'map-is-drawing': drawing, 'map-is-erasing': erasing }"
+    :class="{
+      'map-is-drawing': drawing,
+      'map-is-erasing': erasing,
+      'map-is-foreign': foreignDocument,
+      'map-is-panning': panning,
+      'map-frame-compact': compact,
+    }"
   >
     <div
       ref="element"
       class="map-canvas"
       role="region"
+      :tabindex="foreignDocument ? 0 : undefined"
       :aria-label="t('mapKeyboardHelp')"
       @pointerdown="down"
       @pointermove="move"
@@ -329,16 +442,26 @@ onBeforeUnmount(() => {
       <Button
         :label="t('mapZoomIn')"
         severity="secondary"
+        :size="compact ? 'small' : undefined"
         :disabled="zoom >= 7"
         @click="changeZoom(1)"
       />
       <Button
         :label="t('mapZoomOut')"
         severity="secondary"
+        :size="compact ? 'small' : undefined"
         :disabled="zoom <= 0"
         @click="changeZoom(-1)"
       />
-      <Button :label="t('mapReset')" severity="secondary" @click="reset" />
+      <Button
+        :label="t('mapReset')"
+        severity="secondary"
+        :size="compact ? 'small' : undefined"
+        @click="reset"
+      />
+    </div>
+    <div v-if="$slots.controls" class="map-corner-controls">
+      <slot name="controls" />
     </div>
     <p v-if="loadError" class="map-load-error" role="status">
       {{ t('mapTilesFailed')

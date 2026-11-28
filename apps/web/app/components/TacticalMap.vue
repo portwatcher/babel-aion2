@@ -1,41 +1,56 @@
 <script setup lang="ts">
-import {
-  MAP_COLORS,
-  type ListenerSnapshot,
-  type MapStrokeInput,
-} from '@babel/contracts'
+import { MAP_COLORS, type ListenerSnapshot } from '@babel/contracts'
+import type { RoomMapController } from '~/composables/useRoomMap'
+import type { MapViewState } from '~/utils/pip-layout'
 
 const { t } = useInterfaceLocale()
 const props = defineProps<{
-  roomNumber: string
   session: ListenerSnapshot | null
-  credential: string | null
-  revision: string | null
+  map: RoomMapController
+  view: MapViewState
+  pipSupported?: boolean
+  pipOpen?: boolean
+  pipOpening?: boolean
+  pipMapVisible?: boolean
 }>()
-const { strokes, current, busy, error, enabled, refresh, save, remove } = useRoomMap(
-  props.roomNumber,
-  toRef(props, 'session'),
-  toRef(props, 'credential'),
-  toRef(props, 'revision'),
-)
+const emit = defineEmits<{
+  'update:view': [view: MapViewState]
+  popOutMap: []
+  closePip: []
+}>()
+
 const drawing = ref(false)
 const erasing = ref(false)
 const color = ref<(typeof MAP_COLORS)[number]>(MAP_COLORS[0])
-const pending = shallowRef<MapStrokeInput | null>(null)
 const selected = ref<string | null>(null)
+const strokes = computed(() => props.map.strokes.value)
+const pending = computed(() => props.map.pending.value)
+const current = computed(() => props.map.current.value)
+const busy = computed(() => props.map.busy.value)
+const error = computed(() => props.map.error.value)
+const enabled = computed(() => props.map.enabled.value)
 const own = computed(() =>
   strokes.value.filter((stroke) => stroke.sessionId === props.session?.sessionId),
 )
+const pipButtonLabel = computed(() => {
+  if (!props.pipOpen) {
+    return t('openPip')
+  }
+  return props.pipMapVisible ? t('closePip') : t('pipShowMapAction')
+})
+
 function setTool(tool: 'move' | 'draw' | 'erase') {
   drawing.value = tool === 'draw'
   erasing.value = tool === 'erase'
 }
-async function commit(stroke: MapStrokeInput) {
-  pending.value = stroke
-  if (await save(stroke)) {
-    pending.value = null
+function handlePipAction() {
+  if (props.pipOpen && props.pipMapVisible) {
+    emit('closePip')
+  } else {
+    emit('popOutMap')
   }
 }
+
 watch(enabled, (value) => {
   if (!value) {
     drawing.value = false
@@ -45,7 +60,6 @@ watch(enabled, (value) => {
 watch(
   () => props.session?.sessionId,
   () => {
-    pending.value = null
     selected.value = null
     setTool('move')
   },
@@ -55,8 +69,22 @@ watch(
 <template>
   <section class="tactical-section" aria-labelledby="tactical-title">
     <div class="section-heading">
-      <h2 id="tactical-title">{{ t('mapTitle') }}</h2>
-      <Tag v-if="session && !current" :value="t('mapResyncing')" severity="secondary" />
+      <div class="map-heading-title">
+        <h2 id="tactical-title">{{ t('mapTitle') }}</h2>
+        <Tag
+          v-if="session && !current"
+          :value="t('mapResyncing')"
+          severity="secondary"
+        />
+      </div>
+      <Button
+        v-if="pipSupported"
+        :label="pipButtonLabel"
+        severity="secondary"
+        size="small"
+        :loading="pipOpening"
+        @click="handlePipAction"
+      />
     </div>
     <div class="map-toolbar" role="group" :aria-label="t('mapTools')">
       <div class="map-modes">
@@ -106,7 +134,7 @@ watch(
         severity="secondary"
         variant="text"
         :disabled="!enabled || busy || !own.length"
-        @click="own.at(-1) && remove(own.at(-1)!.id)"
+        @click="own.at(-1) && map.remove(own.at(-1)!.id)"
       />
     </div>
     <p v-if="drawing || erasing" class="muted map-help">
@@ -118,9 +146,13 @@ watch(
       <Button
         :label="t('mapRetrySave')"
         :disabled="!enabled"
-        @click="commit(pending!)"
+        @click="map.commit(pending!)"
       />
-      <Button :label="t('mapDiscard')" severity="secondary" @click="pending = null" />
+      <Button
+        :label="t('mapDiscard')"
+        severity="secondary"
+        @click="map.discardPending()"
+      />
     </div>
     <div class="tactical-layout">
       <ClientOnly>
@@ -132,8 +164,10 @@ watch(
           :selected="selected"
           :erasing="erasing && enabled && !busy"
           :session-id="session?.sessionId ?? null"
-          @draw="commit"
-          @erase="remove"
+          :initial-view="view"
+          @draw="map.commit"
+          @erase="map.remove"
+          @view-change="emit('update:view', $event)"
         />
         <template #fallback
           ><div class="map-canvas map-loading" aria-busy="true">
@@ -176,7 +210,7 @@ watch(
               severity="secondary"
               :disabled="busy"
               :aria-label="t('mapDeleteStroke', { number: index + 1 })"
-              @click="remove(stroke.id)"
+              @click="map.remove(stroke.id)"
             />
           </li>
         </ol>
@@ -187,7 +221,7 @@ watch(
           variant="text"
           size="small"
           :loading="busy"
-          @click="refresh"
+          @click="map.refresh()"
         />
       </aside>
     </div>

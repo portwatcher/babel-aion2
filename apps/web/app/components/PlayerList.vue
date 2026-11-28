@@ -24,7 +24,12 @@ function time(value: string) {
       }}</span>
     </div>
     <p v-if="current && !players.length" class="muted">{{ t('playersEmpty') }}</p>
-    <ul v-if="players.length" class="player-list">
+    <ul
+      v-if="players.length"
+      class="player-list"
+      tabindex="0"
+      :aria-label="t('playersTitle')"
+    >
       <li v-for="player in players" :key="player.sessionId">
         <div class="player-identity">
           <strong>{{ player.nickname }}</strong

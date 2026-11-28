@@ -35,7 +35,10 @@ is in [design.md](design.md), mirrored in [GOAL.md](GOAL.md).
   in-memory translation history for the selected language whenever listeners
   were subscribed to it. See
   [streaming subtitles](docs/streaming-subtitles.md).
-- **Tactical map.** Shared drawing on the Lower Reshanta map, persisted per room.
+- **Tactical map.** Shared drawing on the Lower Reshanta map, persisted per room,
+  pinned beside live subtitles on desktop (and above the listener list on narrow
+  screens) and available inside the unified Picture-in-Picture pop-out alongside
+  subtitles with independent visibility switches.
 - **Interface languages.** English, Simplified Chinese, Japanese and Korean.
   See [interface localization](docs/interface-localization.md).
 - **Source code.** The header's GitHub icon links to this repository.

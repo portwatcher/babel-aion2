@@ -762,6 +762,23 @@ The website cannot promise mouse click-through or coverage above every exclusive
 Do a test with AION2 in the actual supported display mode.
 Record the browser and game display mode.
 
+### Room tactical map layout and unified PiP · 2026-11-28
+
+This amendment extends Section 14 and the multi-room tactical map layout. Keep
+the room tactical map visible alongside live subtitles without letting the
+online listener list push it down the page: on desktop viewports place the map
+in a sticky column beside the listener panel and bound the listener list's
+scroll height; on narrow viewports place the map above the listener list.
+
+Because the Document Picture-in-Picture API permits only one active PiP window
+at a time, combine live subtitles and the room tactical map into that single
+always-on-top Document PiP window rather than opening a second window or
+simulating PiP with video. Provide independent visibility switches inside the
+PiP window for subtitles and the tactical map, reusing the active room session
+and shared map state without adding extra sockets, polling loops, or media
+elements. Map rendering and interaction in PiP must remain responsive without
+relying on animation frames from a hidden main page.
+
 ## 15. Discord bot and media service
 
 Use a normal Discord bot account.
